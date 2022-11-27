@@ -1,5 +1,8 @@
-docker-image:
-	@docker build -t ledger-alephium-app-builder:latest configs
+app-builer-image:
+	@docker build -t ledger-alephium-app-builder:latest -f ./configs/app-builder.Dockerfile configs
+
+speculos-image:
+	@docker build --progress=plain -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
 build:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
@@ -30,3 +33,8 @@ update-configs:
 	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanos.json --output configs/nanos.json
 	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanosplus.json --output configs/nanosplus.json
 	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanox.json --output configs/nanox.json
+
+run-speculos:
+	docker run --rm -it -v $(shell pwd)/rust-app:/speculos/rust-app \
+		--publish 41000:41000 -p 5001:5000 -p 9999:9999 \
+		ledger-speculos --display headless --vnc-port 41000 rust-app/target/nanos/release/rust-app

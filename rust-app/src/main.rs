@@ -87,7 +87,7 @@ extern "C" fn sample_main() {
 
     loop {
         // Draw some 'welcome' screen
-        ui::SingleMessage::new("W e l c o m e").show();
+        ui::SingleMessage::new("A l e p h i u m").show();
 
         // Wait for either a specific button push to exit the app
         // or an APDU command
