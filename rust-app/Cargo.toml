@@ -1,0 +1,20 @@
+[package]
+name = "rust-app"
+version = "0.2.1"
+authors = ["yhql"]
+edition = "2021"
+
+[dependencies]
+nanos_sdk = { git = "https://github.com/LedgerHQ/ledger-nanos-sdk.git" } 
+nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git" } 
+
+[profile.release]
+opt-level = 'z' 
+lto = true
+
+[package.metadata.nanos]
+curve = ["secp256k1"]
+flags = "0"
+icon = "crab.gif"
+icon_small = "crab_14x14.gif"
+path = [""]
