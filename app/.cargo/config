@@ -10,4 +10,4 @@ target = "thumbv6m-none-eabi"
 
 [alias]
 br = "build --release -Z build-std=core -Z build-std-features=compiler-builtins-mem"
-stackcheck = "stack-sizes --release --bin rust-app --target=thumbv6m-none-eabi"
+stackcheck = "stack-sizes --release --bin app --target=thumbv6m-none-eabi"

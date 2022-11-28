@@ -7,7 +7,7 @@ speculos-image:
 build:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cd rust-app && \
+			cd app && \
 			echo 'Building nanos app' && \
 			cargo br --target=../configs/nanos.json && \
 			echo 'Building nanosplus app' && \
@@ -19,7 +19,7 @@ build:
 check:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cd rust-app && \
+			cd app && \
 			echo 'Cargo fmt' && \
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
@@ -36,6 +36,9 @@ update-configs:
 	curl $(TARGET_HOST)/nanox.json --output configs/nanox.json
 
 run-speculos:
-	docker run --rm -it -v $(shell pwd)/rust-app:/speculos/rust-app \
+	docker run --rm -it -v $(shell pwd)/app:/speculos/app \
 		--publish 41000:41000 -p 5001:5000 -p 9999:9999 \
-		ledger-speculos --display headless --vnc-port 41000 rust-app/target/nanos/release/rust-app
+		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/release/app
+
+clean:
+	cd app && cargo clean

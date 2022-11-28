@@ -1,5 +1,5 @@
 [package]
-name = "rust-app"
+name = "app"
 version = "0.2.1"
 authors = ["yhql"]
 edition = "2021"
