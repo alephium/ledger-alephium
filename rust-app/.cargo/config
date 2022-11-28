@@ -9,5 +9,5 @@ runner = "speculos.py --display text -k 2.0"
 target = "thumbv6m-none-eabi"
 
 [alias]
-br = "build --release"
+br = "build --release -Z build-std=core -Z build-std-features=compiler-builtins-mem"
 stackcheck = "stack-sizes --release --bin rust-app --target=thumbv6m-none-eabi"

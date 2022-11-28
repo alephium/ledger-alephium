@@ -2,18 +2,18 @@ app-builer-image:
 	@docker build -t ledger-alephium-app-builder:latest -f ./configs/app-builder.Dockerfile configs
 
 speculos-image:
-	@docker build --progress=plain -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
+	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
 build:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
 			cd rust-app && \
 			echo 'Building nanos app' && \
-			cargo build --release -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=../configs/nanos.json && \
+			cargo br --target=../configs/nanos.json && \
 			echo 'Building nanosplus app' && \
-			cargo build --release -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=../configs/nanosplus.json && \
+			cargo br --target=../configs/nanosplus.json && \
 			echo 'Building nanox app' && \
-			cargo build --release -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=../configs/nanox.json \
+			cargo br --target=../configs/nanox.json \
 		"
 
 check:
@@ -29,10 +29,11 @@ check:
 debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest
 
+TARGET_HOST=https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master
 update-configs:
-	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanos.json --output configs/nanos.json
-	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanosplus.json --output configs/nanosplus.json
-	curl https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master/nanox.json --output configs/nanox.json
+	curl $(TARGET_HOST)/nanos.json --output configs/nanos.json
+	curl $(TARGET_HOST)/nanosplus.json --output configs/nanosplus.json
+	curl $(TARGET_HOST)/nanox.json --output configs/nanox.json
 
 run-speculos:
 	docker run --rm -it -v $(shell pwd)/rust-app:/speculos/rust-app \
