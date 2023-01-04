@@ -37,7 +37,7 @@ update-configs:
 
 run-speculos:
 	docker run --rm -it -v $(shell pwd)/app:/speculos/app \
-		--publish 41000:41000 -p 5001:5000 -p 9999:9999 \
+		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
 		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/release/app
 
 clean:

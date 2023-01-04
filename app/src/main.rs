@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-mod utils;
+use utils;
 
 use core::str::from_utf8;
 use nanos_sdk::buttons::ButtonEvent;
