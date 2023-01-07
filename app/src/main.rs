@@ -13,48 +13,6 @@ use app_utils::print::{println, println_slice};
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 
-/// Display public key in two separate
-/// message scrollers
-// fn show_pubkey(path: &[u32]) {
-//     let pubkey = Secp256k1::from_bip32(path).public_key();
-//     match pubkey {
-//         Ok(pk) => {
-//             {
-//                 let hex0: [u8; 64] = utils::to_hex(&pk.as_ref()[1..33]).unwrap();
-//                 let m = from_utf8(&hex0).unwrap();
-//                 ui::MessageScroller::new(m).event_loop();
-//             }
-//             {
-//                 let hex1: [u8; 64] = utils::to_hex(&pk.as_ref()[33..65]).unwrap();
-//                 let m = from_utf8(&hex1).unwrap();
-//                 ui::MessageScroller::new(m).event_loop();
-//             }
-//         }
-//         Err(_) => ui::popup("Error"),
-//     }
-// }
-
-/// Basic nested menu. Will be subject
-/// to simplifications in the future.
-// #[allow(clippy::needless_borrow)]
-// fn menu_example() {
-//     loop {
-//         match ui::Menu::new(&[&"PubKey", &"Infos", &"Back", &"Exit App"]).show() {
-//             0 => show_pubkey(),
-//             1 => loop {
-//                 match ui::Menu::new(&[&"Copyright", &"Authors", &"Back"]).show() {
-//                     0 => ui::popup("2020 Ledger"),
-//                     1 => ui::popup("???"),
-//                     _ => break,
-//                 }
-//             },
-//             2 => return,
-//             3 => nanos_sdk::exit_app(0),
-//             _ => (),
-//         }
-//     }
-// }
-
 /// This is the UI flow for signing, composed of a scroller
 /// to read the incoming message, a panel that requests user
 /// validation, and an exit message.
