@@ -13,8 +13,6 @@ use app_utils::print::{println, println_slice};
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 
-pub const BIP32_PATH: [u32; 5] = nanos_sdk::ecc::make_bip32_path(b"m/44'/535348'/0'/0/0");
-
 /// Display public key in two separate
 /// message scrollers
 // fn show_pubkey(path: &[u32]) {
@@ -60,7 +58,7 @@ pub const BIP32_PATH: [u32; 5] = nanos_sdk::ecc::make_bip32_path(b"m/44'/535348'
 /// This is the UI flow for signing, composed of a scroller
 /// to read the incoming message, a panel that requests user
 /// validation, and an exit message.
-fn sign_ui(message: &[u8]) -> Result<Option<([u8; 72], u32)>, SyscallError> {
+fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32)>, SyscallError> {
     ui::popup("Message review");
 
     {
@@ -71,7 +69,7 @@ fn sign_ui(message: &[u8]) -> Result<Option<([u8; 72], u32)>, SyscallError> {
     }
 
     if ui::Validator::new("Sign ?").ask() {
-        let signature = Secp256k1::from_bip32(&BIP32_PATH)
+        let signature = Secp256k1::from_bip32(path)
             .deterministic_sign(message)
             .map_err(|_| SyscallError::Unspecified)?;
         ui::popup("Done !");
@@ -87,8 +85,7 @@ extern "C" fn sample_main() {
     let mut comm = io::Comm::new();
 
     // Draw some 'welcome' screen
-    println("Welcome");
-    // ui::SingleMessage::new("A l e p h i u m").show();
+    ui::SingleMessage::new("A l e p h i u m").show();
 
     loop {
 
@@ -150,7 +147,16 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
             comm.append(pk.as_ref());
         }
         Ins::SignHash => {
-            let out = sign_ui(comm.get_data()?)?;
+            let data = comm.get_data()?;
+            if data.len() != 4*5 + 32 {
+                return Err(io::StatusWords::BadLen.into())
+            }
+            // This check can be removed, but we keep it for double checking
+            if !deserialize_path(&data[..20], &mut path) {
+                return Err(io::StatusWords::BadLen.into())
+            }
+
+            let out = sign_ui(&path, &data[20..])?;
             if let Some((signature_buf, length)) = out {
                 comm.append(&signature_buf[..length as usize])
             }

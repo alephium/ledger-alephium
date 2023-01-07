@@ -20,10 +20,10 @@
     "trailingComma": "none"
   },
   "dependencies": {
-    "@alephium/cli": "0.3.0-rc.3",
-    "@alephium/web3": "0.3.0-rc.3",
-    "@alephium/web3-test": "0.3.0-rc.3",
-    "@alephium/web3-wallet": "0.3.0-rc.3",
+    "@alephium/cli": "0.3.0-rc.4",
+    "@alephium/web3": "^0.3.0-rc.4",
+    "@alephium/web3-test": "0.3.0-rc.4",
+    "@alephium/web3-wallet": "0.3.0-rc.4",
     "@ledgerhq/hw-transport": "^6.27.8"
   },
   "devDependencies": {
@@ -37,6 +37,7 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.0.0",
     "jest": "^28.1.0",
+    "node-fetch": "^2.6.7",
     "ts-jest": "^28.0.2",
     "ts-node": "^10.7.0",
     "typescript": "^4.4.2"

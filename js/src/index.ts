@@ -37,16 +37,17 @@ export default class AlephiumApp {
       throw new Error('Invalid hash length')
     }
 
-    const response = await this.transport.send(
-      CLA,
-      INS.SIGN_HASH,
-      0x00,
-      0x00,
-      Buffer.concat([serde.serializePath(path), hash]),
-      [StatusCodes.OK]
-    )
-    const r = response.slice(0, 32)
-    const s = response.slice(32, 64)
+    const data = Buffer.concat([serde.serializePath(path), hash])
+    console.log(`data ${data.length}`)
+    const response = await this.transport.send(CLA, INS.SIGN_HASH, 0x00, 0x00, data, [StatusCodes.OK])
+    console.log(`response ${response.length} - ${response.toString('hex')}`)
+
+    // Decode signature: https://bitcoin.stackexchange.com/a/12556
+    const rLen = response.slice(3, 4)[0]
+    const r = response.slice(4, 4 + rLen)
+    const sLen = response.slice(5 + rLen, 6 + rLen)[0]
+    const s = response.slice(6 + rLen, 6 + rLen + sLen)
+    console.log(`${rLen} - ${r.toString('hex')}\n${sLen} - ${s.toString('hex')}`)
     return encodeHexSignature(r.toString('hex'), s.toString('hex'))
   }
 }
