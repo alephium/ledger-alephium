@@ -9,6 +9,11 @@ nanos_sdk = { git = "https://github.com/LedgerHQ/ledger-nanos-sdk.git" }
 nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git" } 
 utils= { path = "../utils" }
 
+[features]
+default = [ "debug" ]
+debug = ["nanos_sdk/speculos", "nanos_ui/speculos"]
+device = []
+
 [profile.release]
 opt-level = 'z' 
 lto = true

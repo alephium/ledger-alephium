@@ -35,8 +35,9 @@ update-configs:
 	curl $(TARGET_HOST)/nanosplus.json --output configs/nanosplus.json
 	curl $(TARGET_HOST)/nanox.json --output configs/nanox.json
 
+# Webui: http://localhost:25000
 run-speculos:
-	docker run --rm -it -v $(shell pwd)/app:/speculos/app \
+	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
 		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/release/app
 
