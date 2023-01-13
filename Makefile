@@ -4,16 +4,22 @@ app-builer-image:
 speculos-image:
 	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
-build:
-	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+build-release:
+	@make _build type="--release" features="device"
+
+build-debug:
+	@make _build type="" features="debug"
+
+_build:
+	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo br --target=../configs/nanos.json && \
+			cargo bembed $(type) --features $(features) --target=../configs/nanos.json && \
 			echo 'Building nanosplus app' && \
-			cargo br --target=../configs/nanosplus.json && \
+			cargo bembed $(type) --features $(features) --target=../configs/nanosplus.json && \
 			echo 'Building nanox app' && \
-			cargo br --target=../configs/nanox.json \
+			cargo bembed $(type) --features $(features) --target=../configs/nanox.json \
 		"
 
 check:
@@ -39,7 +45,7 @@ update-configs:
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/release/app
+		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/debug/app
 
 clean:
 	cd app && cargo clean

@@ -17,6 +17,6 @@ pub mod print {
 
 #[cfg(feature = "device")]
 pub mod print {
-    pub fn println(s: &str) {}
-    pub fn println_slice<const N: usize>(tab: &[u8]) {}
+    pub fn println(_s: &str) {}
+    pub fn println_slice<const N: usize>(_tab: &[u8]) {}
 }

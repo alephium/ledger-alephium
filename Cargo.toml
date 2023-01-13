@@ -4,3 +4,7 @@ members = [
     "utils",
     "app",
 ]
+
+[profile.release]
+opt-level = 'z'
+lto = true
