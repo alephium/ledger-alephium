@@ -2,9 +2,7 @@
 
 members = [
     "utils",
-    "app",
+    "cargo-ledger"
 ]
 
-[profile.release]
-opt-level = 'z'
-lto = true
+exclude = [ "app" ]

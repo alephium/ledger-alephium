@@ -27,7 +27,9 @@
     "@ledgerhq/hw-transport": "^6.27.8"
   },
   "devDependencies": {
+    "@ledgerhq/hw-transport-node-hid": "^6.27.9",
     "@ledgerhq/hw-transport-node-speculos": "^6.27.9",
+    "@ledgerhq/logs": "^6.10.1",
     "@types/elliptic": "^6.4.13",
     "@types/jest": "^27.5.1",
     "@types/node": "^16.7.8",

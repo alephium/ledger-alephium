@@ -16,3 +16,7 @@ RUN rustup component add rust-src rustfmt clippy
 
 # Adding ARMV6M target to the default toolchain
 RUN rustup target add thumbv6m-none-eabi
+
+RUN apk add python3-dev libusb musl-dev python3-dev libffi-dev openssl-dev pkgconfig
+RUN pip3 install protobuf setuptools ecdsa
+RUN pip3 install ledgerwallet

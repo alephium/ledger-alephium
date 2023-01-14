@@ -4,6 +4,15 @@ app-builer-image:
 speculos-image:
 	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
+build-test:
+	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+		bash -c " \
+			cargo install --path ./cargo-ledger && \
+			cd app && \
+			echo 'Building nanos app' && \
+			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger -l nanosplus -- --features device -Z unstable-options \
+		"
+
 build-release:
 	@make _build type="--release" features="device"
 
@@ -11,7 +20,7 @@ build-debug:
 	@make _build type="" features="debug"
 
 _build:
-	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
@@ -45,7 +54,7 @@ update-configs:
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --display headless --vnc-port 41000 app/target/nanos/debug/app
+		ledger-speculos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
 
 clean:
 	cd app && cargo clean
