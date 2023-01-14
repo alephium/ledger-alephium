@@ -2,7 +2,6 @@
 
 members = [
     "utils",
-    "cargo-ledger"
 ]
 
 exclude = [ "app" ]

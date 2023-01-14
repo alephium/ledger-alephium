@@ -4,12 +4,12 @@
 use utils::{self, deserialize_path};
 mod app_utils;
 
+use app_utils::print::{println, println_slice};
 use core::str::from_utf8;
 use nanos_sdk::ecc::Secp256k1;
 use nanos_sdk::io;
 use nanos_sdk::io::SyscallError;
 use nanos_ui::ui;
-use app_utils::print::{println, println_slice};
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 
@@ -46,7 +46,6 @@ extern "C" fn sample_main() {
     ui::SingleMessage::new("A l e p h i u m").show();
 
     loop {
-
         // Wait for either a specific button push to exit the app
         // or an APDU command
         match comm.next_event() {
@@ -57,7 +56,7 @@ extern "C" fn sample_main() {
                     Ok(()) => comm.reply_ok(),
                     Err(sw) => comm.reply(sw),
                 }
-            },
+            }
             _ => (),
         }
     }
@@ -66,7 +65,7 @@ extern "C" fn sample_main() {
 #[repr(u8)]
 enum Ins {
     GetPubkey,
-    SignHash
+    SignHash,
 }
 
 impl From<u8> for Ins {
@@ -92,7 +91,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
         Ins::GetPubkey => {
             let raw_path = comm.get_data()?;
             if !deserialize_path(raw_path, &mut path) {
-                return Err(io::StatusWords::BadLen.into())
+                return Err(io::StatusWords::BadLen.into());
             }
 
             println_slice::<40>(raw_path);
@@ -100,18 +99,18 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
             let pk = Secp256k1::from_bip32(&mut path)
                 .public_key()
                 .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
-            
+
             println_slice::<130>(pk.as_ref());
             comm.append(pk.as_ref());
         }
         Ins::SignHash => {
             let data = comm.get_data()?;
-            if data.len() != 4*5 + 32 {
-                return Err(io::StatusWords::BadLen.into())
+            if data.len() != 4 * 5 + 32 {
+                return Err(io::StatusWords::BadLen.into());
             }
             // This check can be removed, but we keep it for double checking
             if !deserialize_path(&data[..20], &mut path) {
-                return Err(io::StatusWords::BadLen.into())
+                return Err(io::StatusWords::BadLen.into());
             }
 
             let out = sign_ui(&path, &data[20..])?;

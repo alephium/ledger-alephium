@@ -22,7 +22,7 @@ pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {
 pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
     // The path has to be 5 nodes
     if data.len() != 4 * 5 {
-        return false
+        return false;
     }
 
     for i in 0..5 {
@@ -30,7 +30,7 @@ pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
         path[i] = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
     }
 
-    return true
+    return true;
 }
 
 #[cfg(test)]

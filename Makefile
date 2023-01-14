@@ -4,13 +4,22 @@ app-builer-image:
 speculos-image:
 	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
-build-test:
-	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+install-nanos:
+	@make _install device=nanos
+
+install-nanox:
+	@make _install device=nanox
+
+install-nanosplus:
+	@make _install device=nanosplus
+
+_install:
+	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cargo install --path ./cargo-ledger && \
+			cargo install --git https://github.com/LedgerHQ/cargo-ledger && \
 			cd app && \
 			echo 'Building nanos app' && \
-			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger -l nanosplus -- --features device -Z unstable-options \
+			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger -l $(device) -- --features device -Z unstable-options \
 		"
 
 build-release:
@@ -38,7 +47,7 @@ check:
 			echo 'Cargo fmt' && \
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
-			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=../configs/nanos.json \
+			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --features=debug --target=../configs/nanos.json \
 		"
 
 debug:

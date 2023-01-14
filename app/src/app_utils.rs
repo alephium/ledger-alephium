@@ -7,7 +7,7 @@ pub mod print {
         debug_print(s);
         debug_print("\n");
     }
-    
+
     pub fn println_slice<const N: usize>(tab: &[u8]) {
         let hex: [u8; N] = utils::to_hex(tab).unwrap();
         let m = core::str::from_utf8(&hex).unwrap();
