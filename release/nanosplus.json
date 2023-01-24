@@ -1,0 +1,17 @@
+{
+  "binary": "nanosplus.hex",
+  "dataSize": 0,
+  "derivationPath": {
+    "curves": [
+      "secp256k1"
+    ],
+    "paths": [
+      ""
+    ]
+  },
+  "flags": "0",
+  "icon": "crab_14x14.gif",
+  "name": "Alephium",
+  "targetId": "0x33100004",
+  "version": "0.1.0"
+}

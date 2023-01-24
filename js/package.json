@@ -1,7 +1,11 @@
 {
-  "name": "@alephium/hw-app-alephium",
+  "name": "@alephium/ledger-app",
   "version": "0.1.0",
   "license": "GPL",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
   "scripts": {
     "build": "npm run clean:windows && npm run clean:unix && npx --yes tsc --build .",
     "clean:unix": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || rm -rf dist",
@@ -21,10 +25,10 @@
   },
   "dependencies": {
     "@alephium/cli": "0.3.0-rc.4",
-    "@alephium/web3": "^0.3.0-rc.4",
+    "@alephium/web3": "0.3.0-rc.4",
     "@alephium/web3-test": "0.3.0-rc.4",
     "@alephium/web3-wallet": "0.3.0-rc.4",
-    "@ledgerhq/hw-transport": "^6.27.8"
+    "@ledgerhq/hw-transport": "6.27.10"
   },
   "devDependencies": {
     "@ledgerhq/hw-transport-node-hid": "^6.27.9",

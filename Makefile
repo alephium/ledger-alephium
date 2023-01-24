@@ -4,40 +4,33 @@ app-builer-image:
 speculos-image:
 	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
-install-nanos:
-	@make _install device=nanos
+release:
+	@make _release device=nanos
+	@make _release device=nanox
+	@make _release device=nanosplus
 
-install-nanox:
-	@make _install device=nanox
-
-install-nanosplus:
-	@make _install device=nanosplus
-
-_install:
+_release:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
 			cargo install --git https://github.com/LedgerHQ/cargo-ledger && \
 			cd app && \
 			echo 'Building nanos app' && \
-			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger -l $(device) -- --features device -Z unstable-options \
+			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger $(device) -- -Z unstable-options && \
+			cp ./target/$(device)/release/app.hex ../release/$(device).hex && \
+			mv ./app_$(device).json ../release/$(device).json && \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../release/$(device).json \
 		"
 
-build-release:
-	@make _build type="--release" features="device"
-
 build-debug:
-	@make _build type="" features="debug"
-
-_build:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo bembed $(type) --features $(features) --target=../configs/nanos.json && \
+			cargo bembed --no-default-features --features debug --target=../configs/nanos.json && \
 			echo 'Building nanosplus app' && \
-			cargo bembed $(type) --features $(features) --target=../configs/nanosplus.json && \
+			cargo bembed --no-default-features --features debug --target=../configs/nanosplus.json && \
 			echo 'Building nanox app' && \
-			cargo bembed $(type) --features $(features) --target=../configs/nanox.json \
+			cargo bembed --no-default-features --features debug --target=../configs/nanox.json \
 		"
 
 check:
@@ -67,3 +60,5 @@ run-speculos:
 
 clean:
 	cd app && cargo clean
+
+.PHONY: release clean

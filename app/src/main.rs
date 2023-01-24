@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
 
+use nanos_sdk::buttons::ButtonEvent;
+use nanos_ui::layout;
+use nanos_ui::layout::Draw;
+use nanos_ui::layout::StringPlace;
 use utils::{self, deserialize_path};
 mod app_utils;
 
@@ -10,6 +14,8 @@ use nanos_sdk::ecc::Secp256k1;
 use nanos_sdk::io;
 use nanos_sdk::io::SyscallError;
 use nanos_ui::ui;
+use nanos_ui::bagls;
+use nanos_ui::screen_util;
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 
@@ -38,18 +44,83 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32)>, Sysc
     }
 }
 
+fn show_ui_common(draw: fn() -> ()) {
+    ui::clear_screen();
+
+    bagls::LEFT_ARROW.display();
+    bagls::RIGHT_ARROW.display();
+
+    draw();
+
+    screen_util::screen_update();
+}
+
+fn show_ui_welcome() {
+    show_ui_common(||{
+        let mut lines = [bagls::Label::from_const("Alephium"), bagls::Label::from_const("ready")];
+        lines[0].bold = true;
+        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    });
+}
+
+fn show_ui_version() {
+    show_ui_common(|| {
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        let mut lines = [bagls::Label::from_const("Version"), bagls::Label::from_const(VERSION)];
+        lines[0].bold = true;
+        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    });
+}
+
+fn show_ui_quit() {
+    show_ui_common(|| {
+        let mut lines = [bagls::Label::from_const("Quit")];
+        lines[0].bold = true;
+        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    });
+}
+
+fn show_ui(index: u8) {
+    match index {
+        0 => show_ui_welcome(),
+        1 => show_ui_version(),
+        2 => show_ui_quit(),
+        _ => panic!("Invalid ui index")
+    }
+}
+
 #[no_mangle]
 extern "C" fn sample_main() {
     let mut comm = io::Comm::new();
+    let mut ui_index = 0;
+    let ui_page_num = 3;
 
     // Draw some 'welcome' screen
-    ui::SingleMessage::new("A l e p h i u m").show();
+    show_ui(ui_index);
 
     loop {
         // Wait for either a specific button push to exit the app
         // or an APDU command
         match comm.next_event() {
-            // io::Event::Button(ButtonEvent::RightButtonRelease) => nanos_sdk::exit_app(0),
+            io::Event::Button(ButtonEvent::LeftButtonPress) => {
+                bagls::LEFT_S_ARROW.instant_display();
+            }
+            io::Event::Button(ButtonEvent::RightButtonPress) => {
+                bagls::RIGHT_S_ARROW.instant_display();
+            }
+            io::Event::Button(ButtonEvent::RightButtonRelease) => {
+                ui_index = (ui_index + 1) % ui_page_num;
+                show_ui(ui_index);
+            }
+            io::Event::Button(ButtonEvent::LeftButtonRelease) => {
+                ui_index = (ui_index + ui_page_num - 1 ) % ui_page_num;
+                show_ui(ui_index);
+            }
+            io::Event::Button(ButtonEvent::BothButtonsRelease) => {
+                if ui_index == 2 {
+                    nanos_sdk::exit_app(0);
+                }
+            }
             io::Event::Command(ins) => {
                 println("Event");
                 match handle_apdu(&mut comm, ins) {

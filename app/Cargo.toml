@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.1"
+version = "0.1.0"
 authors = ["alephium devs"]
 edition = "2021"
 
@@ -10,6 +10,7 @@ nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git" }
 utils= { path = "../utils" }
 
 [features]
+default = ["device"]
 debug = ["nanos_sdk/speculos", "nanos_ui/speculos"]
 device = []
 
@@ -18,6 +19,7 @@ opt-level = 'z'
 lto = true
 
 [package.metadata.nanos]
+name = "Alephium"
 curve = ["secp256k1"]
 flags = "0"
 icon = "crab.gif"
