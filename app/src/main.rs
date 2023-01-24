@@ -135,15 +135,17 @@ extern "C" fn sample_main() {
 
 #[repr(u8)]
 enum Ins {
-    GetPubkey,
+    GetVersion,
+    GetPubKey,
     SignHash,
 }
 
 impl From<u8> for Ins {
     fn from(ins: u8) -> Ins {
         match ins {
-            0 => Ins::GetPubkey,
-            1 => Ins::SignHash,
+            0 => Ins::GetVersion,
+            1 => Ins::GetPubKey,
+            2 => Ins::SignHash,
             _ => panic!(),
         }
     }
@@ -159,7 +161,13 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
     let mut path: [u32; 5] = [0; 5];
 
     match ins {
-        Ins::GetPubkey => {
+        Ins::GetVersion => {
+            let version_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u8>().unwrap();
+            let version_minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u8>().unwrap();
+            let version_patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u8>().unwrap();
+            comm.append([version_major, version_minor, version_patch].as_slice());
+        }
+        Ins::GetPubKey => {
             let raw_path = comm.get_data()?;
             if !deserialize_path(raw_path, &mut path) {
                 return Err(io::StatusWords::BadLen.into());

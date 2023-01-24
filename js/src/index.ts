@@ -7,8 +7,9 @@ const ec = new EC('secp256k1')
 
 export const CLA = 0x80
 export enum INS {
-  GET_PUBLIC_KEY = 0x00,
-  SIGN_HASH = 0x01
+  GET_VERSION = 0x00,
+  GET_PUBLIC_KEY = 0x01,
+  SIGN_HASH = 0x02
 }
 
 const HASH_LEN = 32
@@ -20,9 +21,17 @@ export default class AlephiumApp {
     this.transport = transport
   }
 
+  async getVersion(): Promise<string> {
+    const response = await this.transport.send(CLA, INS.GET_VERSION, 0x00, 0x00)
+    console.log(`response ${response.length} - ${response.toString('hex')}`)
+    return `${response[0]}.${response[1]}.${response[2]}`
+  }
+
   // TODO: make address display optional
-  async getAccount(path: string): Promise<Account> {
-    const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, 0x00, 0x00, serde.serializePath(path))
+  async getAccount(startPath: string, targetGroup?: number): Promise<Account> {
+    const p1 = targetGroup === undefined ? 0x00 : 0x11
+    const p2 = targetGroup === undefined ? 0x00 : targetGroup
+    const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))
     console.log(`response ${response.length} - ${response.toString('hex')}`)
     const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
     console.log(`pubkey\n - ${publicKey}\n - ${response.toString('hex')}`)
