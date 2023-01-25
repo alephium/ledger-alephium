@@ -11,11 +11,11 @@ function sleep(ms) {
 }
 
 async function pressButton(button: 'left' | 'right' | 'both') {
+  await sleep(500)
   return fetch(`http://localhost:25000/button/${button}`, {
     method: 'POST',
     body: JSON.stringify({ action: 'press-and-release' })
   })
-  sleep(500)
 }
 
 describe('sdk', () => {
@@ -51,12 +51,10 @@ describe('sdk', () => {
 
     const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))
     setTimeout(async () => {
-      await pressButton('left') // any button action to pass the welcome message
       await pressButton('both') // review message
       await pressButton('both') // done review
       await pressButton('right') // select signing
       await pressButton('both') // done selection
-      await pressButton('right') // exit sign ui
     }, 1000)
     const signature = await app.signHash(path, hash)
     console.log(signature)

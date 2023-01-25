@@ -1,6 +1,6 @@
-#[cfg(feature = "debug")]
 use nanos_sdk::bindings::*;
 
+#[cfg(feature = "debug")]
 pub mod print {
 
     use nanos_sdk::debug_print;
@@ -15,12 +15,19 @@ pub mod print {
         let m = core::str::from_utf8(&hex).unwrap();
         println(m);
     }
+
+    pub fn println_array<const N: usize, const M: usize>(tab: &[u8; N]) {
+        let hex: [u8; M] = utils::to_hex_fixed::<N, M>(tab).unwrap();
+        let m = core::str::from_utf8(&hex).unwrap();
+        println(m);
+    }
 }
 
 #[cfg(feature = "device")]
 pub mod print {
     pub fn println(_s: &str) {}
     pub fn println_slice<const N: usize>(_tab: &[u8]) {}
+    pub fn println_array<const N: usize, const M: usize>(_tab: &[u8; N]) {}
 }
 
 pub fn blake2b(data: &[u8]) -> [u8; 32] {

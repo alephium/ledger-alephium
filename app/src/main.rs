@@ -9,7 +9,7 @@ use utils::{self, deserialize_path};
 mod app_utils;
 
 use app_utils::*;
-use app_utils::print::{println, println_slice};
+use app_utils::print::{println, println_array, println_slice};
 use core::str::from_utf8;
 use nanos_sdk::ecc::{Secp256k1, ECPublicKey};
 use nanos_sdk::io;
@@ -37,10 +37,9 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32)>, Sysc
         let signature = Secp256k1::from_bip32(path)
             .deterministic_sign(message)
             .map_err(|_| SyscallError::Unspecified)?;
-        ui::popup("Done !");
+        ui::SingleMessage::new("Signing...").show();
         Ok(Some(signature))
     } else {
-        ui::popup("Cancelled");
         Ok(None)
     }
 }
@@ -123,11 +122,20 @@ extern "C" fn sample_main() {
                 }
             }
             io::Event::Command(ins) => {
-                println("Event");
-                match handle_apdu(&mut comm, ins, &mut ui_index) {
-                    Ok(()) => comm.reply_ok(),
+                println("=== Before event");
+                println_array::<1, 2>(&[ui_index]);
+                match handle_apdu(&mut comm, ins) {
+                    Ok(ui_changed) => {
+                        comm.reply_ok();
+                        if ui_changed {
+                            ui_index = 0;
+                            show_ui(ui_index);
+                        }
+                    }
                     Err(sw) => comm.reply(sw),
                 }
+                println("=== After event");
+                println_array::<1, 2>(&[ui_index]);
             }
             _ => (),
         }
@@ -154,7 +162,7 @@ impl From<u8> for Ins {
 
 use nanos_sdk::io::Reply;
 
-fn handle_apdu(comm: &mut io::Comm, ins: Ins, ui_index: &mut u8) -> Result<(), Reply> {
+fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
     if comm.rx == 0 {
         return Err(io::StatusWords::NothingReceived.into());
     }
@@ -200,14 +208,14 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, ui_index: &mut u8) -> Result<(), R
                 return Err(io::StatusWords::BadLen.into());
             }
 
-            *ui_index = 0; // reset UI
             let out = sign_ui(&path, &data[20..])?;
             if let Some((signature_buf, length)) = out {
                 comm.append(&signature_buf[..length as usize])
             }
+            return Ok(true)
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {

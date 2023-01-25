@@ -21,6 +21,20 @@ pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {
     Ok(hex)
 }
 
+pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> Result<[u8; M], ()> {
+    assert!(M == 2 * N);
+    let mut hex = [0u8; M];
+    let mut i = 0;
+    for c in m {
+        let c0 = char::from_digit((c >> 4).into(), 16).unwrap();
+        let c1 = char::from_digit((c & 0xf).into(), 16).unwrap();
+        hex[i] = c0 as u8;
+        hex[i + 1] = c1 as u8;
+        i += 2;
+    }
+    Ok(hex)
+}
+
 pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
     // The path has to be 5 nodes
     if data.len() != 4 * 5 {
