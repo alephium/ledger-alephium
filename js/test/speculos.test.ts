@@ -6,11 +6,16 @@ import blake from 'blakejs'
 import fetch from 'node-fetch'
 import { transactionVerifySignature } from '@alephium/web3'
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function pressButton(button: 'left' | 'right' | 'both') {
-  return fetch('http://localhost:25000/button/both', {
+  return fetch(`http://localhost:25000/button/${button}`, {
     method: 'POST',
     body: JSON.stringify({ action: 'press-and-release' })
   })
+  sleep(500)
 }
 
 describe('sdk', () => {
@@ -51,6 +56,7 @@ describe('sdk', () => {
       await pressButton('both') // done review
       await pressButton('right') // select signing
       await pressButton('both') // done selection
+      await pressButton('right') // exit sign ui
     }, 1000)
     const signature = await app.signHash(path, hash)
     console.log(signature)

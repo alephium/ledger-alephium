@@ -12,6 +12,7 @@ export enum INS {
   SIGN_HASH = 0x02
 }
 
+const GROUP_NUM = 4
 const HASH_LEN = 32
 
 export default class AlephiumApp {
@@ -29,7 +30,7 @@ export default class AlephiumApp {
 
   // TODO: make address display optional
   async getAccount(startPath: string, targetGroup?: number): Promise<Account> {
-    const p1 = targetGroup === undefined ? 0x00 : 0x11
+    const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))
     console.log(`response ${response.length} - ${response.toString('hex')}`)

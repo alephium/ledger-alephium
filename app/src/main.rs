@@ -8,9 +8,10 @@ use nanos_ui::layout::StringPlace;
 use utils::{self, deserialize_path};
 mod app_utils;
 
+use app_utils::*;
 use app_utils::print::{println, println_slice};
 use core::str::from_utf8;
-use nanos_sdk::ecc::Secp256k1;
+use nanos_sdk::ecc::{Secp256k1, ECPublicKey};
 use nanos_sdk::io;
 use nanos_sdk::io::SyscallError;
 use nanos_ui::ui;
@@ -123,7 +124,7 @@ extern "C" fn sample_main() {
             }
             io::Event::Command(ins) => {
                 println("Event");
-                match handle_apdu(&mut comm, ins) {
+                match handle_apdu(&mut comm, ins, &mut ui_index) {
                     Ok(()) => comm.reply_ok(),
                     Err(sw) => comm.reply(sw),
                 }
@@ -153,7 +154,7 @@ impl From<u8> for Ins {
 
 use nanos_sdk::io::Reply;
 
-fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
+fn handle_apdu(comm: &mut io::Comm, ins: Ins, ui_index: &mut u8) -> Result<(), Reply> {
     if comm.rx == 0 {
         return Err(io::StatusWords::NothingReceived.into());
     }
@@ -172,12 +173,19 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
             if !deserialize_path(raw_path, &mut path) {
                 return Err(io::StatusWords::BadLen.into());
             }
-
             println_slice::<40>(raw_path);
 
-            let pk = Secp256k1::from_bip32(&mut path)
-                .public_key()
-                .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
+            let p1 = comm.get_p1();
+            let p2 = comm.get_p2();
+
+            let pk = if p1 == 0 {
+                derive_pub_key(& mut path)?
+            } else {
+                let group_num = p1;
+                let target_group = p2 % p1;
+                assert!(target_group < group_num);
+                derive_pub_key_for_group(& mut path, group_num, target_group)?
+            };
 
             println_slice::<130>(pk.as_ref());
             comm.append(pk.as_ref());
@@ -192,6 +200,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
                 return Err(io::StatusWords::BadLen.into());
             }
 
+            *ui_index = 0; // reset UI
             let out = sign_ui(&path, &data[20..])?;
             if let Some((signature_buf, length)) = out {
                 comm.append(&signature_buf[..length as usize])
@@ -199,4 +208,38 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
         }
     }
     Ok(())
+}
+
+fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
+    let pk = Secp256k1::from_bip32(path)
+        .public_key()
+        .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
+    return Ok(pk);
+}
+
+fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -> Result<ECPublicKey<65, 'W'>, Reply> {
+    let pk = derive_pub_key(path)?;
+    if get_pub_key_group(pk.as_ref(), group_num) == target_group {
+        return Ok(pk);
+    } else {
+        path[path.len() - 1] += 1;
+        return derive_pub_key_for_group(path, group_num, target_group);
+    }
+}
+
+pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
+    assert!(pub_key.len() == 65);
+    let mut compressed = [0 as u8; 33];
+    compressed[1..33].copy_from_slice(&pub_key[1..33]);
+    if pub_key.last().unwrap() % 2 == 0 {
+        compressed[0] = 0x02
+    } else {
+        compressed[0] = 0x03
+    }
+
+    let pub_key_hash = blake2b(&compressed);
+    let script_hint = djb_hash(&pub_key_hash) | 1;
+    let group_index = xor_bytes(script_hint);
+
+    return group_index % group_num;
 }
