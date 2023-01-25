@@ -2,6 +2,7 @@ import { Account, addressFromPublicKey, encodeHexSignature, groupOfAddress } fro
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
 import { ec as EC } from 'elliptic'
+import { assert } from 'console'
 
 const ec = new EC('secp256k1')
 
@@ -30,6 +31,7 @@ export default class AlephiumApp {
 
   // TODO: make address display optional
   async getAccount(startPath: string, targetGroup?: number): Promise<Account> {
+    assert((targetGroup ?? 0) < GROUP_NUM)
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))

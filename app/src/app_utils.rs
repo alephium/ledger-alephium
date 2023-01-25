@@ -31,13 +31,18 @@ pub mod print {
 }
 
 pub fn blake2b(data: &[u8]) -> [u8; 32] {
+    print::println("===== a");
     let mut hash = cx_hash_header_s::default();
     let mut result = [0 as u8; 32];
     unsafe {
+        print::println("===== b");
         let error = cx_hash_init_ex(&mut hash, CX_BLAKE2B, 32);
+        print::println("===== c");
         assert!(error == 0);
         cx_hash_update(&mut hash, data.as_ptr(), data.len() as u32);
+        print::println("===== d");
         cx_hash_final(&mut hash, result.as_mut_ptr());
+        print::println("===== e");
     }
     return result;
 }

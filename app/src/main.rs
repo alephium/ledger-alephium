@@ -237,6 +237,8 @@ fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -
 
 pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     assert!(pub_key.len() == 65);
+    println("pub_key 65");
+    println_slice::<130>(pub_key);
     let mut compressed = [0 as u8; 33];
     compressed[1..33].copy_from_slice(&pub_key[1..33]);
     if pub_key.last().unwrap() % 2 == 0 {
@@ -244,10 +246,20 @@ pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     } else {
         compressed[0] = 0x03
     }
+    println("compressed");
+    println_slice::<66>(&compressed);
 
     let pub_key_hash = blake2b(&compressed);
+    println("blake2b done");
     let script_hint = djb_hash(&pub_key_hash) | 1;
+    println("hint done");
     let group_index = xor_bytes(script_hint);
+    println("pub key hash");
+    println_slice::<64>(&pub_key_hash);
+    println("script hint");
+    println_slice::<8>(&script_hint.to_be_bytes());
+    println("group index");
+    println_slice::<2>(&[group_index]);
 
     return group_index % group_num;
 }

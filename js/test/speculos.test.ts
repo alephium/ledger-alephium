@@ -42,6 +42,14 @@ describe('sdk', () => {
     await transport.close()
   })
 
+  it('should get public key for group', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    const account = await app.getAccount(path, 1)
+    console.log(`account: ${JSON.stringify(account)}`)
+    await transport.close()
+  })
+
   it('should sign hash', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
