@@ -13,8 +13,8 @@ export enum INS {
   SIGN_HASH = 0x02
 }
 
-const GROUP_NUM = 4
-const HASH_LEN = 32
+export const GROUP_NUM = 4
+export const HASH_LEN = 32
 
 export default class AlephiumApp {
   readonly transport: Transport
@@ -35,9 +35,7 @@ export default class AlephiumApp {
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))
-    console.log(`response ${response.length} - ${response.toString('hex')}`)
     const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
-    console.log(`pubkey\n - ${publicKey}\n - ${response.toString('hex')}`)
     const address = addressFromPublicKey(publicKey)
     const group = groupOfAddress(address)
 

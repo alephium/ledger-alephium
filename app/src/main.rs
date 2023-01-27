@@ -5,7 +5,7 @@ use nanos_sdk::buttons::ButtonEvent;
 use nanos_ui::layout;
 use nanos_ui::layout::Draw;
 use nanos_ui::layout::StringPlace;
-use utils::{self, deserialize_path};
+use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
 
 use app_utils::*;
@@ -178,6 +178,8 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
         }
         Ins::GetPubKey => {
             let raw_path = comm.get_data()?;
+            println("raw path");
+            println_slice::<40>(raw_path);
             if !deserialize_path(raw_path, &mut path) {
                 return Err(io::StatusWords::BadLen.into());
             }
@@ -226,12 +228,14 @@ fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
 }
 
 fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -> Result<ECPublicKey<65, 'W'>, Reply> {
-    let pk = derive_pub_key(path)?;
-    if get_pub_key_group(pk.as_ref(), group_num) == target_group {
-        return Ok(pk);
-    } else {
+    loop {
+    println("path");
+    println_slice::<8>(&path.last().unwrap().to_be_bytes());
+        let pk = derive_pub_key(path)?;
+        if get_pub_key_group(pk.as_ref(), group_num) == target_group {
+            return Ok(pk);
+        }
         path[path.len() - 1] += 1;
-        return derive_pub_key_for_group(path, group_num, target_group);
     }
 }
 

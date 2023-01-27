@@ -1,10 +1,10 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import NodeTransport from '@ledgerhq/hw-transport-node-hid'
 import { listen } from '@ledgerhq/logs'
-import AlephiumApp from '../src'
+import AlephiumApp, { GROUP_NUM } from '../src'
 import blake from 'blakejs'
 import fetch from 'node-fetch'
-import { transactionVerifySignature } from '@alephium/web3'
+import { groupOfAddress, transactionVerifySignature } from '@alephium/web3'
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -18,12 +18,18 @@ async function pressButton(button: 'left' | 'right' | 'both') {
   })
 }
 
+function getRandomInt(min, max) {
+  min = Math.ceil(min)
+  max = Math.floor(max)
+  return Math.floor(Math.random() * (max - min) + min) // The maximum is exclusive and the minimum is inclusive
+}
+
 describe('sdk', () => {
   const apduPort = 9999
   let path: string
 
   beforeEach(() => {
-    path = `m/44'/1234'/0'/0/` + Math.floor(1000000)
+    path = `m/44'/1234'/0'/0/` + getRandomInt(0, 1000000)
   })
 
   it('should get version', async () => {
@@ -45,8 +51,10 @@ describe('sdk', () => {
   it('should get public key for group', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
-    const account = await app.getAccount(path, 1)
-    console.log(`account: ${JSON.stringify(account)}`)
+    Array(GROUP_NUM).forEach(async (_, group) => {
+      const account = await app.getAccount(path, group)
+      expect(groupOfAddress(account.address)).toBe(group)
+    })
     await transport.close()
   })
 

@@ -1,4 +1,5 @@
 use nanos_sdk::bindings::*;
+use core::ptr::null;
 
 #[cfg(feature = "debug")]
 pub mod print {
@@ -32,30 +33,21 @@ pub mod print {
 
 pub fn blake2b(data: &[u8]) -> [u8; 32] {
     print::println("===== a");
-    let mut hash = cx_hash_header_s::default();
+    let mut hash = cx_blake2b_t::default();
     let mut result = [0 as u8; 32];
     unsafe {
         print::println("===== b");
-        let error = cx_hash_init_ex(&mut hash, CX_BLAKE2B, 32);
+        let error = cx_blake2b_init_no_throw(&mut hash, 32 * 8);
         print::println("===== c");
-        assert!(error == 0);
-        cx_hash_update(&mut hash, data.as_ptr(), data.len() as u32);
+        print::println_array::<4, 8>(&error.to_be_bytes());
+        assert!(error == CX_OK);
+        let error0 = cx_hash_no_throw(&mut hash.header, 0, data.as_ptr(), data.len() as u32, null::<u8>() as *mut u8, 0);
+        assert_eq!(error0, CX_OK);
         print::println("===== d");
-        cx_hash_final(&mut hash, result.as_mut_ptr());
+        let error1 = cx_hash_no_throw(&mut hash.header, CX_LAST, null(), 0, result.as_mut_ptr(), 32);
+        assert_eq!(error1, CX_OK);
         print::println("===== e");
+        print::println_slice::<64>(&result)
     }
     return result;
-}
-
-pub fn djb_hash(data: &[u8]) -> i32 {
-    let mut hash: i32 = 5381;
-    data.into_iter().for_each(|&byte| {
-        hash = ((hash << 5) + hash) + (byte as i32);
-    });
-    return hash;
-}
-
-pub fn xor_bytes(data: i32) -> u8 {
-    let bytes = data.to_be_bytes();
-    return bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3];
 }
