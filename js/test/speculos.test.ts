@@ -1,6 +1,4 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
-import NodeTransport from '@ledgerhq/hw-transport-node-hid'
-import { listen } from '@ledgerhq/logs'
 import AlephiumApp, { GROUP_NUM } from '../src'
 import blake from 'blakejs'
 import fetch from 'node-fetch'
@@ -78,13 +76,4 @@ describe('sdk', () => {
 
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
   }, 10000)
-
-  // it('should test node', async () => {
-  //   const transport = await NodeTransport.open('')
-  //   listen((log) => console.log(log))
-  //   const app = new AlephiumApp(transport)
-
-  //   const account = await app.getAccount(path)
-  //   console.log(`For real ${JSON.stringify(account)}`)
-  // })
 })
