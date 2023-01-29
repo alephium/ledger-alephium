@@ -4,11 +4,7 @@ import blake from 'blakejs'
 
 import { transactionVerifySignature } from '@alephium/web3'
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-import AlephiumApp, { GROUP_NUM } from '../src'
+import AlephiumApp from '../src'
 
 describe('Integration', () => {
   const path = `m/44'/1234'/0'/0/0`
