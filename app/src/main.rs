@@ -24,7 +24,7 @@ nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 /// to read the incoming message, a panel that requests user
 /// validation, and an exit message.
 fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32)>, SyscallError> {
-    ui::popup("Message review");
+    ui::popup("Tx hash review:");
 
     {
         let hex: [u8; 64] = utils::to_hex(message).map_err(|_| SyscallError::Overflow)?;
