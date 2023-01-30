@@ -1,4 +1,4 @@
-app-builer-image:
+app-builder-image:
 	@docker build -t ledger-alephium-app-builder:latest -f ./configs/app-builder.Dockerfile configs
 
 speculos-image:
