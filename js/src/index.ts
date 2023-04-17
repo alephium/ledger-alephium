@@ -39,7 +39,7 @@ export default class AlephiumApp {
     const address = addressFromPublicKey(publicKey)
     const group = groupOfAddress(address)
 
-    return { publicKey: publicKey, address: address, group: group }
+    return { publicKey: publicKey, address: address, group: group, keyType: 'default' }
   }
 
   async signHash(path: string, hash: Buffer): Promise<string> {

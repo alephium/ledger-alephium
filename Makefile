@@ -56,9 +56,17 @@ update-configs:
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
 
 clean:
 	cd app && cargo clean
+
+set-github-action:
+	make app-builder-image
+	make speculos-image
+	make build-debug
+	docker run -d --rm -v $(shell pwd):/speculos/app \
+		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
 
 .PHONY: release clean
