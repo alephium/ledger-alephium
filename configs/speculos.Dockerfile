@@ -1,3 +1,5 @@
+# Source: https://github.com/LedgerHQ/speculos/blob/develop/build.Dockerfile
+# 
 # Dockerfile to have a container with everything ready to build speculos,
 # assuming that neither OpenSSL nor cmocka were updated.
 #
@@ -17,12 +19,14 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     libvncserver-dev \
     python3-pip \
     qemu-user-static \
+    tesseract-ocr \
+    libtesseract-dev \
     wget && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/
 
 # There are issues with PYTHONHOME if using distro packages, use pip instead.
-RUN pip3 install construct flake8 flask flask_restful jsonschema mnemonic pycrypto pyelftools pbkdf2 pytest Pillow requests
+RUN pip3 install construct flake8 flask flask_restful jsonschema mnemonic pycrypto pyelftools pbkdf2 pytest Pillow requests pytesseract
 
 # Create SHA256SUMS, download dependencies and verify their integrity
 RUN \
@@ -56,6 +60,7 @@ RUN mkdir cmocka && \
 RUN git clone https://github.com/LedgerHQ/speculos.git ./speculos
 # ADD . /speculos
 WORKDIR /speculos
+RUN git reset --hard 2bc7542d31e6bde16ed65182afe968c0d42da49a
 
 RUN cmake -Bbuild -H. -DPRECOMPILED_DEPENDENCIES_DIR=/install -DWITH_VNC=1
 RUN make -C build
