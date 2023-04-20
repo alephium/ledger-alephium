@@ -34,6 +34,10 @@ export default class AlephiumApp {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
 
+    if (keyType === "bip340-schnorr") {
+      throw Error("BIP340-Schnorr is not supported yet")
+    }
+
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))

@@ -65,10 +65,7 @@ describe('sdk', () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     Array(GROUP_NUM).forEach(async (_, group) => {
-      const [account, hdIndex] = await app.getAccount(path, group, 'bip340-schnorr')
-      expect(hdIndex >= pathIndex).toBe(true)
-      expect(groupOfAddress(account.address)).toBe(group)
-      expect(account.keyType).toBe('bip340-schnorr')
+      expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
     })
     await transport.close()
   })
