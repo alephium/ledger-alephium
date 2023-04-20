@@ -29,7 +29,7 @@ export default class AlephiumApp {
   }
 
   // TODO: make address display optional
-  async getAccount(startPath: string, targetGroup?: number): Promise<Account> {
+  async getAccount(startPath: string, targetGroup?: number): Promise<readonly [Account, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
@@ -40,8 +40,9 @@ export default class AlephiumApp {
     const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
     const address = addressFromPublicKey(publicKey)
     const group = groupOfAddress(address)
+    const hdIndex = response.slice(65, 69).readUInt32BE(0)
 
-    return { publicKey: publicKey, address: address, group: group, keyType: 'default' }
+    return [{ publicKey: publicKey, address: address, group: group, keyType: 'default' }, hdIndex] as const
   }
 
   async signHash(path: string, hash: Buffer): Promise<string> {

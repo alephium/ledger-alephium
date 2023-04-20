@@ -15,7 +15,7 @@ describe.skip('Integration', () => {
     listen((log) => console.log(log))
     const app = new AlephiumApp(transport)
 
-    const account = await app.getAccount(path)
+    const [account] = await app.getAccount(path)
     console.log(`${JSON.stringify(account)}`)
 
     const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))
