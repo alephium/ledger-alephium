@@ -22,6 +22,10 @@ export default class AlephiumApp {
     this.transport = transport
   }
 
+  async close(): Promise<void> {
+    await this.transport.close()
+  }
+
   async getVersion(): Promise<string> {
     const response = await this.transport.send(CLA, INS.GET_VERSION, 0x00, 0x00)
     console.log(`response ${response.length} - ${response.toString('hex')}`)

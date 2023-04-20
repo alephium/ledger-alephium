@@ -37,7 +37,7 @@ describe('sdk', () => {
     const app = new AlephiumApp(transport)
     const version = await app.getVersion()
     expect(version).toBe('0.1.0')
-    await transport.close()
+    await app.close()
   })
 
   it('should get public key', async () => {
@@ -46,7 +46,7 @@ describe('sdk', () => {
     const [account, hdIndex] = await app.getAccount(path)
     expect(hdIndex).toBe(pathIndex)
     console.log(account)
-    await transport.close()
+    await app.close()
   })
 
   it('should get public key for group', async () => {
@@ -58,7 +58,7 @@ describe('sdk', () => {
       expect(groupOfAddress(account.address)).toBe(group)
       expect(account.keyType).toBe('default')
     })
-    await transport.close()
+    await app.close()
   })
 
   it('should get public key for group for Schnorr signature', async () => {
@@ -67,7 +67,7 @@ describe('sdk', () => {
     Array(GROUP_NUM).forEach(async (_, group) => {
       await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
     })
-    await transport.close()
+    await app.close()
   })
 
   it('should sign hash', async () => {
@@ -86,7 +86,7 @@ describe('sdk', () => {
     }, 1000)
     const signature = await app.signHash(path, hash)
     console.log(signature)
-    await transport.close()
+    await app.close()
 
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
   }, 10000)
@@ -106,6 +106,6 @@ describe('sdk', () => {
       await pressButton('both') // done selection
     }, 1000)
     await expect(app.signHash(path, hash)).rejects.toThrow()
-    await transport.close()
+    await app.close()
   }, 10000)
 })

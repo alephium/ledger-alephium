@@ -23,6 +23,6 @@ describe.skip('Integration', () => {
     console.log(signature)
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
 
-    await transport.close()
+    await app.close()
   }, 100000)
 })
