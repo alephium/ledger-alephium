@@ -1,4 +1,4 @@
-import { Account, addressFromPublicKey, encodeHexSignature, groupOfAddress } from '@alephium/web3'
+import { Account, KeyType, addressFromPublicKey, encodeHexSignature, groupOfAddress } from '@alephium/web3'
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
 import { ec as EC } from 'elliptic'
@@ -29,7 +29,7 @@ export default class AlephiumApp {
   }
 
   // TODO: make address display optional
-  async getAccount(startPath: string, targetGroup?: number): Promise<readonly [Account, number]> {
+  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType): Promise<readonly [Account, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
@@ -42,7 +42,7 @@ export default class AlephiumApp {
     const group = groupOfAddress(address)
     const hdIndex = response.slice(65, 69).readUInt32BE(0)
 
-    return [{ publicKey: publicKey, address: address, group: group, keyType: 'default' }, hdIndex] as const
+    return [{ publicKey: publicKey, address: address, group: group, keyType: keyType ?? 'default' }, hdIndex] as const
   }
 
   async signHash(path: string, hash: Buffer): Promise<string> {

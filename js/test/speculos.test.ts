@@ -56,6 +56,19 @@ describe('sdk', () => {
       const [account, hdIndex] = await app.getAccount(path, group)
       expect(hdIndex >= pathIndex).toBe(true)
       expect(groupOfAddress(account.address)).toBe(group)
+      expect(account.keyType).toBe('default')
+    })
+    await transport.close()
+  })
+
+  it('should get public key for group for Schnorr signature', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    Array(GROUP_NUM).forEach(async (_, group) => {
+      const [account, hdIndex] = await app.getAccount(path, group, 'bip340-schnorr')
+      expect(hdIndex >= pathIndex).toBe(true)
+      expect(groupOfAddress(account.address)).toBe(group)
+      expect(account.keyType).toBe('bip340-schnorr')
     })
     await transport.close()
   })
