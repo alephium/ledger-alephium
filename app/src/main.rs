@@ -211,9 +211,12 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
                 return Err(io::StatusWords::BadLen.into());
             }
 
-            let out = sign_ui(&path, &data[20..])?;
-            if let Some((signature_buf, length)) = out {
-                comm.append(&signature_buf[..length as usize])
+            match sign_ui(&path, &data[20..]) {
+                Ok(Some((signature_buf, length))) => {
+                    comm.append(&signature_buf[..length as usize])
+                }
+                Ok(None) => return Err(io::StatusWords::UserCancelled.into()),
+                Err(_e) => return Err(io::SyscallError::Unspecified.into()),
             }
             return Ok(true)
         }
