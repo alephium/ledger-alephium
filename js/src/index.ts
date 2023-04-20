@@ -34,8 +34,8 @@ export default class AlephiumApp {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
 
-    if (keyType === "bip340-schnorr") {
-      throw Error("BIP340-Schnorr is not supported yet")
+    if (keyType === 'bip340-schnorr') {
+      throw Error('BIP340-Schnorr is not supported yet')
     }
 
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM

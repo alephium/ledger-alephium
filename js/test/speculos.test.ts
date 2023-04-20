@@ -65,7 +65,7 @@ describe('sdk', () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     Array(GROUP_NUM).forEach(async (_, group) => {
-      expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
+      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
     })
     await transport.close()
   })
@@ -89,5 +89,23 @@ describe('sdk', () => {
     await transport.close()
 
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
+  }, 10000)
+
+  it('should reject signing', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+
+    const [account] = await app.getAccount(path)
+    console.log(account)
+
+    const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))
+    setTimeout(async () => {
+      await pressButton('both') // review message
+      await pressButton('both') // done review
+      await pressButton('left') // select signing
+      await pressButton('both') // done selection
+    }, 1000)
+    await expect(app.signHash(path, hash)).rejects.toThrow()
+    await transport.close()
   }, 10000)
 })
