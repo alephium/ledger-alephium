@@ -24,10 +24,12 @@ function getRandomInt(min, max) {
 
 describe('sdk', () => {
   const apduPort = 9999
+  let pathIndex: number
   let path: string
 
   beforeEach(() => {
-    path = `m/44'/1234'/0'/0/` + getRandomInt(0, 1000000)
+    pathIndex = getRandomInt(0, 1000000)
+    path = `m/44'/1234'/0'/0/` + pathIndex
   })
 
   it('should get version', async () => {
@@ -41,7 +43,8 @@ describe('sdk', () => {
   it('should get public key', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
-    const account = await app.getAccount(path)
+    const [account, hdIndex] = await app.getAccount(path)
+    expect(hdIndex).toBe(pathIndex)
     console.log(account)
     await transport.close()
   })
@@ -50,7 +53,8 @@ describe('sdk', () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     Array(GROUP_NUM).forEach(async (_, group) => {
-      const account = await app.getAccount(path, group)
+      const [account, hdIndex] = await app.getAccount(path, group)
+      expect(hdIndex >= pathIndex).toBe(true)
       expect(groupOfAddress(account.address)).toBe(group)
     })
     await transport.close()
@@ -60,7 +64,7 @@ describe('sdk', () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
 
-    const account = await app.getAccount(path)
+    const [account] = await app.getAccount(path)
     console.log(account)
 
     const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))

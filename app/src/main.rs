@@ -188,8 +188,8 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
             let p1 = comm.get_p1();
             let p2 = comm.get_p2();
 
-            let pk = if p1 == 0 {
-                derive_pub_key(& mut path)?
+            let (pk, hd_index) = if p1 == 0 {
+                (derive_pub_key(& mut path)?, path[path.len() - 1])
             } else {
                 let group_num = p1;
                 let target_group = p2 % p1;
@@ -199,6 +199,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
 
             println_slice::<130>(pk.as_ref());
             comm.append(pk.as_ref());
+            comm.append(hd_index.to_be_bytes().as_slice());
         }
         Ins::SignHash => {
             let data = comm.get_data()?;
@@ -227,13 +228,13 @@ fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
     return Ok(pk);
 }
 
-fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -> Result<ECPublicKey<65, 'W'>, Reply> {
+fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -> Result<(ECPublicKey<65, 'W'>, u32), Reply> {
     loop {
     println("path");
     println_slice::<8>(&path.last().unwrap().to_be_bytes());
         let pk = derive_pub_key(path)?;
         if get_pub_key_group(pk.as_ref(), group_num) == target_group {
-            return Ok(pk);
+            return Ok((pk, path[path.len() - 1]));
         }
         path[path.len() - 1] += 1;
     }
