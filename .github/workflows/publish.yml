@@ -48,6 +48,6 @@ jobs:
         run: |
           cd js
           npm ci
-          npm run publish
+          npm run pub
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
