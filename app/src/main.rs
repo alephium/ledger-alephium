@@ -136,6 +136,7 @@ extern "C" fn sample_main() {
                 }
                 println("=== After event");
                 println_array::<1, 2>(&[ui_index]);
+                show_ui(ui_index);
             }
             _ => (),
         }
