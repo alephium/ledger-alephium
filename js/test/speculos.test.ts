@@ -36,7 +36,7 @@ describe('sdk', () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     const version = await app.getVersion()
-    expect(version).toBe('0.1.0')
+    expect(version).toBe('0.2.0')
     await app.close()
   })
 
