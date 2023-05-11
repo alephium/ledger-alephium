@@ -16,9 +16,9 @@ _release:
 			cd app && \
 			echo 'Building $(device) app' && \
 			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger $(device) -- -Z unstable-options && \
-			cp ./target/$(device)/release/app.hex ../release/$(device).hex && \
-			mv ./app_$(device).json ../release/$(device).json && \
-			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../release/$(device).json \
+			cp ./target/$(device)/release/app.hex ../$(device).hex && \
+			mv ./app_$(device).json ../$(device).json && \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../$(device).json \
 		"
 
 build-debug:

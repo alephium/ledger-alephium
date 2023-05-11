@@ -1,17 +1,17 @@
 {
-  "binary": "nanox.hex",
+  "binary": "nanos.hex",
   "dataSize": 0,
   "derivationPath": {
     "curves": [
       "secp256k1"
     ],
     "paths": [
-      ""
+      "m/2645'/1234'"
     ]
   },
-  "flags": "0x200",
-  "icon": "alph_14x14.gif",
+  "flags": "0",
+  "icon": "alph.gif",
   "name": "Alephium",
-  "targetId": "0x33000004",
+  "targetId": "0x31100004",
   "version": "0.2.0"
 }
