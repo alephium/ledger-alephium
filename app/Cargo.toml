@@ -24,4 +24,4 @@ curve = ["secp256k1"]
 flags = "0"
 icon = "alph.gif"
 icon_small = "alph_14x14.gif"
-path = ["m/2645'/1234'"]
+path = ["m/44'/1234'"]
