@@ -25,10 +25,10 @@
     "trailingComma": "none"
   },
   "dependencies": {
-    "@alephium/cli": "0.10.2",
-    "@alephium/web3": "0.10.2",
-    "@alephium/web3-test": "0.10.2",
-    "@alephium/web3-wallet": "0.10.2",
+    "@alephium/cli": "^0.14.0",
+    "@alephium/web3": "^0.14.0",
+    "@alephium/web3-test": "^0.14.0",
+    "@alephium/web3-wallet": "^0.14.0",
     "@ledgerhq/hw-transport": "6.27.10"
   },
   "devDependencies": {
