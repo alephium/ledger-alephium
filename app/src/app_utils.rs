@@ -4,7 +4,7 @@ use core::ptr::null;
 #[cfg(feature = "debug")]
 pub mod print {
 
-    use nanos_sdk::debug_print;
+    use nanos_sdk::testing::debug_print;
 
     pub fn println(s: &str) {
         debug_print(s);

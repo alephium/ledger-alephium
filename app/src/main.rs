@@ -2,6 +2,7 @@
 #![no_main]
 
 use nanos_sdk::buttons::ButtonEvent;
+use nanos_sdk::ecc::SeedDerive;
 use nanos_ui::layout;
 use nanos_ui::layout::Draw;
 use nanos_ui::layout::StringPlace;
@@ -34,7 +35,7 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32)>, Sysc
     }
 
     if ui::Validator::new("Sign ?").ask() {
-        let signature = Secp256k1::from_bip32(path)
+        let signature = Secp256k1::derive_from_path(path)
             .deterministic_sign(message)
             .map_err(|_| SyscallError::Unspecified)?;
         ui::SingleMessage::new("Signing...").show();
@@ -150,13 +151,14 @@ enum Ins {
     SignHash,
 }
 
-impl From<u8> for Ins {
-    fn from(ins: u8) -> Ins {
-        match ins {
-            0 => Ins::GetVersion,
-            1 => Ins::GetPubKey,
-            2 => Ins::SignHash,
-            _ => panic!(),
+impl TryFrom<io::ApduHeader> for Ins {
+    type Error = ();
+    fn try_from(header: io::ApduHeader) -> Result<Self, Self::Error> {
+        match header.ins {
+            0 => Ok(Ins::GetVersion),
+            1 => Ok(Ins::GetPubKey),
+            2 => Ok(Ins::SignHash),
+            _ => Err(()),
         }
     }
 }
@@ -169,6 +171,10 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
     }
 
     let mut path: [u32; 5] = [0; 5];
+    let apdu_header = comm.get_apdu_metadata();
+    if apdu_header.cla != 0x80 {
+        return Err(io::StatusWords::BadCla.into());
+    }
 
     match ins {
         Ins::GetVersion => {
@@ -186,8 +192,8 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
             }
             println_slice::<40>(raw_path);
 
-            let p1 = comm.get_p1();
-            let p2 = comm.get_p2();
+            let p1 = apdu_header.p1;
+            let p2 = apdu_header.p2;
 
             let (pk, hd_index) = if p1 == 0 {
                 (derive_pub_key(& mut path)?, path[path.len() - 1])
@@ -226,7 +232,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
 }
 
 fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
-    let pk = Secp256k1::from_bip32(path)
+    let pk = Secp256k1::derive_from_path(path)
         .public_key()
         .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
     return Ok(pk);
