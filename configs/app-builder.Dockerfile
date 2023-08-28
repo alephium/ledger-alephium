@@ -6,7 +6,7 @@ ENV RUSTUP_HOME=/opt/rustup \
 
 RUN apk add rustup
 
-RUN rustup-init --default-toolchain nightly -y
+RUN rustup-init --default-toolchain nightly-2023-05-01 -y
 
 # Adding cargo binaries to PATH
 ENV PATH=${CARGO_HOME}/bin:${PATH}

@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 nanos_sdk = { git = "https://github.com/LedgerHQ/ledger-nanos-sdk.git" } 
-nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git", rev = "c7fe3dff2417f9a118ad176d578c5c1ee07e83cd" } 
+nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git", rev = "6a7c4a3eb41ee0b09c8fd4dcc5be4f3a1f5d7b45" } 
 utils= { path = "../utils" }
 
 [features]
@@ -25,3 +25,4 @@ flags = "0"
 icon = "alph.gif"
 icon_small = "alph_14x14.gif"
 path = ["m/44'/1234'"]
+api_level = "1"
