@@ -12,7 +12,7 @@ release:
 _release:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cargo install --git https://github.com/LedgerHQ/cargo-ledger --rev 0cfe2cc669d2b8cb9d47c3ab083ca86ae4f03056 && \
+			cargo install --git https://github.com/LedgerHQ/cargo-ledger --rev cf4eab6312218e9bf07e8d68bb9fd4d981647471 && \
 			cd app && \
 			echo 'Building $(device) app' && \
 			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger $(device) -- -Z unstable-options && \

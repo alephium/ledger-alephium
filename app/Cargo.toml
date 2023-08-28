@@ -25,3 +25,4 @@ flags = "0"
 icon = "alph.gif"
 icon_small = "alph_14x14.gif"
 path = ["m/44'/1234'"]
+api_level = "1"
