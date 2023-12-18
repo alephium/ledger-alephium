@@ -20,11 +20,7 @@ To install the app for Nano S+:
 ledgerctl install nanosplus.json
 ```
 
-To install the app for Nano X:
-
-```
-ledgerctl install nanox.json
-```
+Nano X manual installation isn't supported. The device no longer supports application side-loading.
 
 ## Uninstall
 
