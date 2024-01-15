@@ -1,44 +1,44 @@
 #![no_std]
 #![no_main]
 
-use nanos_sdk::buttons::ButtonEvent;
-use nanos_sdk::ecc::SeedDerive;
-use nanos_ui::layout;
-use nanos_ui::layout::Draw;
-use nanos_ui::layout::StringPlace;
+use ledger_secure_sdk_sys::buttons::ButtonEvent;
+use ledger_device_sdk::ecc::SeedDerive;
+use ledger_device_sdk::ui::layout;
+use ledger_device_sdk::ui::layout::Draw;
+use ledger_device_sdk::ui::layout::StringPlace;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
 
 use app_utils::*;
 use app_utils::print::{println, println_array, println_slice};
 use core::str::from_utf8;
-use nanos_sdk::ecc::{Secp256k1, ECPublicKey};
-use nanos_sdk::io;
-use nanos_sdk::io::SyscallError;
-use nanos_ui::ui;
-use nanos_ui::bagls;
-use nanos_ui::screen_util;
+use ledger_device_sdk::ecc::{Secp256k1, ECPublicKey};
+use ledger_device_sdk::io;
+use ledger_device_sdk::io::SyscallError;
+use ledger_device_sdk::ui::gadgets;
+use ledger_device_sdk::ui::bagls;
+use ledger_device_sdk::ui::screen_util;
 
-nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
+ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 
 /// This is the UI flow for signing, composed of a scroller
 /// to read the incoming message, a panel that requests user
 /// validation, and an exit message.
 fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32, u32)>, SyscallError> {
-    ui::popup("Tx hash review:");
+    gadgets::popup("Tx hash review:");
 
     {
         let hex: [u8; 64] = utils::to_hex(message).map_err(|_| SyscallError::Overflow)?;
         let m = from_utf8(&hex).map_err(|_| SyscallError::InvalidParameter)?;
 
-        ui::MessageScroller::new(m).event_loop();
+        gadgets::MessageScroller::new(m).event_loop();
     }
 
-    if ui::Validator::new("Sign ?").ask() {
+    if gadgets::Validator::new("Sign ?").ask() {
         let signature = Secp256k1::derive_from_path(path)
             .deterministic_sign(message)
             .map_err(|_| SyscallError::Unspecified)?;
-        ui::SingleMessage::new("Signing...").show();
+        gadgets::SingleMessage::new("Signing...").show();
         Ok(Some(signature))
     } else {
         Ok(None)
@@ -46,7 +46,7 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32, u32)>,
 }
 
 fn show_ui_common(draw: fn() -> ()) {
-    ui::clear_screen();
+    gadgets::clear_screen();
 
     bagls::LEFT_ARROW.display();
     bagls::RIGHT_ARROW.display();
@@ -119,7 +119,7 @@ extern "C" fn sample_main() {
             }
             io::Event::Button(ButtonEvent::BothButtonsRelease) => {
                 if ui_index == 2 {
-                    nanos_sdk::exit_app(0);
+                    ledger_device_sdk::exit_app(0);
                 }
             }
             io::Event::Command(ins) => {
@@ -152,18 +152,18 @@ enum Ins {
 }
 
 impl TryFrom<io::ApduHeader> for Ins {
-    type Error = ();
+    type Error = ledger_device_sdk::io::StatusWords;
     fn try_from(header: io::ApduHeader) -> Result<Self, Self::Error> {
         match header.ins {
             0 => Ok(Ins::GetVersion),
             1 => Ok(Ins::GetPubKey),
             2 => Ok(Ins::SignHash),
-            _ => Err(()),
+            _ => Err(ledger_device_sdk::io::StatusWords::Unknown),
         }
     }
 }
 
-use nanos_sdk::io::Reply;
+use ledger_device_sdk::io::Reply;
 
 fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
     if comm.rx == 0 {

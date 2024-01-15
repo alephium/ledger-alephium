@@ -5,13 +5,13 @@ authors = ["alephium devs"]
 edition = "2021"
 
 [dependencies]
-nanos_sdk = { git = "https://github.com/LedgerHQ/ledger-nanos-sdk.git" } 
-nanos_ui = { git = "https://github.com/LedgerHQ/ledger-nanos-ui.git", rev = "6a7c4a3eb41ee0b09c8fd4dcc5be4f3a1f5d7b45" } 
+ledger_device_sdk = "1.4.1"
+ledger_secure_sdk_sys = "1.0.3"
 utils= { path = "../utils" }
 
 [features]
 default = ["device"]
-debug = ["nanos_sdk/speculos", "nanos_ui/speculos"]
+debug = ["ledger_device_sdk/speculos", "ledger_device_sdk/speculos"]
 device = []
 
 [profile.release]
