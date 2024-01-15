@@ -1,10 +1,10 @@
-use nanos_sdk::bindings::*;
+use ledger_secure_sdk_sys::*;
 use core::ptr::null;
 
 #[cfg(feature = "debug")]
 pub mod print {
 
-    use nanos_sdk::testing::debug_print;
+    use ledger_device_sdk::testing::debug_print;
 
     pub fn println(s: &str) {
         debug_print(s);
@@ -41,7 +41,7 @@ pub fn blake2b(data: &[u8]) -> [u8; 32] {
         print::println("===== c");
         print::println_array::<4, 8>(&error.to_be_bytes());
         assert!(error == CX_OK);
-        let error0 = cx_hash_no_throw(&mut hash.header, 0, data.as_ptr(), data.len() as u32, null::<u8>() as *mut u8, 0);
+        let error0 = cx_hash_no_throw(&mut hash.header, 0, data.as_ptr(), data.len() as usize, null::<u8>() as *mut u8, 0);
         assert_eq!(error0, CX_OK);
         print::println("===== d");
         let error1 = cx_hash_no_throw(&mut hash.header, CX_LAST, null(), 0, result.as_mut_ptr(), 32);
