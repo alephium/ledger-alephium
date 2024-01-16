@@ -18,11 +18,17 @@ device = []
 opt-level = 'z'
 lto = true
 
-[package.metadata.nanos]
+[package.metadata.ledger]
 name = "Alephium"
 curve = ["secp256k1"]
 flags = "0"
-icon = "alph.gif"
-icon_small = "alph_14x14.gif"
 path = ["m/44'/1234'"]
-api_level = "1"
+
+[package.metadata.ledger.nanos]
+icon = "alph.gif"
+
+[package.metadata.ledger.nanox]
+icon = "alph_14x14.gif"
+
+[package.metadata.ledger.nanosplus]
+icon = "alph_14x14.gif"
