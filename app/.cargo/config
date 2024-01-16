@@ -9,5 +9,8 @@ runner = "speculos.py --display text -k 2.0"
 target = "thumbv6m-none-eabi"
 
 [alias]
-bembed = "build -Z build-std=core -Z build-std-features=compiler-builtins-mem"
 stackcheck = "stack-sizes --release --bin app --target=thumbv6m-none-eabi"
+
+[unstable]
+build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]

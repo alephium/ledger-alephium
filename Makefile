@@ -12,10 +12,9 @@ release:
 _release:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cargo install --git https://github.com/LedgerHQ/cargo-ledger --rev cf4eab6312218e9bf07e8d68bb9fd4d981647471 && \
 			cd app && \
 			echo 'Building $(device) app' && \
-			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger $(device) -- -Z unstable-options && \
+			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
 			cp ./target/$(device)/release/app.hex ../$(device).hex && \
 			mv ./app_$(device).json ../$(device).json && \
 			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../$(device).json \
@@ -26,11 +25,11 @@ build-debug:
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanos.json && \
+			cargo build --no-default-features --features debug --target=nanos && \
 			echo 'Building nanosplus app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanosplus.json && \
+			cargo build --no-default-features --features debug --target=nanosplus && \
 			echo 'Building nanox app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanox.json \
+			cargo build --no-default-features --features debug --target=nanox \
 		"
 
 check:
@@ -40,7 +39,7 @@ check:
 			echo 'Cargo fmt' && \
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
-			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --features=debug --target=../configs/nanos.json \
+			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=nanos \
 		"
 
 debug:
