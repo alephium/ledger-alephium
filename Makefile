@@ -45,12 +45,6 @@ check:
 debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest
 
-TARGET_HOST=https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master
-update-configs:
-	curl $(TARGET_HOST)/nanos.json --output configs/nanos.json
-	curl $(TARGET_HOST)/nanosplus.json --output configs/nanosplus.json
-	curl $(TARGET_HOST)/nanox.json --output configs/nanox.json
-
 # Webui: http://localhost:25000
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \

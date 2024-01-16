@@ -1,3 +1,5 @@
 target
 app.json
 app/app*.json
+nanox.hex
+nanox.json
