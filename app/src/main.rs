@@ -1,22 +1,22 @@
 #![no_std]
 #![no_main]
 
-use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
 use ledger_device_sdk::ui::layout::StringPlace;
+use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
 
-use app_utils::*;
 use app_utils::print::{println, println_array, println_slice};
+use app_utils::*;
 use core::str::from_utf8;
-use ledger_device_sdk::ecc::{Secp256k1, ECPublicKey};
+use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io;
 use ledger_device_sdk::io::SyscallError;
-use ledger_device_sdk::ui::gadgets;
 use ledger_device_sdk::ui::bagls;
+use ledger_device_sdk::ui::gadgets;
 use ledger_device_sdk::ui::screen_util;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
@@ -57,8 +57,11 @@ fn show_ui_common(draw: fn() -> ()) {
 }
 
 fn show_ui_welcome() {
-    show_ui_common(||{
-        let mut lines = [bagls::Label::from_const("Alephium"), bagls::Label::from_const("ready")];
+    show_ui_common(|| {
+        let mut lines = [
+            bagls::Label::from_const("Alephium"),
+            bagls::Label::from_const("ready"),
+        ];
         lines[0].bold = true;
         lines.place(layout::Location::Middle, layout::Layout::Centered, false);
     });
@@ -67,7 +70,10 @@ fn show_ui_welcome() {
 fn show_ui_version() {
     show_ui_common(|| {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
-        let mut lines = [bagls::Label::from_const("Version"), bagls::Label::from_const(VERSION)];
+        let mut lines = [
+            bagls::Label::from_const("Version"),
+            bagls::Label::from_const(VERSION),
+        ];
         lines[0].bold = true;
         lines.place(layout::Location::Middle, layout::Layout::Centered, false);
     });
@@ -86,7 +92,7 @@ fn show_ui(index: u8) {
         0 => show_ui_welcome(),
         1 => show_ui_version(),
         2 => show_ui_quit(),
-        _ => panic!("Invalid ui index")
+        _ => panic!("Invalid ui index"),
     }
 }
 
@@ -114,7 +120,7 @@ extern "C" fn sample_main() {
                 show_ui(ui_index);
             }
             io::Event::Button(ButtonEvent::LeftButtonRelease) => {
-                ui_index = (ui_index + ui_page_num - 1 ) % ui_page_num;
+                ui_index = (ui_index + ui_page_num - 1) % ui_page_num;
                 show_ui(ui_index);
             }
             io::Event::Button(ButtonEvent::BothButtonsRelease) => {
@@ -196,12 +202,12 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
             let p2 = apdu_header.p2;
 
             let (pk, hd_index) = if p1 == 0 {
-                (derive_pub_key(& mut path)?, path[path.len() - 1])
+                (derive_pub_key(&path)?, path[path.len() - 1])
             } else {
                 let group_num = p1;
                 let target_group = p2 % p1;
                 assert!(target_group < group_num);
-                derive_pub_key_for_group(& mut path, group_num, target_group)?
+                derive_pub_key_for_group(&mut path, group_num, target_group)?
             };
 
             println_slice::<130>(pk.as_ref());
@@ -225,7 +231,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
                 Ok(None) => return Err(io::StatusWords::UserCancelled.into()),
                 Err(_e) => return Err(io::SyscallError::Unspecified.into()),
             }
-            return Ok(true)
+            return Ok(true);
         }
     }
     Ok(false)
@@ -235,13 +241,17 @@ fn derive_pub_key(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
     let pk = Secp256k1::derive_from_path(path)
         .public_key()
         .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
-    return Ok(pk);
+    Ok(pk)
 }
 
-fn derive_pub_key_for_group(path: &mut [u32], group_num: u8, target_group: u8) -> Result<(ECPublicKey<65, 'W'>, u32), Reply> {
+fn derive_pub_key_for_group(
+    path: &mut [u32],
+    group_num: u8,
+    target_group: u8,
+) -> Result<(ECPublicKey<65, 'W'>, u32), Reply> {
     loop {
-    println("path");
-    println_slice::<8>(&path.last().unwrap().to_be_bytes());
+        println("path");
+        println_slice::<8>(&path.last().unwrap().to_be_bytes());
         let pk = derive_pub_key(path)?;
         if get_pub_key_group(pk.as_ref(), group_num) == target_group {
             return Ok((pk, path[path.len() - 1]));
@@ -254,7 +264,7 @@ pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     assert!(pub_key.len() == 65);
     println("pub_key 65");
     println_slice::<130>(pub_key);
-    let mut compressed = [0 as u8; 33];
+    let mut compressed = [0_u8; 33];
     compressed[1..33].copy_from_slice(&pub_key[1..33]);
     if pub_key.last().unwrap() % 2 == 0 {
         compressed[0] = 0x02
@@ -276,5 +286,5 @@ pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     println("group index");
     println_slice::<2>(&[group_index]);
 
-    return group_index % group_num;
+    group_index % group_num
 }

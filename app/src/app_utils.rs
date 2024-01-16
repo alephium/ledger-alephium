@@ -1,5 +1,5 @@
-use ledger_secure_sdk_sys::*;
 use core::ptr::null;
+use ledger_secure_sdk_sys::*;
 
 #[cfg(feature = "debug")]
 pub mod print {
@@ -34,20 +34,34 @@ pub mod print {
 pub fn blake2b(data: &[u8]) -> [u8; 32] {
     print::println("===== a");
     let mut hash = cx_blake2b_t::default();
-    let mut result = [0 as u8; 32];
+    let mut result = [0_u8; 32];
     unsafe {
         print::println("===== b");
         let error = cx_blake2b_init_no_throw(&mut hash, 32 * 8);
         print::println("===== c");
         print::println_array::<4, 8>(&error.to_be_bytes());
         assert!(error == CX_OK);
-        let error0 = cx_hash_no_throw(&mut hash.header, 0, data.as_ptr(), data.len() as usize, null::<u8>() as *mut u8, 0);
+        let error0 = cx_hash_no_throw(
+            &mut hash.header,
+            0,
+            data.as_ptr(),
+            data.len(),
+            null::<u8>() as *mut u8,
+            0,
+        );
         assert_eq!(error0, CX_OK);
         print::println("===== d");
-        let error1 = cx_hash_no_throw(&mut hash.header, CX_LAST, null(), 0, result.as_mut_ptr(), 32);
+        let error1 = cx_hash_no_throw(
+            &mut hash.header,
+            CX_LAST,
+            null(),
+            0,
+            result.as_mut_ptr(),
+            32,
+        );
         assert_eq!(error1, CX_OK);
         print::println("===== e");
         print::println_slice::<64>(&result)
     }
-    return result;
+    result
 }
