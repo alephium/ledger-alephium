@@ -5,7 +5,7 @@
 #
 # Support Debian buster & Ubuntu Bionic
 
-FROM python:3.9-slim
+FROM docker.io/library/python:3.9-slim
 ENV LANG C.UTF-8
 
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -19,21 +19,21 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     libvncserver-dev \
     python3-pip \
     qemu-user-static \
-    tesseract-ocr \
-    libtesseract-dev \
     wget && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/
 
 # There are issues with PYTHONHOME if using distro packages, use pip instead.
-RUN pip3 install construct flake8 flask flask_restful jsonschema mnemonic pycrypto pyelftools pbkdf2 pytest Pillow requests pytesseract
+RUN pip3 install construct flake8 flask flask_restful jsonschema mnemonic pycrypto pyelftools pbkdf2 pytest Pillow requests
 
 # Create SHA256SUMS, download dependencies and verify their integrity
 RUN \
   echo 892a0875b9872acd04a9fde79b1f943075d5ea162415de3047c327df33fbaee5 openssl-1.1.1k.tar.gz >> SHA256SUMS && \
   echo f0ccd8242d55e2fd74b16ba518359151f6f8383ff8aef4976e48393f77bba8b6 cmocka-1.1.5.tar.xz >> SHA256SUMS && \
+  echo 70127766f8031cde3df4224d88f7b33dec6c33fc7ac6b8e4308d4f7d0bdffd7b d0bc304a132df43856d8302e15dabee97d3d8a95.tar.gz && \
   wget --quiet https://www.openssl.org/source/openssl-1.1.1k.tar.gz && \
   wget --quiet https://cmocka.org/files/1.1/cmocka-1.1.5.tar.xz && \
+  wget --quiet https://github.com/supranational/blst/archive/d0bc304a132df43856d8302e15dabee97d3d8a95.tar.gz && \
   sha256sum --check SHA256SUMS && \
   rm SHA256SUMS
 
@@ -55,12 +55,22 @@ RUN mkdir cmocka && \
   cd .. && \
   rm -r cmocka/ cmocka-1.1.5/ cmocka-1.1.5.tar.xz
 
+RUN tar xf d0bc304a132df43856d8302e15dabee97d3d8a95.tar.gz && \
+  cd blst-d0bc304a132df43856d8302e15dabee97d3d8a95 && \
+  sh build.sh CC=arm-linux-gnueabihf-gcc && \
+  cp libblst.a ../install/lib/ && \
+  cp bindings/blst.h ../install/include/ && \
+  cp bindings/blst_aux.h ../install/include/ && \
+  cd .. && \
+  rm -r blst-d0bc304a132df43856d8302e15dabee97d3d8a95/ d0bc304a132df43856d8302e15dabee97d3d8a95.tar.gz
+
 ###### Building Speculos
 
 RUN git clone https://github.com/LedgerHQ/speculos.git ./speculos
 # ADD . /speculos
 WORKDIR /speculos
-RUN git reset --hard 2bc7542d31e6bde16ed65182afe968c0d42da49a
+# v0.5.0
+RUN git reset --hard 574648f3617b9a957fc40b5d8ba7695ef0ffb991
 
 RUN cmake -Bbuild -H. -DPRECOMPILED_DEPENDENCIES_DIR=/install -DWITH_VNC=1
 RUN make -C build
@@ -72,6 +82,7 @@ RUN apt-get update && apt-get install -qy \
     qemu-user-static \
     libvncserver-dev \
     gdb-multiarch \
+    binutils-arm-none-eabi \
     && apt-get clean
 
 RUN apt-get clean && rm -rf /var/lib/apt/lists/
