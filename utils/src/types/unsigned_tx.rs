@@ -48,14 +48,18 @@ impl RawDecoder for UnsignedTx {
 #[cfg(test)]
 mod tests {
   extern crate std;
+  extern crate alloc;
 
+  use alloc::string::String;
   use blake2::{Blake2b, Digest};
   use digest::consts::U32;
   use core::cmp::min;
   use std::vec::Vec;
+  use std::vec;
+  use num_bigint::BigUint;
   use crate::buffer::Buffer;
   use crate::decode::{Decoder, DecodeError, new_decoder};
-  use crate::types::{I32, U256};
+  use crate::types::{I32, U256, Hint, UnlockScript, PublicKey, Hash, LockupScript};
   use crate::types::i32::tests::random_usize;
   use crate::types::u256::tests::hex_to_bytes;
   use super::{UnsignedTx, PartialDecoder};
@@ -98,6 +102,15 @@ mod tests {
     }
   }
 
+  fn u256_to_string(u256: &U256) -> String {
+    let mut bytes: Vec<u8> = vec![];
+    for n in u256.inner {
+      bytes.extend(n.to_be_bytes());
+    }
+    let big_int = BigUint::from_bytes_be(&bytes);
+    return big_int.to_str_radix(10);
+  }
+
   #[test]
   fn test_decode_transfer_alph_tx() {
     let tx_id_hex = "c53f150bceb13c6ca1c13fee897e688c0ef86c73ad8113edf444b7b15ecf438b";
@@ -110,6 +123,22 @@ mod tests {
       assert_eq!(expected.gas_price, U256::from_u64(100000000000));
       assert_eq!(expected.inputs.inner.total_size.inner, 6);
       assert_eq!(expected.fixed_outputs.inner.total_size.inner, 7);
+
+      let last_input = expected.inputs.inner.get_current_item().unwrap();
+      let input_hint_bytes = i32::to_be_bytes(-882572943);
+      let output_ref_key_bytes = hex_to_bytes("950bf46c8d7fe6ca54a2cffdbc29f60c9b666fb42cb1c09a17d2ff555e3e893e").unwrap();
+      let public_key_bytes = hex_to_bytes("02622da4723abe3e57e6926b69a049635dad0f9059a89ca222d83f0b2da256235e").unwrap();
+      assert_eq!(last_input.output_ref.inner.hint, Hint::from_bytes(input_hint_bytes));
+      assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
+      assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
+
+      let last_output = expected.fixed_outputs.inner.get_current_item().unwrap();
+      let atto_alph_amount = String::from("5674913458402000000");
+      let public_key_hash_bytes = hex_to_bytes("9b85f066b1b2821339bf73e9e00bbe660b0cfb97158ceedff3260e1e4368961d").unwrap();
+      assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
+      assert_eq!(last_output.lockup_script, LockupScript::P2PKH(Hash::from_bytes(public_key_hash_bytes.as_slice().try_into().unwrap())));
+      assert!(last_output.tokens.inner.is_empty());
+      assert!(last_output.additional_data.inner.is_empty());
     };
 
     let mut length: usize = 0;
@@ -149,6 +178,22 @@ mod tests {
       assert_eq!(expected.gas_price, U256::from_u64(100000000000));
       assert_eq!(expected.inputs.inner.total_size.inner, 3);
       assert_eq!(expected.fixed_outputs.inner.total_size.inner, 4);
+
+      let last_input = expected.inputs.inner.get_current_item().unwrap();
+      let input_hint_bytes = i32::to_be_bytes(-166226891);
+      let output_ref_key_bytes = hex_to_bytes("3cfed394414a0238ab8be798b88140c4f9255f094f30614f184afa0ba5984ba0").unwrap();
+      let public_key_bytes = hex_to_bytes("02e835a6e954a0a0b0e540f4451186e5a1f99baf93a111d304866945a768c39d5c").unwrap();
+      assert_eq!(last_input.output_ref.inner.hint, Hint::from_bytes(input_hint_bytes));
+      assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
+      assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
+
+      let last_output = expected.fixed_outputs.inner.get_current_item().unwrap();
+      let atto_alph_amount = String::from("4081253400000000000");
+      let public_key_hash_bytes = hex_to_bytes("4e796b6f3b889eb8959c285ea4ef8dea6d7aad4c444e2f83f3403fdfde5d2eb6").unwrap();
+      assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
+      assert_eq!(last_output.lockup_script, LockupScript::P2PKH(Hash::from_bytes(public_key_hash_bytes.as_slice().try_into().unwrap())));
+      assert!(last_output.tokens.inner.is_empty());
+      assert!(last_output.additional_data.inner.is_empty());
     };
 
     let mut length: usize = 0;

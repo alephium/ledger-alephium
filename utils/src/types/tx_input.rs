@@ -5,8 +5,8 @@ use super::*;
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct TxInput {
-  output_ref: PartialDecoder<AssetOutputRef>,
-  unlock_script: UnlockScript,
+  pub output_ref: PartialDecoder<AssetOutputRef>,
+  pub unlock_script: UnlockScript,
 }
 
 impl RawDecoder for TxInput {

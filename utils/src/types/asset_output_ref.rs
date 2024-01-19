@@ -5,8 +5,8 @@ use super::*;
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct AssetOutputRef {
-  hint: Hint,
-  key: Hash,
+  pub hint: Hint,
+  pub key: Hash,
 }
 
 impl RawDecoder for AssetOutputRef {

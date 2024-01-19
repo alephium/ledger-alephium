@@ -5,11 +5,11 @@ use super::*;
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct AssetOutput {
-  amount: U256,
-  lockup_script: LockupScript,
-  lock_time: TimeStamp,
-  tokens: PartialDecoder<AVector<Token>>,
-  additional_data: PartialDecoder<ByteString>,
+  pub amount: U256,
+  pub lockup_script: LockupScript,
+  pub lock_time: TimeStamp,
+  pub tokens: PartialDecoder<AVector<Token>>,
+  pub additional_data: PartialDecoder<ByteString>,
 }
 
 impl RawDecoder for AssetOutput {

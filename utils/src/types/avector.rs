@@ -17,6 +17,10 @@ impl <T> AVector<T> {
       Some(&self.current_item.inner)
     }
   }
+
+  pub fn is_empty(&self) -> bool {
+    self.total_size.inner == 0
+  }
 }
 
 impl <T: Default + RawDecoder> Default for AVector<T> {
