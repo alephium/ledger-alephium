@@ -1,5 +1,8 @@
 #![no_std]
 
+pub mod buffer;
+pub mod decode;
+
 use core::char;
 use core::num::Wrapping;
 
