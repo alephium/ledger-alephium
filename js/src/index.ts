@@ -9,7 +9,8 @@ export const CLA = 0x80
 export enum INS {
   GET_VERSION = 0x00,
   GET_PUBLIC_KEY = 0x01,
-  SIGN_HASH = 0x02
+  SIGN_HASH = 0x02,
+  SIGN_TX = 0x03
 }
 
 export const GROUP_NUM = 4
@@ -63,12 +64,40 @@ export default class AlephiumApp {
     const response = await this.transport.send(CLA, INS.SIGN_HASH, 0x00, 0x00, data, [StatusCodes.OK])
     console.log(`response ${response.length} - ${response.toString('hex')}`)
 
-    // Decode signature: https://bitcoin.stackexchange.com/a/12556
-    const rLen = response.slice(3, 4)[0]
-    const r = response.slice(4, 4 + rLen)
-    const sLen = response.slice(5 + rLen, 6 + rLen)[0]
-    const s = response.slice(6 + rLen, 6 + rLen + sLen)
-    console.log(`${rLen} - ${r.toString('hex')}\n${sLen} - ${s.toString('hex')}`)
-    return encodeHexSignature(r.toString('hex'), s.toString('hex'))
+    return decodeSignature(response)
   }
+
+  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
+    console.log(`unsigned tx size: ${unsignedTx.length}`)
+    const encodedPath = serde.serializePath(path)
+    const firstFrameTxLength = 256 - 25;
+    const txData = unsignedTx.slice(0, unsignedTx.length > firstFrameTxLength ? firstFrameTxLength : unsignedTx.length)
+    const data = Buffer.concat([encodedPath, txData])
+    let response = await this.transport.send(CLA, INS.SIGN_TX, 0x00, 0x00, data, [StatusCodes.OK])
+    if (unsignedTx.length <= firstFrameTxLength) {
+      return decodeSignature(response)
+    }
+
+    const frameLength = 256 - 5
+    let fromIndex = firstFrameTxLength
+    while (fromIndex < unsignedTx.length) {
+      const remain = unsignedTx.length - fromIndex
+      const toIndex = remain > frameLength ? (fromIndex + frameLength) : unsignedTx.length
+      const data = unsignedTx.slice(fromIndex, toIndex)
+      response = await this.transport.send(CLA, INS.SIGN_TX, 0x01, 0x00, data, [StatusCodes.OK])
+      fromIndex = toIndex
+    }
+
+    return decodeSignature(response)
+  }
+}
+
+function decodeSignature(response: Buffer): string {
+  // Decode signature: https://bitcoin.stackexchange.com/a/12556
+  const rLen = response.slice(3, 4)[0]
+  const r = response.slice(4, 4 + rLen)
+  const sLen = response.slice(5 + rLen, 6 + rLen)[0]
+  const s = response.slice(6 + rLen, 6 + rLen + sLen)
+  console.log(`${rLen} - ${r.toString('hex')}\n${sLen} - ${s.toString('hex')}`)
+  return encodeHexSignature(r.toString('hex'), s.toString('hex'))
 }
