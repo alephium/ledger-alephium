@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+use blind_signing::is_blind_signing_enabled;
+use blind_signing::update_blind_signing;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
@@ -8,6 +10,7 @@ use ledger_device_sdk::ui::layout::StringPlace;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
+mod blind_signing;
 
 use app_utils::print::{println, println_array, println_slice};
 use app_utils::*;
@@ -67,6 +70,17 @@ fn show_ui_welcome() {
     });
 }
 
+fn show_ui_blind_signing() {
+    show_ui_common(|| {
+        let mut lines = [
+            bagls::Label::from_const("Blind Signing"),
+            bagls::Label::from_const(if is_blind_signing_enabled() { "enabled" } else { "disabled" }),
+        ];
+        lines[0].bold = true;
+        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    });
+}
+
 fn show_ui_version() {
     show_ui_common(|| {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -91,7 +105,8 @@ fn show_ui(index: u8) {
     match index {
         0 => show_ui_welcome(),
         1 => show_ui_version(),
-        2 => show_ui_quit(),
+        2 => show_ui_blind_signing(),
+        3 => show_ui_quit(),
         _ => panic!("Invalid ui index"),
     }
 }
@@ -100,7 +115,7 @@ fn show_ui(index: u8) {
 extern "C" fn sample_main() {
     let mut comm = io::Comm::new();
     let mut ui_index = 0;
-    let ui_page_num = 3;
+    let ui_page_num = 4;
 
     // Draw some 'welcome' screen
     show_ui(ui_index);
@@ -125,6 +140,10 @@ extern "C" fn sample_main() {
             }
             io::Event::Button(ButtonEvent::BothButtonsRelease) => {
                 if ui_index == 2 {
+                    update_blind_signing();
+                    show_ui_blind_signing();
+                }
+                if ui_index == 3 {
                     ledger_device_sdk::exit_app(0);
                 }
             }
