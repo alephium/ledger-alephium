@@ -5,13 +5,13 @@ use super::*;
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct UnsignedTx {
-  version: Byte,
-  network_id: Byte,
+  pub version: Byte,
+  pub network_id: Byte,
   // script_opt: None,
-  gas_amount: I32,
-  gas_price: U256,
-  inputs: PartialDecoder<AVector<TxInput>>,
-  fixed_outputs: PartialDecoder<AVector<AssetOutput>>,
+  pub gas_amount: I32,
+  pub gas_price: U256,
+  pub inputs: PartialDecoder<AVector<TxInput>>,
+  pub fixed_outputs: PartialDecoder<AVector<AssetOutput>>,
 }
 
 impl UnsignedTx {

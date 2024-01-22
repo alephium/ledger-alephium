@@ -59,32 +59,37 @@ impl <T: Default> Default for PartialDecoder<T> {
   }
 }
 
-impl <T: Default + RawDecoder> Decoder<T> for PartialDecoder<T> {
-  fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>> {
-    if self.stage.is_complete() {
-      return Ok(Some(&self.inner))
+impl <T: RawDecoder> PartialDecoder<T> {
+  pub fn try_decode_one_step<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<bool> {
+    if buffer.is_empty() {
+      return Ok(false);
     }
     if self.stage.step >= self.inner.step_size() {
       return Err(DecodeError::InternalError);
     }
     match self.inner.decode(buffer, &self.stage) {
       Ok(stage) => {
+        let result = stage.is_complete();
         let stage = if stage.is_complete() { self.stage.next_step() } else { stage };
         self.stage = if stage.step == self.inner.step_size() { DecodeStage::COMPLETE } else { stage };
-        if self.stage.is_complete() {
-          Ok(Some(&self.inner))
-        } else if !buffer.is_empty() {
-          self.decode(buffer)
-        } else {
-          Ok(None)
-        }
+        Ok(result)
       },
       Err(err) => Err(err),
     }
   }
 }
 
-impl <T: Default + RawDecoder> PartialDecoder<T> {
+impl <T: RawDecoder> Decoder<T> for PartialDecoder<T> {
+  fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>> {
+    match self.try_decode_one_step(buffer) {
+      Ok(true) => if self.stage.is_complete() { Ok(Some(&self.inner)) } else { self.decode(buffer) },
+      Ok(false) => Ok(None),
+      Err(err) => Err(err),
+    }
+  }
+}
+
+impl <T: RawDecoder> PartialDecoder<T> {
   pub fn decode_children<'a>(&mut self, buffer: &mut Buffer<'a>, parent_stage: &DecodeStage) -> DecodeResult<DecodeStage> {
     self.decode(buffer).map(|result| {
       if result.is_some() {

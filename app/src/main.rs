@@ -8,16 +8,20 @@ use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
 use ledger_device_sdk::ui::layout::StringPlace;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
+use error_code::ErrorCode;
+use sign_tx_context::SignTxContext;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
 mod blind_signing;
+mod sign_tx_context;
+mod blake2b_hasher;
+mod error_code;
 
 use app_utils::print::{println, println_array, println_slice};
 use app_utils::*;
 use core::str::from_utf8;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io;
-use ledger_device_sdk::io::SyscallError;
 use ledger_device_sdk::ui::bagls;
 use ledger_device_sdk::ui::gadgets;
 use ledger_device_sdk::ui::screen_util;
@@ -27,12 +31,12 @@ ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 /// This is the UI flow for signing, composed of a scroller
 /// to read the incoming message, a panel that requests user
 /// validation, and an exit message.
-fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32, u32)>, SyscallError> {
+fn sign_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
     gadgets::popup("Tx hash review:");
 
     {
-        let hex: [u8; 64] = utils::to_hex(message).map_err(|_| SyscallError::Overflow)?;
-        let m = from_utf8(&hex).map_err(|_| SyscallError::InvalidParameter)?;
+        let hex: [u8; 64] = utils::to_hex(message).map_err(|_| ErrorCode::InvalidHashLength)?;
+        let m = from_utf8(&hex).map_err(|_| ErrorCode::InvalidParameter)?;
 
         gadgets::MessageScroller::new(m).event_loop();
     }
@@ -40,11 +44,11 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<Option<([u8; 72], u32, u32)>,
     if gadgets::Validator::new("Sign ?").ask() {
         let signature = Secp256k1::derive_from_path(path)
             .deterministic_sign(message)
-            .map_err(|_| SyscallError::Unspecified)?;
+            .map_err(|_| ErrorCode::TxSignFail)?;
         gadgets::SingleMessage::new("Signing...").show();
-        Ok(Some(signature))
+        Ok(signature)
     } else {
-        Ok(None)
+        Err(ErrorCode::UserCancelled)
     }
 }
 
@@ -117,6 +121,7 @@ extern "C" fn sample_main() {
     let mut ui_index = 0;
     let ui_page_num = 4;
 
+    let mut sign_tx_context: Option<SignTxContext> = None;
     // Draw some 'welcome' screen
     show_ui(ui_index);
 
@@ -150,7 +155,7 @@ extern "C" fn sample_main() {
             io::Event::Command(ins) => {
                 println("=== Before event");
                 println_array::<1, 2>(&[ui_index]);
-                match handle_apdu(&mut comm, ins) {
+                match handle_apdu(&mut comm, ins, &mut sign_tx_context) {
                     Ok(ui_changed) => {
                         comm.reply_ok();
                         if ui_changed {
@@ -174,6 +179,7 @@ enum Ins {
     GetVersion,
     GetPubKey,
     SignHash,
+    SignTx,
 }
 
 impl TryFrom<io::ApduHeader> for Ins {
@@ -183,6 +189,7 @@ impl TryFrom<io::ApduHeader> for Ins {
             0 => Ok(Ins::GetVersion),
             1 => Ok(Ins::GetPubKey),
             2 => Ok(Ins::SignHash),
+            3 => Ok(Ins::SignTx),
             _ => Err(ledger_device_sdk::io::StatusWords::Unknown),
         }
     }
@@ -190,7 +197,7 @@ impl TryFrom<io::ApduHeader> for Ins {
 
 use ledger_device_sdk::io::Reply;
 
-fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
+fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<SignTxContext>) -> Result<bool, Reply> {
     if comm.rx == 0 {
         return Err(io::StatusWords::NothingReceived.into());
     }
@@ -244,13 +251,39 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<bool, Reply> {
             }
 
             match sign_ui(&path, &data[20..]) {
-                Ok(Some((signature_buf, length, _))) => {
+                Ok((signature_buf, length, _)) => {
                     comm.append(&signature_buf[..length as usize])
                 }
-                Ok(None) => return Err(io::StatusWords::UserCancelled.into()),
-                Err(_e) => return Err(io::SyscallError::Unspecified.into()),
+                Err(code) => return Err(code.into()),
             }
             return Ok(true);
+        },
+        Ins::SignTx => {
+            if sign_tx_context_opt.is_none() {
+                *sign_tx_context_opt = Some(SignTxContext::new()?);
+            }
+            let sign_tx_context = sign_tx_context_opt.as_mut().unwrap();
+            let data = comm.get_data()?;
+            match sign_tx_context.handle_data(apdu_header, data) {
+                Ok(()) if !sign_tx_context.is_complete() => {
+                    return Ok(true)
+                },
+                Ok(()) => {
+                    let tx_id = sign_tx_context.get_tx_id()?;
+                    let result = match sign_ui(&sign_tx_context.path, &tx_id) {
+                        Ok((signature_buf, length, _)) => {
+                            comm.append(&signature_buf[..length as usize]);
+                            Ok(true)
+                        }
+                        Err(code) => Err(code.into())
+                    };
+                    *sign_tx_context = SignTxContext::new()?;
+                    return result;
+                },
+                Err(code) => {
+                    return Err(code.into())
+                },
+            }
         }
     }
     Ok(false)

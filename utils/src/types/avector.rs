@@ -5,27 +5,41 @@ use super::I32;
 #[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
   current_item: PartialDecoder<T>,
+  current_item_complete: bool,
   pub current_index: usize,
   pub total_size: I32,
 }
 
 impl <T> AVector<T> {
   pub fn get_current_item(&self) -> Option<&T> {
-    if self.total_size.inner == 0 {
-      None
-    } else {
+    if self.current_item_complete {
       Some(&self.current_item.inner)
+    } else {
+      None
     }
   }
 
+  pub fn size(&self) -> usize {
+    self.total_size.inner as usize
+  }
+
   pub fn is_empty(&self) -> bool {
-    self.total_size.inner == 0
+    self.size() == 0
+  }
+
+  pub fn is_complete(&self) -> bool {
+    self.current_index == (self.size() - 1) && self.current_item_complete
   }
 }
 
 impl <T: Default + RawDecoder> Default for AVector<T> {
   fn default() -> Self {
-    AVector { current_item: new_decoder::<T>(), current_index: 0, total_size: I32::default() }
+    AVector {
+      current_item: new_decoder::<T>(),
+      current_item_complete: false,
+      current_index: 0,
+      total_size: I32::default()
+    }
   }
 }
 
@@ -41,9 +55,13 @@ impl <T: Default + RawDecoder> RawDecoder for AVector<T> {
     }
     if stage.step > (self.current_index + 1) {
       self.current_index += 1;
+      self.current_item_complete = false;
       self.current_item.reset();
     }
-    self.current_item.decode_children(buffer, stage)
+    self.current_item.decode_children(buffer, stage).map(|result| {
+      self.current_item_complete = true;
+      result
+    })
   }
 }
 
