@@ -3,7 +3,7 @@ use crate::buffer::Buffer;
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(PartialEq)]
-pub struct PublicKey([u8; 33]);
+pub struct PublicKey(pub [u8; 33]);
 
 impl PublicKey {
   const ENCODED_LENGTH: usize = 33;
@@ -20,7 +20,7 @@ impl Default for PublicKey {
 }
 
 impl RawDecoder for PublicKey {
-  fn step_size(&self) -> usize { 1}
+  fn step_size(&self) -> usize { 1 }
 
   fn decode<'a>(&mut self, buffer: &mut Buffer<'a>, stage: &DecodeStage) -> DecodeResult<DecodeStage> {
     let remain = PublicKey::ENCODED_LENGTH - stage.index;

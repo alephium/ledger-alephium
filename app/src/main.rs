@@ -266,7 +266,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
             let data = comm.get_data()?;
             match sign_tx_context.handle_data(apdu_header, data) {
                 Ok(()) if !sign_tx_context.is_complete() => {
-                    return Ok(true)
+                    return Ok(true);
                 },
                 Ok(()) => {
                     let tx_id = sign_tx_context.get_tx_id()?;
@@ -281,6 +281,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
                     return result;
                 },
                 Err(code) => {
+                    *sign_tx_context = SignTxContext::new()?;
                     return Err(code.into())
                 },
             }

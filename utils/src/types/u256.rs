@@ -2,7 +2,7 @@ use crate::decode::*;
 use crate::types::compact_integer::*;
 use crate::buffer::Buffer;
 
-use super::reset;
+use super::{extend_slice, reset};
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
@@ -15,15 +15,6 @@ impl PartialEq for U256 {
   fn eq(&self, other: &Self) -> bool {
     self.inner == other.inner
   }
-}
-
-fn extend_slice<const NUM: usize>(dest: &mut [u8; NUM], from_index: usize, source: &[u8]) -> usize {
-  let mut index = 0;
-  while index < source.len() {
-    dest[index + from_index] = source[index];
-    index += 1;
-  }
-  from_index + index
 }
 
 fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM]) -> &'a [u8] {

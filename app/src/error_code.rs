@@ -13,6 +13,8 @@ pub enum ErrorCode {
   TxSignFail = 0xF001,
   InvalidHashLength = 0xF002,
   InvalidParameter = 0xF003,
+  Overflow = 0xF004,
+  NotSupported = 0xF005,
   InternalError = 0xFF00,
   Unknown = StatusWords::Unknown as u16,
 }

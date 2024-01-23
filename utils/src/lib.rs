@@ -3,6 +3,7 @@
 pub mod buffer;
 pub mod decode;
 pub mod types;
+pub mod base58;
 
 use core::char;
 use core::num::Wrapping;

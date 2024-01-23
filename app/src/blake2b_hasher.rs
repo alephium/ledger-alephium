@@ -23,6 +23,13 @@ impl Blake2bHasher {
     Self([0; Self::WORK_AREA_SIZE])
   }
 
+  pub fn hash(input: &[u8]) -> Result<[u8; BLAKE2B_HASH_SIZE], ErrorCode> {
+    let mut hasher = Blake2bHasher::new();
+    hasher.init()?;
+    hasher.update(input)?;
+    hasher.finalize()
+  }
+
   pub fn reset(&mut self) {
     unsafe { write_bytes(self, 0, 1); }
   }

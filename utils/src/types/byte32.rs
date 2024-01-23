@@ -3,7 +3,7 @@ use crate::buffer::Buffer;
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default, PartialEq)]
-pub struct Byte32([u8; 32]);
+pub struct Byte32(pub [u8; 32]);
 
 impl Byte32 {
   const ENCODED_LENGTH: usize = 32;

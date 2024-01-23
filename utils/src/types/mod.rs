@@ -42,3 +42,12 @@ fn reset<const NUM: usize>(dest: &mut [u8; NUM]) {
     index += 1;
   }
 }
+
+pub fn extend_slice<const NUM: usize>(dest: &mut [u8; NUM], from_index: usize, source: &[u8]) -> usize {
+  let mut index = 0;
+  while index < source.len() {
+    dest[index + from_index] = source[index];
+    index += 1;
+  }
+  from_index + index
+}

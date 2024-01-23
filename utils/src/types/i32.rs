@@ -35,6 +35,10 @@ impl I32 {
     I32 { inner, first_byte: 0 }
   }
 
+  pub fn unsafe_from(value: usize) -> Self {
+    I32 { inner: value as i32, first_byte: 0 }
+  }
+
   #[inline]
   pub fn get_length(&self) -> usize {
     decode_length(self.first_byte)
