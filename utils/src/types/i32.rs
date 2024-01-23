@@ -2,11 +2,30 @@ use crate::decode::*;
 use crate::types::compact_integer::*;
 use crate::buffer::Buffer;
 
+use super::reset;
+
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct I32 {
   pub inner: i32,
   first_byte: u8,
+}
+
+fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM], is_negative: bool) -> &'a [u8] {
+  let mut index = 0;
+  while index < dest.len() {
+    if dest[index] == b'0' {
+      index += 1;
+    } else {
+      break;
+    }
+  }
+  if is_negative {
+    dest[index - 1] = b'-';
+    &dest[(index - 1)..]
+  } else {
+    &dest[index..]
+  }
 }
 
 impl I32 {
@@ -24,6 +43,28 @@ impl I32 {
   #[inline]
   pub fn is_fixed_size(&self) -> bool {
     is_fixed_size(self.first_byte)
+  }
+
+  pub fn to_str<'a, const NUM: usize>(&self, output: &'a mut [u8; NUM]) -> Option<&'a [u8]> {
+    reset(output);
+    if output.len() < 1 { return None; }
+    if self.inner == 0 {
+      output[0] = b'0';
+      return Some(&output[0..1]);
+    }
+
+    let num_length = if self.inner < 0 { output.len() - 1 } else { output.len() };
+    let mut raw_number = self.inner;
+    let mut length = 0;
+    while raw_number != 0 {
+      if length >= num_length { return None; }
+      let index = output.len() - length - 1;
+      let number = raw_number % 10;
+      output[index] = b'0' + if number < 0 { (-number) as u8 } else { number as u8 };
+      raw_number = raw_number / 10;
+      length += 1;
+    }
+    Some(trim(output, self.inner < 0))
   }
 
   fn decode_fixed_size(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
@@ -93,6 +134,7 @@ pub mod tests {
 
     use super::*;
     use rand::Rng;
+    use core::str::from_utf8;
     use std::vec::Vec;
 
     fn hex_to_bytes(hex_string: &str) -> Result<Vec<u8>, std::num::ParseIntError> {
@@ -167,6 +209,26 @@ pub mod tests {
             assert_eq!(decoder.stage.index, length);
           }
         }
+      }
+    }
+
+    #[test]
+    fn test_to_str() {
+      let cases = [
+        (0, "0"),
+        (1, "1"),
+        (-1, "-1"),
+        (i32::MAX, "2147483647"),
+        (i32::MIN, "-2147483648"),
+        (111000, "111000"),
+        (999999, "999999"),
+      ];
+      for (number, str) in cases {
+        let mut output = [0; 11];
+        let result = I32::from(number).to_str(&mut output);
+        assert!(result.is_some());
+        let expected = from_utf8(result.unwrap()).unwrap();
+        assert_eq!(*str, *expected);
       }
     }
 }

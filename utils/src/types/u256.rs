@@ -2,6 +2,8 @@ use crate::decode::*;
 use crate::types::compact_integer::*;
 use crate::buffer::Buffer;
 
+use super::reset;
+
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
 pub struct U256 {
@@ -15,7 +17,36 @@ impl PartialEq for U256 {
   }
 }
 
+fn extend_slice<const NUM: usize>(dest: &mut [u8; NUM], from_index: usize, source: &[u8]) -> usize {
+  let mut index = 0;
+  while index < source.len() {
+    dest[index + from_index] = source[index];
+    index += 1;
+  }
+  from_index + index
+}
+
+fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM]) -> &'a [u8] {
+  let mut index = dest.len() - 1;
+  while index != 0 {
+    if dest[index] == b'0' {
+      index -= 1;
+    } else {
+      break;
+    }
+  }
+  if dest[index] == b'.' {
+    &dest[0..(index)]
+  } else {
+    &dest[0..(index + 1)]
+  }
+}
+
 impl U256 {
+  const ALPH_DECIMALS: usize = 18;
+  const DECIMAL_PLACES: usize = 6;
+  const ALPH_MIN: u128 = (10 as u128).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
+
   #[inline]
   pub fn get_length(&self) -> usize {
     decode_length(self.first_byte)
@@ -24,6 +55,10 @@ impl U256 {
   #[inline]
   pub fn is_fixed_size(&self) -> bool {
     is_fixed_size(self.first_byte)
+  }
+
+  pub fn is_zero(&self) -> bool {
+    self.inner.iter().all(|x| *x == 0)
   }
 
   pub fn from(array: [u64; 4]) -> U256 {
@@ -36,6 +71,70 @@ impl U256 {
 
   pub fn from_u64(value: u64) -> U256 {
     U256 { inner: [0, 0, 0, value], first_byte: 0 }
+  }
+
+  #[cfg(test)]
+  pub fn from_u128(value: u128) -> U256 {
+    U256 {
+      inner: [
+        0,
+        0,
+        ((value >> 64) & (u64::MAX as u128)) as u64,
+        (value & (u64::MAX as u128)) as u64
+      ],
+      first_byte: 0
+    }
+  }
+
+  pub fn to_u128(&self) -> Option<u128> {
+    if self.inner[0] != 0 || self.inner[1] != 0 {
+      return None;
+    }
+    let result = ((self.inner[2] as u128) << 64) | (self.inner[3] as u128);
+    Some(result)
+  }
+
+  pub fn to_alph<'a, const NUM: usize>(&self, output: &'a mut [u8; NUM]) -> Option<&'a [u8]> {
+    reset(output);
+
+    if self.is_zero() {
+      output[0] = b'0';
+      return Some(&output[..1]);
+    }
+
+    let mut raw_amount = self.to_u128()?;
+    if raw_amount < Self::ALPH_MIN {
+      extend_slice(output, 0, b"<0.000001");
+      return Some(trim(output));
+    }
+
+    let mut bytes = [b'0'; 28];
+    let mut length = 0;
+    while raw_amount > 0 {
+      if length >= bytes.len() { return None; }
+      let index = bytes.len() - length - 1;
+      bytes[index] = b'0' + ((raw_amount % 10) as u8);
+      raw_amount = raw_amount / 10;
+      length += 1;
+    }
+
+    let str_length = if length > Self::ALPH_DECIMALS {
+      length - 18 + 1 + Self::DECIMAL_PLACES
+    } else {
+      2 + Self::DECIMAL_PLACES
+    };
+    if str_length > output.len() { return None; }
+
+    let decimal_index = bytes.len() - Self::ALPH_DECIMALS;
+    let from_index = if length > Self::ALPH_DECIMALS {
+      let str = &bytes[(bytes.len() - length)..decimal_index];
+      extend_slice(output, 0, str)
+    } else {
+      extend_slice(output, 0, b"0")
+    };
+    extend_slice(output, from_index, &[b'.']);
+    extend_slice(output, from_index + 1, &bytes[decimal_index..(decimal_index + Self::DECIMAL_PLACES)]);
+    Some(trim(output))
   }
 
   fn decode_u32(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
@@ -104,10 +203,12 @@ impl RawDecoder for U256 {
 pub mod tests {
   extern crate std;
 
+  use std::string::String;
   use rand::Rng;
   use crate::buffer::Buffer;
   use crate::types::u256::U256 ;
   use crate::decode::*;
+  use core::str::from_utf8;
   use std::vec::Vec;
 
   pub fn hex_to_bytes(hex_string: &str) -> Result<Vec<u8>, std::num::ParseIntError> {
@@ -194,5 +295,55 @@ pub mod tests {
         }
       }
     }
+  }
+
+  #[test]
+  fn test_to_alph() {
+    let alph = |str: &str| {
+      let index_opt = str.find('.');
+      let mut result_str = String::new();
+      if index_opt.is_none() {
+        result_str.extend(str.chars());
+        let pad: String = std::iter::repeat('0').take(U256::ALPH_DECIMALS).collect();
+        result_str.extend(pad.chars());
+      } else {
+        let index = index_opt.unwrap();
+        let pad_size = U256::ALPH_DECIMALS - (str.len() - index_opt.unwrap()) + 1;
+        result_str.extend(str[0..index].chars());
+        result_str.extend(str[(index + 1)..].chars());
+        let pad: String = std::iter::repeat('0').take(pad_size).collect();
+        result_str.extend(pad.chars());
+      }
+      result_str.parse::<u128>().unwrap()
+    };
+
+    let cases = [
+      (0, "0"),
+      (U256::ALPH_MIN, "0.000001"),
+      ((10 as u128).pow(12), "0.000001"),
+      (U256::ALPH_MIN - 1, "<0.000001"),
+      ((10 as u128).pow(13), "0.00001"),
+      ((10 as u128).pow(14), "0.0001"),
+      ((10 as u128).pow(17), "0.1"),
+      ((10 as u128).pow(17), "0.1"),
+      ((10 as u128).pow(18), "1"),
+      (alph("0.11111111111"), "0.111111"),
+      (alph("111111.11111111"), "111111.111111"),
+      (alph("1.010101"), "1.010101"),
+      (alph("1.101010"), "1.10101"),
+      (alph("1.9999999"), "1.999999"),
+    ];
+    for (number, str) in cases {
+      let u256 = U256::from_u128(number);
+      let mut output = [0u8; 17];
+      let result = u256.to_alph(&mut output);
+      assert!(result.is_some());
+      let expected = from_utf8(result.unwrap()).unwrap();
+      assert_eq!(*str, *expected);
+    }
+
+    let mut output = [0u8; 17];
+    let value = U256::from([0, 1, 0, 0]);
+    assert!(value.to_alph(&mut output).is_none());
   }
 }

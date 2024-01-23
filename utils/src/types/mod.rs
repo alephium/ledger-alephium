@@ -34,3 +34,11 @@ pub use unsigned_tx::UnsignedTx;
 
 pub type Hash = Byte32;
 pub type ByteString = AVector<Byte>;
+
+fn reset<const NUM: usize>(dest: &mut [u8; NUM]) {
+  let mut index = 0;
+  while index < dest.len() {
+    dest[index] = b'0';
+    index += 1;
+  }
+}
