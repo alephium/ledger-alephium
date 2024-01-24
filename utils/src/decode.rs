@@ -89,18 +89,6 @@ impl <T: RawDecoder> Decoder<T> for PartialDecoder<T> {
   }
 }
 
-impl <T: RawDecoder> PartialDecoder<T> {
-  pub fn decode_children<'a>(&mut self, buffer: &mut Buffer<'a>, parent_stage: &DecodeStage) -> DecodeResult<DecodeStage> {
-    self.decode(buffer).map(|result| {
-      if result.is_some() {
-        DecodeStage::COMPLETE
-      } else {
-        DecodeStage { ..*parent_stage }
-      }
-    })
-  }
-}
-
 pub fn new_decoder<T: Default + RawDecoder>() -> PartialDecoder<T> {
   PartialDecoder::<T>::default()
 }

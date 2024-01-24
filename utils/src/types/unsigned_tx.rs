@@ -138,8 +138,8 @@ mod tests {
       let input_hint_bytes = i32::to_be_bytes(-882572943);
       let output_ref_key_bytes = hex_to_bytes("950bf46c8d7fe6ca54a2cffdbc29f60c9b666fb42cb1c09a17d2ff555e3e893e").unwrap();
       let public_key_bytes = hex_to_bytes("02622da4723abe3e57e6926b69a049635dad0f9059a89ca222d83f0b2da256235e").unwrap();
-      assert_eq!(last_input.output_ref.inner.hint, Hint::from_bytes(input_hint_bytes));
-      assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
+      assert_eq!(last_input.hint, Hint::from_bytes(input_hint_bytes));
+      assert_eq!(last_input.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
       assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
 
       let last_output = expected.fixed_outputs.get_current_item().unwrap();
@@ -147,8 +147,8 @@ mod tests {
       let public_key_hash_bytes = hex_to_bytes("9b85f066b1b2821339bf73e9e00bbe660b0cfb97158ceedff3260e1e4368961d").unwrap();
       assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
       assert_eq!(last_output.lockup_script, LockupScript::P2PKH(Hash::from_bytes(public_key_hash_bytes.as_slice().try_into().unwrap())));
-      assert!(last_output.tokens.inner.is_empty());
-      assert!(last_output.additional_data.inner.is_empty());
+      assert!(last_output.tokens.is_empty());
+      assert!(last_output.additional_data.is_empty());
     };
 
     let mut length: usize = 0;
@@ -195,8 +195,8 @@ mod tests {
       let input_hint_bytes = i32::to_be_bytes(-166226891);
       let output_ref_key_bytes = hex_to_bytes("3cfed394414a0238ab8be798b88140c4f9255f094f30614f184afa0ba5984ba0").unwrap();
       let public_key_bytes = hex_to_bytes("02e835a6e954a0a0b0e540f4451186e5a1f99baf93a111d304866945a768c39d5c").unwrap();
-      assert_eq!(last_input.output_ref.inner.hint, Hint::from_bytes(input_hint_bytes));
-      assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
+      assert_eq!(last_input.hint, Hint::from_bytes(input_hint_bytes));
+      assert_eq!(last_input.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
       assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
 
       let last_output = expected.fixed_outputs.get_current_item().unwrap();
@@ -204,8 +204,8 @@ mod tests {
       let public_key_hash_bytes = hex_to_bytes("4e796b6f3b889eb8959c285ea4ef8dea6d7aad4c444e2f83f3403fdfde5d2eb6").unwrap();
       assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
       assert_eq!(last_output.lockup_script, LockupScript::P2PKH(Hash::from_bytes(public_key_hash_bytes.as_slice().try_into().unwrap())));
-      assert!(last_output.tokens.inner.is_empty());
-      assert!(last_output.additional_data.inner.is_empty());
+      assert!(last_output.tokens.is_empty());
+      assert!(last_output.additional_data.is_empty());
     };
 
     let mut length: usize = 0;
