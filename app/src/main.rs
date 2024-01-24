@@ -3,19 +3,19 @@
 
 use blind_signing::is_blind_signing_enabled;
 use blind_signing::update_blind_signing;
+use error_code::ErrorCode;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
 use ledger_device_sdk::ui::layout::StringPlace;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
-use error_code::ErrorCode;
 use sign_tx_context::SignTxContext;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod app_utils;
-mod blind_signing;
-mod sign_tx_context;
 mod blake2b_hasher;
+mod blind_signing;
 mod error_code;
+mod sign_tx_context;
 
 use app_utils::print::{println, println_array, println_slice};
 use app_utils::*;
@@ -78,7 +78,11 @@ fn show_ui_blind_signing() {
     show_ui_common(|| {
         let mut lines = [
             bagls::Label::from_const("Blind Signing"),
-            bagls::Label::from_const(if is_blind_signing_enabled() { "enabled" } else { "disabled" }),
+            bagls::Label::from_const(if is_blind_signing_enabled() {
+                "enabled"
+            } else {
+                "disabled"
+            }),
         ];
         lines[0].bold = true;
         lines.place(layout::Location::Middle, layout::Layout::Centered, false);
@@ -197,7 +201,11 @@ impl TryFrom<io::ApduHeader> for Ins {
 
 use ledger_device_sdk::io::Reply;
 
-fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<SignTxContext>) -> Result<bool, Reply> {
+fn handle_apdu(
+    comm: &mut io::Comm,
+    ins: Ins,
+    sign_tx_context_opt: &mut Option<SignTxContext>,
+) -> Result<bool, Reply> {
     if comm.rx == 0 {
         return Err(io::StatusWords::NothingReceived.into());
     }
@@ -251,13 +259,11 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
             }
 
             match sign_ui(&path, &data[20..]) {
-                Ok((signature_buf, length, _)) => {
-                    comm.append(&signature_buf[..length as usize])
-                }
+                Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),
                 Err(code) => return Err(code.into()),
             }
             return Ok(true);
-        },
+        }
         Ins::SignTx => {
             if sign_tx_context_opt.is_none() {
                 *sign_tx_context_opt = Some(SignTxContext::new()?);
@@ -267,7 +273,7 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
             match sign_tx_context.handle_data(apdu_header, data) {
                 Ok(()) if !sign_tx_context.is_complete() => {
                     return Ok(true);
-                },
+                }
                 Ok(()) => {
                     let tx_id = sign_tx_context.get_tx_id()?;
                     let result = match sign_ui(&sign_tx_context.path, &tx_id) {
@@ -275,15 +281,15 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
                             comm.append(&signature_buf[..length as usize]);
                             Ok(true)
                         }
-                        Err(code) => Err(code.into())
+                        Err(code) => Err(code.into()),
                     };
                     *sign_tx_context_opt = None;
                     return result;
-                },
+                }
                 Err(code) => {
                     *sign_tx_context_opt = None;
-                    return Err(code.into())
-                },
+                    return Err(code.into());
+                }
             }
         }
     }
