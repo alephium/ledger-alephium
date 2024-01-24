@@ -63,3 +63,12 @@ set-github-action:
 		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
 
 .PHONY: release clean
+
+install_nanos:
+	@make _install device=nanos
+
+install_nanosplus:
+	@make _install device=nanosplus
+
+_install:
+	cd app && cargo ledger build $(device) -l && cd ..
