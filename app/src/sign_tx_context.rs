@@ -78,16 +78,16 @@ impl SignTxContext {
     self.hasher.finalize()
   }
 
-  fn display(&mut self) -> Result<(), ErrorCode> {
+  fn review(&mut self) -> Result<(), ErrorCode> {
     match self.current_step {
-      DecodeStep::TxNetworkId => display_network(self.unsigned_tx.inner.network_id.0),
-      DecodeStep::TxGasAmount => display_gas_amount(&self.unsigned_tx.inner.gas_amount),
-      DecodeStep::TxGasPrice => display_gas_price(&self.unsigned_tx.inner.gas_price),
+      DecodeStep::TxNetworkId => review_network(self.unsigned_tx.inner.network_id.0),
+      DecodeStep::TxGasAmount => review_gas_amount(&self.unsigned_tx.inner.gas_amount),
+      DecodeStep::TxGasPrice => review_gas_price(&self.unsigned_tx.inner.gas_price),
       DecodeStep::TxInputs => {
         let current_input = self.unsigned_tx.inner.inputs.get_current_item();
         if current_input.is_some() {
           let current_index = self.unsigned_tx.inner.inputs.current_index;
-          display_tx_input(current_input.unwrap(), current_index as usize)
+          review_tx_input(current_input.unwrap(), current_index as usize)
         } else {
           Ok(())
         }
@@ -96,7 +96,7 @@ impl SignTxContext {
         let current_output = self.unsigned_tx.inner.fixed_outputs.get_current_item();
         if current_output.is_some() {
           let current_index = self.unsigned_tx.inner.fixed_outputs.current_index;
-          display_tx_output(current_output.unwrap(), current_index as usize)
+          review_tx_output(current_output.unwrap(), current_index as usize)
         } else {
           Ok(())
         }
@@ -108,7 +108,7 @@ impl SignTxContext {
   fn _decode_tx(&mut self, buffer: &mut Buffer) -> Result<(), ErrorCode> {
     match self.unsigned_tx.try_decode_one_step(buffer) {
       Ok(true) => {
-        self.display()?;
+        self.review()?;
         self.next_step();
         if self.unsigned_tx.stage.is_complete() {
           self.current_step = DecodeStep::Complete;
@@ -157,7 +157,7 @@ impl SignTxContext {
   }
 }
 
-fn display_network(id: u8) -> Result<(), ErrorCode> {
+fn review_network(id: u8) -> Result<(), ErrorCode> {
   let network_type = match id {
     0 => "mainnet",
     1 => "testnet",
@@ -165,7 +165,7 @@ fn display_network(id: u8) -> Result<(), ErrorCode> {
   };
 
   let fields = [Field { name: "Network", value: network_type }];
-  display(&fields, "Review Network")
+  review(&fields, "Review Network")
 }
 
 #[inline]
@@ -203,21 +203,21 @@ fn to_address<'a, const NUM: usize>(prefix: u8, hash: &Hash, output: &'a mut [u8
   bytes_to_string(str_bytes.unwrap())
 }
 
-fn display_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
+fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
   let mut output = [0; 11];
   let value = num_with_prefix(b"", gas_amount, &mut output)?;
   let fields = [Field { name: "GasAmount", value }];
-  display(&fields, "Review Gas Amount")
+  review(&fields, "Review Gas Amount")
 }
 
-fn display_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
+fn review_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
   let mut output = [0; 22];
   let value = to_alph_str(gas_price, &mut output)?;
   let fields = [Field { name: "GasPrice", value }];
-  display(&fields, "Review Gas Price")
+  review(&fields, "Review Gas Price")
 }
 
-fn display_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), ErrorCode> {
+fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), ErrorCode> {
   match &tx_input.unlock_script {
     UnlockScript::P2PKH(public_key) => {
       let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
@@ -226,13 +226,13 @@ fn display_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Erro
       let fields = [Field { name: "Address", value }];
       let mut review_message_bytes = [0u8; 25]; // b"Review Input #".len() + 11
       let review_message = num_with_prefix(b"Review Input #", &I32::unsafe_from(current_index), &mut review_message_bytes)?;
-      return display(&fields, review_message);
+      return review(&fields, review_message);
     },
     _ => return Err(ErrorCode::NotSupported),
   };
 }
 
-fn display_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), ErrorCode> {
+fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), ErrorCode> {
   let mut amount_output = [0u8; 22];
   let amount_str = to_alph_str(&output.amount, &mut amount_output)?;
   let amount_field = Field { name: "Amount", value: amount_str };
@@ -243,14 +243,14 @@ fn display_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), E
       let fields = [amount_field, Field { name: "Address", value }];
       let mut review_message_bytes = [0u8; 26]; // b"Review Output #".len() + 11
       let review_message = num_with_prefix(b"Review Output #", &I32::unsafe_from(current_index), &mut review_message_bytes)?;
-      // TODO: display tokens
-      return display(&fields, review_message);
+      // TODO: review tokens
+      return review(&fields, review_message);
     },
     LockupScript::Unknown => return Err(ErrorCode::NotSupported),
   }
 }
 
-fn display<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
+fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
   let review_messages = [review_message];
   let review = MultiFieldReview::new(
     fields,
