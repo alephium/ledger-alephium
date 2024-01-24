@@ -15,6 +15,7 @@ pub enum ErrorCode {
   InvalidParameter = 0xF003,
   Overflow = 0xF004,
   NotSupported = 0xF005,
+  DerivePathDecodeFail = 0xF006,
   InternalError = 0xFF00,
   Unknown = StatusWords::Unknown as u16,
 }

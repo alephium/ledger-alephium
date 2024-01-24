@@ -52,14 +52,14 @@ impl SignTxContext {
       DecodeStep::TxGasAmount => DecodeStep::TxGasPrice,
       DecodeStep::TxGasPrice => DecodeStep::TxInputs,
       DecodeStep::TxInputs => {
-        if self.unsigned_tx.inner.inputs.inner.is_complete() {
+        if self.unsigned_tx.inner.inputs.is_complete() {
           DecodeStep::TxOutputs
         } else {
           DecodeStep::TxInputs
         }
       },
       DecodeStep::TxOutputs => {
-        if self.unsigned_tx.inner.fixed_outputs.inner.is_complete() {
+        if self.unsigned_tx.inner.fixed_outputs.is_complete() {
           DecodeStep::Complete
         } else {
           DecodeStep::TxOutputs
@@ -84,19 +84,19 @@ impl SignTxContext {
       DecodeStep::TxGasAmount => display_gas_amount(&self.unsigned_tx.inner.gas_amount),
       DecodeStep::TxGasPrice => display_gas_price(&self.unsigned_tx.inner.gas_price),
       DecodeStep::TxInputs => {
-        let current_input = self.unsigned_tx.inner.inputs.inner.get_current_item();
+        let current_input = self.unsigned_tx.inner.inputs.get_current_item();
         if current_input.is_some() {
-          let current_index = self.unsigned_tx.inner.inputs.inner.current_index;
-          display_tx_input(current_input.unwrap(), current_index)
+          let current_index = self.unsigned_tx.inner.inputs.current_index;
+          display_tx_input(current_input.unwrap(), current_index as usize)
         } else {
           Ok(())
         }
       },
       DecodeStep::TxOutputs => {
-        let current_output = self.unsigned_tx.inner.fixed_outputs.inner.get_current_item();
+        let current_output = self.unsigned_tx.inner.fixed_outputs.get_current_item();
         if current_output.is_some() {
-          let current_index = self.unsigned_tx.inner.fixed_outputs.inner.current_index;
-          display_tx_output(current_output.unwrap(), current_index)
+          let current_index = self.unsigned_tx.inner.fixed_outputs.current_index;
+          display_tx_output(current_output.unwrap(), current_index as usize)
         } else {
           Ok(())
         }
@@ -108,10 +108,10 @@ impl SignTxContext {
   fn _decode_tx(&mut self, buffer: &mut Buffer) -> Result<(), ErrorCode> {
     match self.unsigned_tx.try_decode_one_step(buffer) {
       Ok(true) => {
-        self.next_step();
         self.display()?;
+        self.next_step();
         if self.unsigned_tx.stage.is_complete() {
-          self.next_step();
+          self.current_step = DecodeStep::Complete;
           Ok(())
         } else {
           self._decode_tx(buffer)
@@ -139,8 +139,10 @@ impl SignTxContext {
       DecodeStep::Complete => Err(ErrorCode::InternalError),
       DecodeStep::Init =>
         if apdu_header.p1 == 0 && data.len() >= 20 {
-          self.next_step();
-          deserialize_path(&data[0..20], &mut self.path);
+          if !deserialize_path(&data[0..20], &mut self.path) {
+            return Err(ErrorCode::DerivePathDecodeFail);
+          }
+          self.current_step = DecodeStep::TxVersion;
           self.decode_tx(&data[20..])
         } else {
           Err(ErrorCode::TxDecodeFail)

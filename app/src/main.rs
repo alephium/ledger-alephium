@@ -277,11 +277,11 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins, sign_tx_context_opt: &mut Option<S
                         }
                         Err(code) => Err(code.into())
                     };
-                    *sign_tx_context = SignTxContext::new()?;
+                    *sign_tx_context_opt = None;
                     return result;
                 },
                 Err(code) => {
-                    *sign_tx_context = SignTxContext::new()?;
+                    *sign_tx_context_opt = None;
                     return Err(code.into())
                 },
             }

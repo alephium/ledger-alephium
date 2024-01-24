@@ -10,8 +10,8 @@ pub struct UnsignedTx {
   // script_opt: None,
   pub gas_amount: I32,
   pub gas_price: U256,
-  pub inputs: PartialDecoder<AVector<TxInput>>,
-  pub fixed_outputs: PartialDecoder<AVector<AssetOutput>>,
+  pub inputs: AVector<TxInput>,
+  pub fixed_outputs: AVector<AssetOutput>,
 }
 
 impl UnsignedTx {
@@ -29,7 +29,9 @@ impl UnsignedTx {
 }
 
 impl RawDecoder for UnsignedTx {
-  fn step_size(&self) -> usize { 7 }
+  fn step_size(&self) -> usize {
+    5 + self.inputs.step_size() + self.fixed_outputs.step_size()
+  }
 
   fn decode<'a>(&mut self, buffer: &mut Buffer<'a>, stage: &DecodeStage) -> DecodeResult<DecodeStage> {
     match stage.step {
@@ -38,9 +40,15 @@ impl RawDecoder for UnsignedTx {
       2 => self.decode_script_opt(buffer, stage),
       3 => self.gas_amount.decode(buffer, stage),
       4 => self.gas_price.decode(buffer, stage),
-      5 => self.inputs.decode_children(buffer, stage),
-      6 => self.fixed_outputs.decode_children(buffer, stage),
-      _ => Err(DecodeError::InternalError),
+      step => {
+        if step > 4 && step <= (4 + self.inputs.step_size()) {
+          self.inputs.decode(buffer, stage)
+        } else if step <= self.step_size() {
+          self.fixed_outputs.decode(buffer, stage)
+        } else {
+          Err(DecodeError::InternalError)
+        }
+      },
     }
   }
 }
@@ -121,10 +129,12 @@ mod tests {
       assert_eq!(expected.network_id.0, 0);
       assert_eq!(expected.gas_amount, I32::from(56860));
       assert_eq!(expected.gas_price, U256::from_u64(100000000000));
-      assert_eq!(expected.inputs.inner.total_size.inner, 6);
-      assert_eq!(expected.fixed_outputs.inner.total_size.inner, 7);
+      assert_eq!(expected.inputs.size(), 6);
+      assert_eq!(expected.fixed_outputs.size(), 7);
+      assert!(expected.inputs.is_complete());
+      assert!(expected.fixed_outputs.is_complete());
 
-      let last_input = expected.inputs.inner.get_current_item().unwrap();
+      let last_input = expected.inputs.get_current_item().unwrap();
       let input_hint_bytes = i32::to_be_bytes(-882572943);
       let output_ref_key_bytes = hex_to_bytes("950bf46c8d7fe6ca54a2cffdbc29f60c9b666fb42cb1c09a17d2ff555e3e893e").unwrap();
       let public_key_bytes = hex_to_bytes("02622da4723abe3e57e6926b69a049635dad0f9059a89ca222d83f0b2da256235e").unwrap();
@@ -132,7 +142,7 @@ mod tests {
       assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
       assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
 
-      let last_output = expected.fixed_outputs.inner.get_current_item().unwrap();
+      let last_output = expected.fixed_outputs.get_current_item().unwrap();
       let atto_alph_amount = String::from("5674913458402000000");
       let public_key_hash_bytes = hex_to_bytes("9b85f066b1b2821339bf73e9e00bbe660b0cfb97158ceedff3260e1e4368961d").unwrap();
       assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
@@ -176,10 +186,12 @@ mod tests {
       assert_eq!(expected.network_id.0, 0);
       assert_eq!(expected.gas_amount, I32::from(31180));
       assert_eq!(expected.gas_price, U256::from_u64(100000000000));
-      assert_eq!(expected.inputs.inner.total_size.inner, 3);
-      assert_eq!(expected.fixed_outputs.inner.total_size.inner, 4);
+      assert_eq!(expected.inputs.size(), 3);
+      assert_eq!(expected.fixed_outputs.size(), 4);
+      assert!(expected.inputs.is_complete());
+      assert!(expected.fixed_outputs.is_complete());
 
-      let last_input = expected.inputs.inner.get_current_item().unwrap();
+      let last_input = expected.inputs.get_current_item().unwrap();
       let input_hint_bytes = i32::to_be_bytes(-166226891);
       let output_ref_key_bytes = hex_to_bytes("3cfed394414a0238ab8be798b88140c4f9255f094f30614f184afa0ba5984ba0").unwrap();
       let public_key_bytes = hex_to_bytes("02e835a6e954a0a0b0e540f4451186e5a1f99baf93a111d304866945a768c39d5c").unwrap();
@@ -187,7 +199,7 @@ mod tests {
       assert_eq!(last_input.output_ref.inner.key, Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap()));
       assert_eq!(last_input.unlock_script, UnlockScript::P2PKH(PublicKey::from_bytes(public_key_bytes.as_slice().try_into().unwrap())));
 
-      let last_output = expected.fixed_outputs.inner.get_current_item().unwrap();
+      let last_output = expected.fixed_outputs.get_current_item().unwrap();
       let atto_alph_amount = String::from("4081253400000000000");
       let public_key_hash_bytes = hex_to_bytes("4e796b6f3b889eb8959c285ea4ef8dea6d7aad4c444e2f83f3403fdfde5d2eb6").unwrap();
       assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);

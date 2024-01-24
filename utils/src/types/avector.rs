@@ -1,3 +1,5 @@
+use core::cmp;
+
 use crate::decode::*;
 use crate::buffer::Buffer;
 use super::I32;
@@ -6,8 +8,8 @@ use super::I32;
 pub struct AVector<T> {
   current_item: PartialDecoder<T>,
   current_item_complete: bool,
-  pub current_index: usize,
-  pub total_size: I32,
+  pub current_index: isize,
+  total_size: I32,
 }
 
 impl <T> AVector<T> {
@@ -19,16 +21,30 @@ impl <T> AVector<T> {
     }
   }
 
+  #[inline]
   pub fn size(&self) -> usize {
     self.total_size.inner as usize
   }
 
+  #[inline]
   pub fn is_empty(&self) -> bool {
     self.size() == 0
   }
 
+  #[inline]
+  fn total_size_decoded(&self) -> bool {
+    self.current_index >= 0
+  }
+
   pub fn is_complete(&self) -> bool {
-    self.current_index == (self.size() - 1) && self.current_item_complete
+    if !self.total_size_decoded() {
+      return false;
+    }
+    if self.is_empty() {
+      return true;
+    }
+    return ((self.current_index as usize) == (self.size() - 1)) &&
+      self.current_item_complete
   }
 }
 
@@ -37,31 +53,40 @@ impl <T: Default + RawDecoder> Default for AVector<T> {
     AVector {
       current_item: new_decoder::<T>(),
       current_item_complete: false,
-      current_index: 0,
+      current_index: -1,
       total_size: I32::default()
     }
   }
 }
 
 impl <T: Default + RawDecoder> RawDecoder for AVector<T> {
-  fn step_size(&self) -> usize { (self.total_size.inner as usize) + 1 }
+  fn step_size(&self) -> usize {
+    if self.total_size_decoded() {
+      cmp::max(self.size(), 1)
+    } else {
+      1
+    }
+  }
 
   fn decode<'a>(&mut self, buffer: &mut Buffer<'a>, stage: &DecodeStage) -> DecodeResult<DecodeStage> {
-    if stage.step == 0 {
-      return self.total_size.decode(buffer, stage);
+    if !self.total_size_decoded() {
+      let result = self.total_size.decode(buffer, stage)?;
+      if !result.is_complete() { return Ok(DecodeStage { ..*stage }); }
+      self.current_index = 0;
+      if self.size() == 0 { return Ok(DecodeStage::COMPLETE); }
     }
-    if self.step_size() == 1 { // empty avector
-      return Ok(DecodeStage::COMPLETE);
-    }
-    if stage.step > (self.current_index + 1) {
-      self.current_index += 1;
+
+    if self.current_item_complete {
       self.current_item_complete = false;
       self.current_item.reset();
+      self.current_index += 1;
     }
-    self.current_item.decode_children(buffer, stage).map(|result| {
-      self.current_item_complete = true;
-      result
-    })
+
+    let result = self.current_item.decode(buffer)?;
+    if result.is_none() { return Ok(DecodeStage { ..*stage }); }
+
+    self.current_item_complete = true;
+    return Ok(DecodeStage::COMPLETE);
   }
 }
 
@@ -85,11 +110,13 @@ mod tests {
     let mut decoder0 = new_decoder::<AVector<Hash>>();
     let result0 = decoder0.decode(&mut buffer0).unwrap().unwrap();
     assert!(result0.get_current_item().is_none());
+    assert!(result0.is_complete());
 
     let mut buffer1 = Buffer::new(&empty_avector_encoded).unwrap();
     let mut decoder1 = new_decoder::<AVector<U256>>();
     let result1 = decoder1.decode(&mut buffer1).unwrap().unwrap();
     assert!(result1.get_current_item().is_none());
+    assert!(result1.is_complete());
   }
 
   #[test]
@@ -111,7 +138,7 @@ mod tests {
         let result = decoder.decode(&mut buffer).unwrap().unwrap();
         assert_eq!(result.total_size, I32::from(size as i32));
         assert_eq!(result.get_current_item(), hashes.last());
-        assert_eq!(result.current_index, size - 1);
+        assert_eq!(result.current_index as usize, size - 1);
       }
 
       let mut length: usize = 0;
@@ -129,7 +156,7 @@ mod tests {
         } else {
           let index = length / 32;
           assert!(result.is_none());
-          assert_eq!(decoder.stage.step, index + 1);
+          assert_eq!(decoder.stage.step, index);
           assert_eq!(decoder.inner.get_current_item(), Some(&hashes[index - 1]));
         }
       }
