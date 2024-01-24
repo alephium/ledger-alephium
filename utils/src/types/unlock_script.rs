@@ -1,17 +1,56 @@
-use super::PublicKey;
+use super::*;
 use crate::buffer::Buffer;
 use crate::decode::*;
 
-#[cfg_attr(test, derive(Debug))]
-#[derive(PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
+pub struct PublicKeyWithIndex {
+    public_key: PublicKey,
+    index: I32,
+}
+
+impl RawDecoder for PublicKeyWithIndex {
+    fn step_size(&self) -> usize {
+        2
+    }
+
+    fn decode<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            0 => self.public_key.decode(buffer, stage),
+            1 => self.index.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum UnlockScript {
     P2PKH(PublicKey),
+    P2MPKH(PartialDecoder<AVector<PublicKeyWithIndex>>),
+    P2SH(PartialDecoder<(Script, AVector<Val>)>),
+    SameAsPrevious,
     Unknown,
 }
 
 impl Default for UnlockScript {
     fn default() -> Self {
         UnlockScript::Unknown
+    }
+}
+
+impl UnlockScript {
+    fn from_type(tpe: u8) -> Option<Self> {
+        match tpe {
+            0 => Some(UnlockScript::P2PKH(PublicKey::default())),
+            1 => Some(UnlockScript::P2MPKH(PartialDecoder::default())),
+            2 => Some(UnlockScript::P2SH(PartialDecoder::default())),
+            3 => Some(UnlockScript::SameAsPrevious),
+            _ => None,
+        }
     }
 }
 
@@ -28,16 +67,23 @@ impl RawDecoder for UnlockScript {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        if *self == UnlockScript::Unknown {
-            let tpe = buffer.next_byte().unwrap();
-            if tpe != 0 {
-                return Err(DecodeError::NotSupported);
-            }
-            *self = UnlockScript::P2PKH(PublicKey::default());
-        }
         match self {
-            Self::P2PKH(public_key) => public_key.decode(buffer, stage),
-            Self::Unknown => Err(DecodeError::InternalError),
+            UnlockScript::Unknown => {
+                let tpe = buffer.next_byte().unwrap();
+                let result = UnlockScript::from_type(tpe);
+                if result.is_none() {
+                    return Err(DecodeError::InvalidData);
+                }
+                *self = result.unwrap();
+            }
+            _ => (),
+        };
+        match self {
+            UnlockScript::P2PKH(public_key) => public_key.decode(buffer, stage),
+            UnlockScript::P2MPKH(keys) => keys.decode_children(buffer, stage),
+            UnlockScript::P2SH(script) => script.decode_children(buffer, stage),
+            UnlockScript::SameAsPrevious => Ok(DecodeStage::COMPLETE),
+            UnlockScript::Unknown => Err(DecodeError::InternalError),
         }
     }
 }
@@ -47,7 +93,7 @@ mod tests {
     extern crate std;
 
     use crate::buffer::Buffer;
-    use crate::decode::{new_decoder, DecodeError, Decoder};
+    use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
     use crate::types::{PublicKey, UnlockScript};
@@ -87,19 +133,6 @@ mod tests {
                     assert_eq!(result, None);
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_decode_invalid_unlock_script() {
-        let invalid_types = [1u8, 2u8, 3u8];
-        for tpe in invalid_types {
-            let bytes = vec![tpe];
-            let mut buffer = Buffer::new(&bytes).unwrap();
-            let mut decoder = new_decoder::<UnlockScript>();
-            let result = decoder.decode(&mut buffer);
-            assert!(result.is_err());
-            assert_eq!(result.unwrap_err(), DecodeError::NotSupported);
         }
     }
 }

@@ -4,7 +4,7 @@ use super::I32;
 use crate::buffer::Buffer;
 use crate::decode::*;
 
-#[cfg_attr(test, derive(Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct AVector<T> {
     current_item: PartialDecoder<T>,
     current_item_complete: bool,

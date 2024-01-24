@@ -1,17 +1,31 @@
-use super::Hash;
+use super::{AVector, Hash, I32};
 use crate::buffer::Buffer;
 use crate::decode::*;
 
-#[cfg_attr(test, derive(Debug))]
-#[derive(PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum LockupScript {
     P2PKH(Hash),
+    P2MPKH(PartialDecoder<(AVector<Hash>, I32)>),
+    P2SH(Hash),
+    P2C(Hash),
     Unknown,
 }
 
 impl Default for LockupScript {
     fn default() -> Self {
         LockupScript::Unknown
+    }
+}
+
+impl LockupScript {
+    fn from_type(tpe: u8) -> Option<Self> {
+        match tpe {
+            0 => Some(LockupScript::P2PKH(Hash::default())),
+            1 => Some(LockupScript::P2MPKH(PartialDecoder::default())),
+            2 => Some(LockupScript::P2SH(Hash::default())),
+            3 => Some(LockupScript::P2C(Hash::default())),
+            _ => None,
+        }
     }
 }
 
@@ -28,16 +42,23 @@ impl RawDecoder for LockupScript {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        if *self == LockupScript::Unknown {
-            let tpe = buffer.next_byte().unwrap();
-            if tpe != 0 {
-                return Err(DecodeError::NotSupported);
-            }
-            *self = LockupScript::P2PKH(Hash::default());
-        }
         match self {
-            Self::P2PKH(hash) => hash.decode(buffer, stage),
-            Self::Unknown => Err(DecodeError::InternalError),
+            LockupScript::Unknown => {
+                let tpe = buffer.next_byte().unwrap();
+                let result = LockupScript::from_type(tpe);
+                if result.is_none() {
+                    return Err(DecodeError::InvalidData);
+                }
+                *self = result.unwrap();
+            }
+            _ => (),
+        };
+        match self {
+            LockupScript::P2PKH(hash) => hash.decode(buffer, stage),
+            LockupScript::P2MPKH(hashes) => hashes.decode_children(buffer, stage),
+            LockupScript::P2SH(hash) => hash.decode(buffer, stage),
+            LockupScript::P2C(hash) => hash.decode(buffer, stage),
+            LockupScript::Unknown => Err(DecodeError::InternalError),
         }
     }
 }
@@ -47,7 +68,7 @@ mod tests {
     extern crate std;
 
     use crate::buffer::Buffer;
-    use crate::decode::{new_decoder, DecodeError, Decoder};
+    use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
     use crate::types::{Hash, LockupScript};
@@ -86,19 +107,6 @@ mod tests {
                     assert_eq!(result, None);
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_decode_invalid_lockup_script() {
-        let invalid_types = [1u8, 2u8, 3u8];
-        for tpe in invalid_types {
-            let bytes = vec![tpe];
-            let mut buffer = Buffer::new(&bytes).unwrap();
-            let mut decoder = new_decoder::<LockupScript>();
-            let result = decoder.decode(&mut buffer);
-            assert!(result.is_err());
-            assert_eq!(result.unwrap_err(), DecodeError::NotSupported);
         }
     }
 }

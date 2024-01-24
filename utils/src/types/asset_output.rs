@@ -29,7 +29,7 @@ impl RawDecoder for AssetOutput {
             step if step > 2 && step <= (2 + self.tokens.step_size()) => {
                 self.tokens.decode(buffer, stage)
             }
-            step if step <= self.step_size() => self.additional_data.decode(buffer, stage),
+            step if step < self.step_size() => self.additional_data.decode(buffer, stage),
             _ => Err(DecodeError::InternalError),
         }
     }

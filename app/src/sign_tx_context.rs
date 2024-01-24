@@ -304,7 +304,7 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
             // TODO: review tokens
             return review(&fields, review_message);
         }
-        LockupScript::Unknown => return Err(ErrorCode::NotSupported),
+        _ => return Err(ErrorCode::NotSupported),
     }
 }
 

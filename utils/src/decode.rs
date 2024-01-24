@@ -98,6 +98,20 @@ impl<T: RawDecoder> PartialDecoder<T> {
             Err(err) => Err(err),
         }
     }
+
+    pub fn decode_children<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a>,
+        parent_stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        self.decode(buffer).map(|result| {
+            if result.is_some() {
+                DecodeStage::COMPLETE
+            } else {
+                DecodeStage { ..*parent_stage }
+            }
+        })
+    }
 }
 
 impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
@@ -112,6 +126,59 @@ impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
             }
             Ok(false) => Ok(None),
             Err(err) => Err(err),
+        }
+    }
+}
+
+impl<T: Default + RawDecoder> RawDecoder for Option<T> {
+    fn step_size(&self) -> usize {
+        match self {
+            None => 1,
+            Some(v) => v.step_size(),
+        }
+    }
+
+    fn decode<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        if buffer.is_empty() {
+            return Ok(DecodeStage { ..*stage });
+        }
+
+        if self.is_none() {
+            let byte = buffer.next_byte().unwrap();
+            if byte == 0 {
+                return Ok(DecodeStage::COMPLETE);
+            } else if byte == 1 {
+                *self = Some(T::default());
+            } else {
+                return Err(DecodeError::InvalidData);
+            }
+        }
+
+        match self {
+            Some(v) => v.decode(buffer, stage),
+            None => Err(DecodeError::InternalError),
+        }
+    }
+}
+
+impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
+    fn step_size(&self) -> usize {
+        self.0.step_size() + self.1.step_size()
+    }
+
+    fn decode<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            step if step < self.0.step_size() => self.0.decode(buffer, stage),
+            step if step < self.step_size() => self.1.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
         }
     }
 }

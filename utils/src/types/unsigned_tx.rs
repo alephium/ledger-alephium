@@ -7,29 +7,11 @@ use crate::decode::*;
 pub struct UnsignedTx {
     pub version: Byte,
     pub network_id: Byte,
-    // script_opt: None,
+    pub script_opt: PartialDecoder<Option<Script>>,
     pub gas_amount: I32,
     pub gas_price: U256,
     pub inputs: AVector<TxInput>,
     pub fixed_outputs: AVector<AssetOutput>,
-}
-
-impl UnsignedTx {
-    fn decode_script_opt(
-        &mut self,
-        buffer: &mut Buffer,
-        stage: &DecodeStage,
-    ) -> DecodeResult<DecodeStage> {
-        if buffer.is_empty() {
-            return Ok(DecodeStage { ..*stage });
-        }
-        let byte = buffer.next_byte().unwrap();
-        if byte != 0 {
-            Err(DecodeError::NotSupported)
-        } else {
-            Ok(DecodeStage::COMPLETE)
-        }
-    }
 }
 
 impl RawDecoder for UnsignedTx {
@@ -45,18 +27,14 @@ impl RawDecoder for UnsignedTx {
         match stage.step {
             0 => self.version.decode(buffer, stage),
             1 => self.network_id.decode(buffer, stage),
-            2 => self.decode_script_opt(buffer, stage),
+            2 => self.script_opt.decode_children(buffer, stage),
             3 => self.gas_amount.decode(buffer, stage),
             4 => self.gas_price.decode(buffer, stage),
-            step => {
-                if step > 4 && step <= (4 + self.inputs.step_size()) {
-                    self.inputs.decode(buffer, stage)
-                } else if step <= self.step_size() {
-                    self.fixed_outputs.decode(buffer, stage)
-                } else {
-                    Err(DecodeError::InternalError)
-                }
+            step if step >= 5 && step < (5 + self.inputs.step_size()) => {
+                self.inputs.decode(buffer, stage)
             }
+            step if step < self.step_size() => self.fixed_outputs.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
         }
     }
 }
@@ -284,12 +262,76 @@ mod tests {
 
     #[test]
     fn test_script_tx() {
-        // b4d93868e9b20c2757067334799ea815614fcec306eb254832dbbbd58eb8d42a
+        let tx_id_hex = "b4d93868e9b20c2757067334799ea815614fcec306eb254832dbbbd58eb8d42a";
         let bytes = hex_to_bytes("0000010101030001000b1440205bf2f559ae714dab83ff36bed4d9e634dfda3ca9ed755d60f00be89e2a20bd001700b4160013c5056bc75e2d63100000a313c5056bc75e2d631000000d0c1440205bf2f559ae714dab83ff36bed4d9e634dfda3ca9ed755d60f00be89e2a20bd00010e8000bffcc1174876e80002e412bbf9030c20b11b0d1755c76eca9aee0144286933d46bfadbdd0b59976ae73e67523000037fda053ebb06b77a9b03ba029f826ec3e1337e47462743bc0b5035ec0d033615e412bbf93f98f4e88567ca1b978d5a59b126fa8afd7432231c8217e2684e99d3d686826e00037fda053ebb06b77a9b03ba029f826ec3e1337e47462743bc0b5035ec0d03361502c3038d7ea4c68000005bb4d7a6644d4981818916b1d480335290ec9c38beacb827fe92dde7cab5698d0000000000000000015bf2f559ae714dab83ff36bed4d9e634dfda3ca9ed755d60f00be89e2a20bd00c50d49f0894c3e0c685800c530759dc0cd56ff0000005bb4d7a6644d4981818916b1d480335290ec9c38beacb827fe92dde7cab5698d00000000000000000000").unwrap();
-        let mut buffer = Buffer::new(&bytes[..(u8::MAX as usize)]).unwrap();
-        let mut decoder = new_decoder::<UnsignedTx>();
-        let result = decoder.decode(&mut buffer);
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), DecodeError::NotSupported);
+        let check = |expected: &UnsignedTx| {
+            assert_eq!(expected.version.0, 0);
+            assert_eq!(expected.network_id.0, 0);
+            assert_eq!(expected.gas_amount, I32::from(49148));
+            assert_eq!(expected.gas_price, U256::from_u64(100000000000));
+            assert_eq!(expected.inputs.size(), 2);
+            assert_eq!(expected.fixed_outputs.size(), 2);
+            assert!(expected.inputs.is_complete());
+            assert!(expected.fixed_outputs.is_complete());
+
+            let last_input = expected.inputs.get_current_item().unwrap();
+            let input_hint_bytes = i32::to_be_bytes(-468534279);
+            let output_ref_key_bytes =
+                hex_to_bytes("3f98f4e88567ca1b978d5a59b126fa8afd7432231c8217e2684e99d3d686826e")
+                    .unwrap();
+            let public_key_bytes =
+                hex_to_bytes("037fda053ebb06b77a9b03ba029f826ec3e1337e47462743bc0b5035ec0d033615")
+                    .unwrap();
+            assert_eq!(last_input.hint, Hint::from_bytes(input_hint_bytes));
+            assert_eq!(
+                last_input.key,
+                Hash::from_bytes(output_ref_key_bytes.as_slice().try_into().unwrap())
+            );
+            assert_eq!(
+                last_input.unlock_script,
+                UnlockScript::P2PKH(PublicKey::from_bytes(
+                    public_key_bytes.as_slice().try_into().unwrap()
+                ))
+            );
+
+            let last_output = expected.fixed_outputs.get_current_item().unwrap();
+            let atto_alph_amount = String::from("893918857600000000000");
+            let public_key_hash_bytes =
+                hex_to_bytes("5bb4d7a6644d4981818916b1d480335290ec9c38beacb827fe92dde7cab5698d")
+                    .unwrap();
+            assert_eq!(u256_to_string(&last_output.amount), atto_alph_amount);
+            assert_eq!(
+                last_output.lockup_script,
+                LockupScript::P2PKH(Hash::from_bytes(
+                    public_key_hash_bytes.as_slice().try_into().unwrap()
+                ))
+            );
+            assert!(last_output.tokens.is_empty());
+            assert!(last_output.additional_data.is_empty());
+        };
+
+        let mut length: usize = 0;
+        let mut decoder = TxDecodeContext::default();
+
+        while length < bytes.len() {
+            let remain = bytes.len() - length;
+            let size = min(random_usize(0, u8::MAX as usize), remain);
+            let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+            length += size;
+
+            let result = decoder.decode(&mut buffer).unwrap();
+            if length == bytes.len() {
+                assert!(buffer.is_empty());
+                assert!(result.is_some());
+                check(result.unwrap());
+                assert!(decoder.is_complete());
+            } else {
+                assert!(result.is_none());
+                assert!(!decoder.is_complete());
+            }
+        }
+
+        let tx_id = decoder.get_tx_id().unwrap();
+        assert_eq!(hex_to_bytes(tx_id_hex).unwrap(), tx_id);
     }
 }
