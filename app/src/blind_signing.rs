@@ -2,7 +2,7 @@ use ledger_device_sdk::nvm::{AtomicStorage, SingleStorage};
 use ledger_device_sdk::NVMData;
 
 #[link_section = ".nvm_data"]
-static mut BLIND_SIGNING: NVMData<AtomicStorage<u8>> = NVMData::new(AtomicStorage::new(&1));
+static mut BLIND_SIGNING: NVMData<AtomicStorage<u8>> = NVMData::new(AtomicStorage::new(&0));
 
 pub fn is_blind_signing_enabled() -> bool {
     let blind_signing = unsafe { BLIND_SIGNING.get_mut() };

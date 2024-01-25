@@ -16,6 +16,7 @@ pub enum ErrorCode {
     Overflow = 0xF004,
     NotSupported = 0xF005,
     DerivePathDecodeFail = 0xF006,
+    BlindSigningNotEnabled = 0xF007,
     InternalError = 0xFF00,
     Unknown = StatusWords::Unknown as u16,
 }

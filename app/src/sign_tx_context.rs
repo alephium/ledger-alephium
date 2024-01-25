@@ -1,13 +1,14 @@
 use core::str::from_utf8;
 use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
-use ledger_device_sdk::ui::gadgets::{Field, MultiFieldReview};
+use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
 use utils::base58::base58_encode;
 use utils::types::{
     extend_slice, AssetOutput, Hash, LockupScript, TxInput, UnlockScript, I32, U256,
 };
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
+use crate::blind_signing::is_blind_signing_enabled;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
     error_code::ErrorCode,
@@ -142,12 +143,17 @@ impl SignTxContext {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
-                if apdu_header.p1 == 0 && data.len() >= 20 {
+                if apdu_header.p1 == 0 && data.len() >= 23 {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::DerivePathDecodeFail);
                     }
                     self.current_step = DecodeStep::TxVersion;
-                    self.decode_tx(&data[20..])
+                    let tx_data = &data[20..];
+                    if tx_data[2] == 0x01 && !is_blind_signing_enabled() {
+                        blind_signing_warning();
+                        return Err(ErrorCode::BlindSigningNotEnabled);
+                    }
+                    self.decode_tx(tx_data)
                 } else {
                     Err(ErrorCode::TxDecodeFail)
                 }
@@ -271,10 +277,10 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
                 &I32::unsafe_from(current_index),
                 &mut review_message_bytes,
             )?;
-            return review(&fields, review_message);
+            review(&fields, review_message)
         }
-        _ => return Err(ErrorCode::NotSupported),
-    };
+        _ => Err(ErrorCode::NotSupported),
+    }
 }
 
 fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), ErrorCode> {
@@ -302,9 +308,9 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
                 &mut review_message_bytes,
             )?;
             // TODO: review tokens
-            return review(&fields, review_message);
+            review(&fields, review_message)
         }
-        _ => return Err(ErrorCode::NotSupported),
+        _ => Err(ErrorCode::NotSupported),
     }
 }
 
@@ -324,4 +330,9 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
     } else {
         Err(ErrorCode::UserCancelled)
     }
+}
+
+fn blind_signing_warning() {
+    let scroller = MessageScroller::new("Blind signing must be enabled");
+    scroller.event_loop();
 }
