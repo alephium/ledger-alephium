@@ -1,4 +1,6 @@
 use core::str::from_utf8;
+use ledger_device_sdk::ecc::Secp256k1;
+use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
@@ -108,6 +110,21 @@ impl SignTxContext {
             }
             _ => Ok(()),
         }
+    }
+
+    pub fn review_tx_id_and_sign(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
+        let tx_id = self.get_tx_id()?;
+        let hex: [u8; 64] = utils::to_hex(&tx_id).unwrap();
+        let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InvalidParameter)?;
+        let fields = [Field {
+            name: "TxId",
+            value: hex_str,
+        }];
+        review(&fields, "Review Tx Id")?;
+        let signature = Secp256k1::derive_from_path(&self.path)
+            .deterministic_sign(&tx_id)
+            .map_err(|_| ErrorCode::TxSignFail)?;
+        Ok(signature)
     }
 
     fn _decode_tx(&mut self, buffer: &mut Buffer) -> Result<(), ErrorCode> {
@@ -313,7 +330,7 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
     match &output.lockup_script {
         LockupScript::P2PKH(hash) | LockupScript::P2SH(hash) => {
             let mut bytes = [0u8; 50];
-            let value = to_address(0u8, hash, &mut bytes)?;
+            let value = to_address(output.lockup_script.get_type(), hash, &mut bytes)?;
             let fields = [
                 amount_field,
                 Field {

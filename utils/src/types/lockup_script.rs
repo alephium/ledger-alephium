@@ -27,6 +27,16 @@ impl LockupScript {
             _ => None,
         }
     }
+
+    pub fn get_type(&self) -> u8 {
+        match self {
+            LockupScript::P2PKH(_) => 0,
+            LockupScript::P2MPKH(_) => 1,
+            LockupScript::P2SH(_) => 2,
+            LockupScript::P2C(_) => 3,
+            _ => 0xff, // dead branch
+        }
+    }
 }
 
 impl RawDecoder for LockupScript {
