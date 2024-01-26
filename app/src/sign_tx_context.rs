@@ -262,6 +262,12 @@ fn review_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
 }
 
 fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), ErrorCode> {
+    let mut review_message_bytes = [0u8; 25]; // b"Review Input #".len() + 11
+    let review_message = num_with_prefix(
+        b"Review Input #",
+        &I32::unsafe_from(current_index),
+        &mut review_message_bytes,
+    )?;
     match &tx_input.unlock_script {
         UnlockScript::P2PKH(public_key) => {
             let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
@@ -271,12 +277,20 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
                 name: "Address",
                 value,
             }];
-            let mut review_message_bytes = [0u8; 25]; // b"Review Input #".len() + 11
-            let review_message = num_with_prefix(
-                b"Review Input #",
-                &I32::unsafe_from(current_index),
-                &mut review_message_bytes,
-            )?;
+            review(&fields, review_message)
+        }
+        UnlockScript::P2MPKH(_) => {
+            let fields = [Field {
+                name: "Address",
+                value: "multi-sig address",
+            }];
+            review(&fields, review_message)
+        }
+        UnlockScript::P2SH(_) => {
+            let fields = [Field {
+                name: "Address",
+                value: "p2sh address", // TODO: display p2sh address
+            }];
             review(&fields, review_message)
         }
         _ => Err(ErrorCode::NotSupported),
@@ -290,10 +304,16 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
         name: "Amount",
         value: amount_str,
     };
+    let mut review_message_bytes = [0u8; 26]; // b"Review Output #".len() + 11
+    let review_message = num_with_prefix(
+        b"Review Output #",
+        &I32::unsafe_from(current_index),
+        &mut review_message_bytes,
+    )?;
     match &output.lockup_script {
-        LockupScript::P2PKH(public_key_hash) => {
+        LockupScript::P2PKH(hash) | LockupScript::P2SH(hash) => {
             let mut bytes = [0u8; 50];
-            let value = to_address(0u8, public_key_hash, &mut bytes)?;
+            let value = to_address(0u8, hash, &mut bytes)?;
             let fields = [
                 amount_field,
                 Field {
@@ -301,13 +321,17 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
                     value,
                 },
             ];
-            let mut review_message_bytes = [0u8; 26]; // b"Review Output #".len() + 11
-            let review_message = num_with_prefix(
-                b"Review Output #",
-                &I32::unsafe_from(current_index),
-                &mut review_message_bytes,
-            )?;
             // TODO: review tokens
+            review(&fields, review_message)
+        }
+        LockupScript::P2MPKH(_) => {
+            let fields = [
+                amount_field,
+                Field {
+                    name: "Address",
+                    value: "multi-sig address", // TODO: display multi-sig address
+                },
+            ];
             review(&fields, review_message)
         }
         _ => Err(ErrorCode::NotSupported),
