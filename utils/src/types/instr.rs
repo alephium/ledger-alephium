@@ -395,7 +395,7 @@ impl Instr {
     }
 }
 impl RawDecoder for Instr {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         match self {
             Self::CallLocal(v0) => v0.step_size(),
             Self::CallExternal(v0) => v0.step_size(),

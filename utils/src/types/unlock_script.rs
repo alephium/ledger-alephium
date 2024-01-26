@@ -10,7 +10,7 @@ pub struct PublicKeyWithIndex {
 }
 
 impl RawDecoder for PublicKeyWithIndex {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         2
     }
 
@@ -55,7 +55,7 @@ impl UnlockScript {
 }
 
 impl RawDecoder for UnlockScript {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 

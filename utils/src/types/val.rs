@@ -31,7 +31,7 @@ impl Val {
 }
 
 impl RawDecoder for Val {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         match self {
             Val::Bool(v) => v.step_size(),
             Val::I256(v) => v.step_size(),

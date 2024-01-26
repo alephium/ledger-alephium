@@ -13,14 +13,14 @@ pub type DecodeResult<T> = Result<T, DecodeError>;
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default, PartialEq)]
 pub struct DecodeStage {
-    pub step: usize,
-    pub index: usize,
+    pub step: u16,
+    pub index: u16,
 }
 
 impl DecodeStage {
     pub const COMPLETE: DecodeStage = DecodeStage {
-        step: usize::MAX,
-        index: usize::MAX,
+        step: u16::MAX,
+        index: u16::MAX,
     };
 
     pub fn is_complete(&self) -> bool {
@@ -36,7 +36,7 @@ impl DecodeStage {
 }
 
 pub trait RawDecoder: Sized {
-    fn step_size(&self) -> usize;
+    fn step_size(&self) -> u16;
 
     fn decode<'a>(
         &mut self,
@@ -131,7 +131,7 @@ impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
 }
 
 impl<T: Default + RawDecoder> RawDecoder for Option<T> {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         match self {
             None => 1,
             Some(v) => v.step_size(),
@@ -166,7 +166,7 @@ impl<T: Default + RawDecoder> RawDecoder for Option<T> {
 }
 
 impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         self.0.step_size() + self.1.step_size()
     }
 

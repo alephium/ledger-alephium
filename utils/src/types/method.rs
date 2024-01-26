@@ -14,7 +14,7 @@ pub struct Method {
 }
 
 impl RawDecoder for Method {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         5 + self.instrs.step_size()
     }
 

@@ -10,7 +10,7 @@ impl TimeStamp {
 }
 
 impl RawDecoder for TimeStamp {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -19,20 +19,20 @@ impl RawDecoder for TimeStamp {
         buffer: &mut Buffer<'a>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        let remain = Self::ENCODED_LENGTH - stage.index;
+        let remain = Self::ENCODED_LENGTH - (stage.index as usize);
         let mut idx: usize = 0;
         while !buffer.is_empty() && idx < remain {
             let byte = buffer.next_byte().unwrap();
             self.0 |= ((byte & 0xff) as u64) << ((remain - 1 - idx) * 8);
             idx += 1;
         }
-        let new_index = stage.index + idx;
+        let new_index = (stage.index as usize) + idx;
         if new_index == Self::ENCODED_LENGTH {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }

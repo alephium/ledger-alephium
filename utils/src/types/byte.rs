@@ -6,7 +6,7 @@ use crate::decode::*;
 pub struct Byte(pub u8);
 
 impl RawDecoder for Byte {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 

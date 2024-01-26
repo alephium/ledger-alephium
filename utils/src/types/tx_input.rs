@@ -11,7 +11,7 @@ pub struct TxInput {
 }
 
 impl RawDecoder for TxInput {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         3
     }
 

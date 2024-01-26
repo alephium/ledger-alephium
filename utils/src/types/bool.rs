@@ -6,7 +6,7 @@ use crate::decode::*;
 pub struct Bool(bool);
 
 impl RawDecoder for Bool {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 

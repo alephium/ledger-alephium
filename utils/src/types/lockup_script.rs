@@ -30,7 +30,7 @@ impl LockupScript {
 }
 
 impl RawDecoder for LockupScript {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 

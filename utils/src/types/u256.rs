@@ -176,7 +176,7 @@ impl U256 {
 }
 
 impl RawDecoder for U256 {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -196,9 +196,9 @@ impl RawDecoder for U256 {
             if stage.index == 0 {
                 self.inner[3] =
                     (((self.first_byte as u32) & MASK_MODE) << ((length - 1) * 8)) as u64;
-                self.decode_u32(buffer, length, stage.index + 1)
+                self.decode_u32(buffer, length, (stage.index as usize) + 1)
             } else {
-                self.decode_u32(buffer, length, stage.index)
+                self.decode_u32(buffer, length, stage.index as usize)
             }
         } else {
             let from_index = if stage.index == 0 {
@@ -207,9 +207,9 @@ impl RawDecoder for U256 {
                 stage.index
             };
             if length == 5 {
-                self.decode_u32(buffer, length, from_index)
+                self.decode_u32(buffer, length, from_index as usize)
             } else {
-                self.decode_multi_bytes(buffer, length, from_index)
+                self.decode_multi_bytes(buffer, length, from_index as usize)
             }
         };
         if new_index == length {
@@ -217,7 +217,7 @@ impl RawDecoder for U256 {
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }
@@ -348,7 +348,7 @@ pub mod tests {
                     assert!(decoder.stage.is_complete())
                 } else {
                     assert_eq!(result, None);
-                    assert_eq!(decoder.stage.index, length);
+                    assert_eq!(decoder.stage.index as usize, length);
                 }
             }
         }

@@ -16,7 +16,7 @@ impl Token {
 }
 
 impl RawDecoder for Token {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         2
     }
 

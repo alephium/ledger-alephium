@@ -128,7 +128,7 @@ impl PartialEq for I32 {
 }
 
 impl RawDecoder for I32 {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -149,21 +149,21 @@ impl RawDecoder for I32 {
         }
 
         let new_index = if self.is_fixed_size() {
-            self.decode_fixed_size(buffer, length, stage.index)
+            self.decode_fixed_size(buffer, length, stage.index as usize)
         } else {
             let from_index = if stage.index == 0 {
                 stage.index + 1
             } else {
                 stage.index
             };
-            self.decode_i32(buffer, length, from_index)
+            self.decode_i32(buffer, length, from_index as usize)
         };
         if new_index == length {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }
@@ -248,7 +248,7 @@ pub mod tests {
                     assert!(decoder.stage.is_complete())
                 } else {
                     assert_eq!(result, None);
-                    assert_eq!(decoder.stage.index, length);
+                    assert_eq!(decoder.stage.index as usize, length);
                 }
             }
         }

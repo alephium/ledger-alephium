@@ -8,7 +8,7 @@ use crate::decode::*;
 pub struct AVector<T> {
     current_item: PartialDecoder<T>,
     current_item_complete: bool,
-    pub current_index: isize,
+    pub current_index: i16,
     total_size: I32,
 }
 
@@ -59,9 +59,9 @@ impl<T: Default + RawDecoder> Default for AVector<T> {
 }
 
 impl<T: Default + RawDecoder> RawDecoder for AVector<T> {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         if self.total_size_decoded() {
-            cmp::max(self.size(), 1)
+            cmp::max(self.size() as u16, 1)
         } else {
             1
         }
@@ -165,7 +165,7 @@ mod tests {
                 } else {
                     let index = length / 32;
                     assert!(result.is_none());
-                    assert_eq!(decoder.stage.step, index);
+                    assert_eq!(decoder.stage.step as usize, index);
                     assert_eq!(decoder.inner.get_current_item(), Some(&hashes[index - 1]));
                 }
             }

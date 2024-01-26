@@ -20,7 +20,7 @@ impl Default for PublicKey {
 }
 
 impl RawDecoder for PublicKey {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -29,19 +29,19 @@ impl RawDecoder for PublicKey {
         buffer: &mut Buffer<'a>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        let remain = PublicKey::ENCODED_LENGTH - stage.index;
+        let remain = PublicKey::ENCODED_LENGTH - (stage.index as usize);
         let mut idx: usize = 0;
         while !buffer.is_empty() && idx < remain {
-            self.0[stage.index + idx] = buffer.next_byte().unwrap();
+            self.0[(stage.index as usize) + idx] = buffer.next_byte().unwrap();
             idx += 1;
         }
-        let new_index = stage.index + idx;
+        let new_index = (stage.index as usize) + idx;
         if new_index == PublicKey::ENCODED_LENGTH {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }

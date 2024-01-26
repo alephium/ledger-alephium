@@ -15,7 +15,7 @@ pub struct UnsignedTx {
 }
 
 impl RawDecoder for UnsignedTx {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         5 + self.inputs.step_size() + self.fixed_outputs.step_size()
     }
 

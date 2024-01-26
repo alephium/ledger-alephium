@@ -32,7 +32,7 @@ impl I256 {
 }
 
 impl RawDecoder for I256 {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -52,17 +52,17 @@ impl RawDecoder for I256 {
         };
         let length = self.get_length();
         let mut idx = 0;
-        while !buffer.is_empty() && idx < (length - from_index) {
-            self.bytes[from_index + idx] = buffer.next_byte().unwrap();
+        while !buffer.is_empty() && idx < (length - (from_index as usize)) {
+            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
             idx += 1;
         }
-        let new_index = from_index + idx;
+        let new_index = (from_index as usize) + idx;
         if new_index == length {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }
@@ -143,7 +143,7 @@ mod tests {
                     assert!(decoder.stage.is_complete());
                 } else {
                     assert_eq!(result, None);
-                    assert_eq!(decoder.stage.index, length);
+                    assert_eq!(decoder.stage.index as usize, length);
                 }
             }
         }

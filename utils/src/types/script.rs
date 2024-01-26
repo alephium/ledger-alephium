@@ -7,7 +7,7 @@ use crate::decode::*;
 pub struct Script(AVector<Method>);
 
 impl RawDecoder for Script {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         self.0.step_size()
     }
 

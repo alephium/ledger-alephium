@@ -13,7 +13,7 @@ pub struct AssetOutput {
 }
 
 impl RawDecoder for AssetOutput {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         3 + self.tokens.step_size() + self.additional_data.step_size()
     }
 

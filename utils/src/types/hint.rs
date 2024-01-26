@@ -14,7 +14,7 @@ impl Hint {
 }
 
 impl RawDecoder for Hint {
-    fn step_size(&self) -> usize {
+    fn step_size(&self) -> u16 {
         1
     }
 
@@ -23,19 +23,19 @@ impl RawDecoder for Hint {
         buffer: &mut Buffer<'a>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        let remain = Hint::ENCODED_LENGTH - stage.index;
+        let remain = Hint::ENCODED_LENGTH - (stage.index as usize);
         let mut idx: usize = 0;
         while !buffer.is_empty() && idx < remain {
-            self.0[stage.index + idx] = buffer.next_byte().unwrap();
+            self.0[(stage.index as usize) + idx] = buffer.next_byte().unwrap();
             idx += 1;
         }
-        let new_index = stage.index + idx;
+        let new_index = (stage.index as usize) + idx;
         if new_index == Hint::ENCODED_LENGTH {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage {
                 step: stage.step,
-                index: new_index,
+                index: new_index as u16,
             })
         }
     }
