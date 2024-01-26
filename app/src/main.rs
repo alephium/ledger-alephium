@@ -3,7 +3,6 @@
 
 use blind_signing::is_blind_signing_enabled;
 use blind_signing::update_blind_signing;
-use error_code::ErrorCode;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
@@ -19,7 +18,6 @@ mod sign_tx_context;
 
 use app_utils::print::{println, println_array, println_slice};
 use app_utils::*;
-use core::str::from_utf8;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io;
 use ledger_device_sdk::ui::bagls;
@@ -27,30 +25,6 @@ use ledger_device_sdk::ui::gadgets;
 use ledger_device_sdk::ui::screen_util;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
-
-/// This is the UI flow for signing, composed of a scroller
-/// to read the incoming message, a panel that requests user
-/// validation, and an exit message.
-fn sign_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
-    gadgets::popup("Tx hash review:");
-
-    {
-        let hex: [u8; 64] = utils::to_hex(message).map_err(|_| ErrorCode::InvalidHashLength)?;
-        let m = from_utf8(&hex).map_err(|_| ErrorCode::InvalidParameter)?;
-
-        gadgets::MessageScroller::new(m).event_loop();
-    }
-
-    if gadgets::Validator::new("Sign ?").ask() {
-        let signature = Secp256k1::derive_from_path(path)
-            .deterministic_sign(message)
-            .map_err(|_| ErrorCode::TxSignFail)?;
-        gadgets::SingleMessage::new("Signing...").show();
-        Ok(signature)
-    } else {
-        Err(ErrorCode::UserCancelled)
-    }
-}
 
 fn show_ui_common(draw: fn() -> ()) {
     gadgets::clear_screen();
@@ -182,7 +156,6 @@ extern "C" fn sample_main() {
 enum Ins {
     GetVersion,
     GetPubKey,
-    SignHash,
     SignTx,
 }
 
@@ -192,8 +165,7 @@ impl TryFrom<io::ApduHeader> for Ins {
         match header.ins {
             0 => Ok(Ins::GetVersion),
             1 => Ok(Ins::GetPubKey),
-            2 => Ok(Ins::SignHash),
-            3 => Ok(Ins::SignTx),
+            2 => Ok(Ins::SignTx),
             _ => Err(ledger_device_sdk::io::StatusWords::Unknown),
         }
     }
@@ -247,22 +219,6 @@ fn handle_apdu(
             println_slice::<130>(pk.as_ref());
             comm.append(pk.as_ref());
             comm.append(hd_index.to_be_bytes().as_slice());
-        }
-        Ins::SignHash => {
-            let data = comm.get_data()?;
-            if data.len() != 4 * 5 + 32 {
-                return Err(io::StatusWords::BadLen.into());
-            }
-            // This check can be removed, but we keep it for double checking
-            if !deserialize_path(&data[..20], &mut path) {
-                return Err(io::StatusWords::BadLen.into());
-            }
-
-            match sign_ui(&path, &data[20..]) {
-                Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),
-                Err(code) => return Err(code.into()),
-            }
-            return Ok(true);
         }
         Ins::SignTx => {
             if sign_tx_context_opt.is_none() {
