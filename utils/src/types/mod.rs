@@ -19,6 +19,8 @@ pub mod u256;
 pub mod unlock_script;
 pub mod unsigned_tx;
 pub mod val;
+#[macro_use]
+pub mod macros;
 
 pub use byte32::Byte32;
 pub use i256::I256;

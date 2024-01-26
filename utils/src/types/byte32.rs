@@ -1,45 +1,8 @@
 use crate::buffer::Buffer;
 use crate::decode::*;
+use crate::fixed_bytes;
 
-#[cfg_attr(test, derive(Debug))]
-#[derive(Default, PartialEq)]
-pub struct Byte32(pub [u8; 32]);
-
-impl Byte32 {
-    const ENCODED_LENGTH: usize = 32;
-
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        Byte32(bytes)
-    }
-}
-
-impl RawDecoder for Byte32 {
-    fn step_size(&self) -> u16 {
-        1
-    }
-
-    fn decode<'a>(
-        &mut self,
-        buffer: &mut Buffer<'a>,
-        stage: &DecodeStage,
-    ) -> DecodeResult<DecodeStage> {
-        let remain = Byte32::ENCODED_LENGTH - (stage.index as usize);
-        let mut idx: usize = 0;
-        while !buffer.is_empty() && idx < remain {
-            self.0[(stage.index as usize) + idx] = buffer.next_byte().unwrap();
-            idx += 1;
-        }
-        let new_index = (stage.index as usize) + idx;
-        if new_index == Byte32::ENCODED_LENGTH {
-            Ok(DecodeStage::COMPLETE)
-        } else {
-            Ok(DecodeStage {
-                step: stage.step,
-                index: new_index as u16,
-            })
-        }
-    }
-}
+fixed_bytes!(Byte32, 32);
 
 #[cfg(test)]
 pub mod tests {
