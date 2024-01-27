@@ -231,10 +231,15 @@ fn handle_apdu(
                     return Ok(true);
                 }
                 Ok(()) => {
-                    let (signature_buf, length, _) = sign_tx_context.review_tx_id_and_sign()?;
-                    comm.append(&signature_buf[..length as usize]);
+                    let result = match sign_tx_context.review_tx_id_and_sign() {
+                        Ok((signature_buf, length, _)) => {
+                            comm.append(&signature_buf[..length as usize]);
+                            Ok(true)
+                        }
+                        Err(code) => Err(code.into()),
+                    };
                     *sign_tx_context_opt = None;
-                    return Ok(true);
+                    return result;
                 }
                 Err(code) => {
                     *sign_tx_context_opt = None;
