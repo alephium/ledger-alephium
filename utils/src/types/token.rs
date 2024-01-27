@@ -5,8 +5,8 @@ use crate::decode::*;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
 pub struct Token {
-    id: Hash,
-    amount: U256,
+    pub id: Hash,
+    pub amount: U256,
 }
 
 impl Token {

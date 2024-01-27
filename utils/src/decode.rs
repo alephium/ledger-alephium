@@ -55,6 +55,13 @@ pub struct PartialDecoder<T> {
     pub stage: DecodeStage,
 }
 
+impl<T> PartialDecoder<T> {
+    pub fn reset_stage(&mut self) {
+        self.stage.index = 0;
+        self.stage.step = 0;
+    }
+}
+
 impl<T: Default> PartialDecoder<T> {
     pub fn reset(&mut self) {
         self.inner = T::default();

@@ -3,7 +3,7 @@ use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
-pub struct TimeStamp(u64);
+pub struct TimeStamp(pub u64);
 
 impl TimeStamp {
     const ENCODED_LENGTH: usize = 8;

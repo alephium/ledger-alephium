@@ -4,12 +4,32 @@ use super::I32;
 use crate::buffer::Buffer;
 use crate::decode::*;
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
     current_item: PartialDecoder<T>,
     current_item_complete: bool,
     pub current_index: i16,
     total_size: I32,
+}
+
+#[cfg(test)]
+impl<T: PartialEq> PartialEq for AVector<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.current_item.inner == other.current_item.inner
+    }
+}
+
+#[cfg(test)]
+impl<T: Default + RawDecoder> AVector<T> {
+    pub fn from_item(value: T) -> Self {
+        AVector {
+            current_item: PartialDecoder {
+                inner: value,
+                stage: DecodeStage::default(),
+            },
+            ..AVector::default()
+        }
+    }
 }
 
 impl<T> AVector<T> {

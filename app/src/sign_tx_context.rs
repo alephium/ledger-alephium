@@ -19,14 +19,7 @@ use crate::{
 #[derive(PartialEq)]
 enum DecodeStep {
     Init,
-    DerivePath,
-    TxVersion,
-    TxNetworkId,
-    TxScriptOpt,
-    TxGasAmount,
-    TxGasPrice,
-    TxInputs,
-    TxOutputs,
+    DecodingTx,
     Complete,
 }
 
@@ -49,34 +42,6 @@ impl SignTxContext {
         })
     }
 
-    fn next_step(&mut self) {
-        let next = match self.current_step {
-            DecodeStep::Init => DecodeStep::DerivePath,
-            DecodeStep::DerivePath => DecodeStep::TxVersion,
-            DecodeStep::TxVersion => DecodeStep::TxNetworkId,
-            DecodeStep::TxNetworkId => DecodeStep::TxScriptOpt,
-            DecodeStep::TxScriptOpt => DecodeStep::TxGasAmount,
-            DecodeStep::TxGasAmount => DecodeStep::TxGasPrice,
-            DecodeStep::TxGasPrice => DecodeStep::TxInputs,
-            DecodeStep::TxInputs => {
-                if self.unsigned_tx.inner.inputs.is_complete() {
-                    DecodeStep::TxOutputs
-                } else {
-                    DecodeStep::TxInputs
-                }
-            }
-            DecodeStep::TxOutputs => {
-                if self.unsigned_tx.inner.fixed_outputs.is_complete() {
-                    DecodeStep::Complete
-                } else {
-                    DecodeStep::TxOutputs
-                }
-            }
-            DecodeStep::Complete => DecodeStep::Complete,
-        };
-        self.current_step = next;
-    }
-
     pub fn is_complete(&self) -> bool {
         self.current_step == DecodeStep::Complete
     }
@@ -86,24 +51,22 @@ impl SignTxContext {
     }
 
     fn review(&mut self) -> Result<(), ErrorCode> {
-        match self.current_step {
-            DecodeStep::TxNetworkId => review_network(self.unsigned_tx.inner.network_id.0),
-            DecodeStep::TxGasAmount => review_gas_amount(&self.unsigned_tx.inner.gas_amount),
-            DecodeStep::TxGasPrice => review_gas_price(&self.unsigned_tx.inner.gas_price),
-            DecodeStep::TxInputs => {
-                let current_input = self.unsigned_tx.inner.inputs.get_current_item();
+        match &self.unsigned_tx.inner {
+            UnsignedTx::NetworkId(byte) => review_network(byte.0),
+            UnsignedTx::GasAmount(amount) => review_gas_amount(amount),
+            UnsignedTx::GasPrice(amount) => review_gas_price(amount),
+            UnsignedTx::Inputs(inputs) => {
+                let current_input = inputs.get_current_item();
                 if current_input.is_some() {
-                    let current_index = self.unsigned_tx.inner.inputs.current_index;
-                    review_tx_input(current_input.unwrap(), current_index as usize)
+                    review_tx_input(current_input.unwrap(), inputs.current_index as usize)
                 } else {
                     Ok(())
                 }
             }
-            DecodeStep::TxOutputs => {
-                let current_output = self.unsigned_tx.inner.fixed_outputs.get_current_item();
+            UnsignedTx::FixedOutputs(outputs) => {
+                let current_output = outputs.get_current_item();
                 if current_output.is_some() {
-                    let current_index = self.unsigned_tx.inner.fixed_outputs.current_index;
-                    review_tx_output(current_output.unwrap(), current_index as usize)
+                    review_tx_output(current_output.unwrap(), outputs.current_index as usize)
                 } else {
                     Ok(())
                 }
@@ -128,20 +91,23 @@ impl SignTxContext {
     }
 
     fn _decode_tx(&mut self, buffer: &mut Buffer) -> Result<(), ErrorCode> {
-        match self.unsigned_tx.try_decode_one_step(buffer) {
-            Ok(true) => {
-                self.review()?;
-                self.next_step();
-                if self.unsigned_tx.stage.is_complete() {
-                    self.current_step = DecodeStep::Complete;
-                    Ok(())
-                } else {
-                    self._decode_tx(buffer)
+        while !buffer.is_empty() {
+            match self.unsigned_tx.try_decode_one_step(buffer) {
+                Ok(true) => {
+                    self.review()?;
+                    if self.unsigned_tx.inner.is_complete() {
+                        self.current_step = DecodeStep::Complete;
+                        return Ok(());
+                    } else {
+                        self.unsigned_tx.inner.next_step();
+                        self.unsigned_tx.reset_stage();
+                    }
                 }
+                Ok(false) => return Ok(()),
+                Err(_) => return Err(ErrorCode::TxDecodeFail),
             }
-            Ok(false) => Ok(()),
-            Err(_) => Err(ErrorCode::TxDecodeFail),
         }
+        Ok(())
     }
 
     fn decode_tx(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
@@ -164,7 +130,7 @@ impl SignTxContext {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::DerivePathDecodeFail);
                     }
-                    self.current_step = DecodeStep::TxVersion;
+                    self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
                     if tx_data[2] == 0x01 && !is_blind_signing_enabled() {
                         blind_signing_warning();

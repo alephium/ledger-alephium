@@ -2,7 +2,7 @@ use super::*;
 use crate::buffer::Buffer;
 use crate::decode::*;
 
-#[cfg_attr(test, derive(Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
 pub struct TxInput {
     pub hint: Hint,
