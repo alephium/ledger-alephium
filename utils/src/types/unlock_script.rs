@@ -6,7 +6,7 @@ use crate::decode::*;
 #[derive(Default)]
 pub struct PublicKeyWithIndex {
     public_key: PublicKey,
-    index: I32,
+    index: U16,
 }
 
 impl RawDecoder for PublicKeyWithIndex {

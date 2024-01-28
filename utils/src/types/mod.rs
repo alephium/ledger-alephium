@@ -22,6 +22,7 @@ pub mod val;
 #[macro_use]
 pub mod macros;
 pub mod byte_string;
+pub mod u16;
 
 pub use byte32::Byte32;
 pub use i256::I256;
@@ -29,6 +30,7 @@ pub use u256::U256;
 
 pub use self::bool::Bool;
 pub use self::i32::I32;
+pub use self::u16::U16;
 pub use asset_output::AssetOutput;
 pub use avector::AVector;
 pub use byte::Byte;

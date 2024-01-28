@@ -1,13 +1,13 @@
 use core::cmp;
 
-use super::I32;
+use super::U16;
 use crate::buffer::Buffer;
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
     current_item: PartialDecoder<T>,
-    total_size: I32,
+    total_size: U16,
     pub current_index: i16,
 }
 
@@ -72,7 +72,7 @@ impl<T: Default + RawDecoder> Default for AVector<T> {
         AVector {
             current_item: new_decoder::<T>(),
             current_index: -1,
-            total_size: I32::default(),
+            total_size: U16::default(),
         }
     }
 }
@@ -125,7 +125,7 @@ mod tests {
     use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
-    use crate::types::{Hash, I32, U256};
+    use crate::types::{Hash, U16, U256};
     use std::vec;
     use std::vec::Vec;
 
@@ -162,7 +162,7 @@ mod tests {
                 let mut buffer = Buffer::new(&bytes).unwrap();
                 let mut decoder = new_decoder::<AVector<Hash>>();
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
-                assert_eq!(result.total_size, I32::from(size as i32));
+                assert_eq!(result.total_size, U16::from(size as u16));
                 assert_eq!(result.get_current_item(), hashes.last());
                 assert_eq!(result.current_index as usize, size - 1);
             }

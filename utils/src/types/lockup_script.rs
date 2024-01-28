@@ -1,11 +1,11 @@
-use super::{AVector, Hash, I32};
+use super::{AVector, Hash, U16};
 use crate::buffer::Buffer;
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum LockupScript {
     P2PKH(Hash),
-    P2MPKH(PartialDecoder<(AVector<Hash>, I32)>),
+    P2MPKH(PartialDecoder<(AVector<Hash>, U16)>),
     P2SH(Hash),
     P2C(Hash),
     Unknown,

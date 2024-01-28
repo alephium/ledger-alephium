@@ -7,9 +7,9 @@ use crate::decode::*;
 pub struct Method {
     is_public: Byte,
     asset_modifier: Byte,
-    args_length: I32,
-    locals_length: I32,
-    return_length: I32,
+    args_length: U16,
+    locals_length: U16,
+    return_length: U16,
     instrs: AVector<Instr>,
 }
 
