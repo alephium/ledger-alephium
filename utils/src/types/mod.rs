@@ -21,6 +21,7 @@ pub mod unsigned_tx;
 pub mod val;
 #[macro_use]
 pub mod macros;
+pub mod byte_string;
 
 pub use byte32::Byte32;
 pub use i256::I256;
@@ -31,6 +32,7 @@ pub use self::i32::I32;
 pub use asset_output::AssetOutput;
 pub use avector::AVector;
 pub use byte::Byte;
+pub use byte_string::ByteString;
 pub use hint::Hint;
 pub use instr::Instr;
 pub use lockup_script::LockupScript;
@@ -45,7 +47,6 @@ pub use unsigned_tx::UnsignedTx;
 pub use val::Val;
 
 pub type Hash = Byte32;
-pub type ByteString = AVector<Byte>;
 
 fn reset<const NUM: usize>(dest: &mut [u8; NUM]) {
     let mut index = 0;

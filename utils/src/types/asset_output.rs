@@ -9,7 +9,7 @@ pub struct AssetOutput {
     pub lockup_script: LockupScript,
     pub lock_time: TimeStamp,
     pub tokens: AVector<Token>,
-    pub additional_data: ByteString, // TODO: improve decode byte string
+    pub additional_data: ByteString,
 }
 
 impl RawDecoder for AssetOutput {

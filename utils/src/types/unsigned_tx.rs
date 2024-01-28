@@ -152,7 +152,7 @@ mod tests {
             lockup_script,
             lock_time: TimeStamp(0),
             tokens: AVector::default(),
-            additional_data: AVector::default(),
+            additional_data: ByteString::empty(),
         }
     }
 

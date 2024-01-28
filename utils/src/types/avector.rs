@@ -7,9 +7,8 @@ use crate::decode::*;
 #[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
     current_item: PartialDecoder<T>,
-    current_item_complete: bool,
-    pub current_index: i16,
     total_size: I32,
+    pub current_index: i16,
 }
 
 #[cfg(test)]
@@ -34,7 +33,7 @@ impl<T: Default + RawDecoder> AVector<T> {
 
 impl<T> AVector<T> {
     pub fn get_current_item(&self) -> Option<&T> {
-        if self.current_item_complete {
+        if self.current_item.stage.is_complete() {
             Some(&self.current_item.inner)
         } else {
             None
@@ -63,7 +62,8 @@ impl<T> AVector<T> {
         if self.is_empty() {
             return true;
         }
-        return ((self.current_index as usize) == (self.size() - 1)) && self.current_item_complete;
+        return ((self.current_index as usize) == (self.size() - 1))
+            && self.current_item.stage.is_complete();
     }
 }
 
@@ -71,7 +71,6 @@ impl<T: Default + RawDecoder> Default for AVector<T> {
     fn default() -> Self {
         AVector {
             current_item: new_decoder::<T>(),
-            current_item_complete: false,
             current_index: -1,
             total_size: I32::default(),
         }
@@ -103,8 +102,7 @@ impl<T: Default + RawDecoder> RawDecoder for AVector<T> {
             }
         }
 
-        if self.current_item_complete {
-            self.current_item_complete = false;
+        if self.current_item.stage.is_complete() {
             self.current_item.reset();
             self.current_index += 1;
         }
@@ -114,7 +112,6 @@ impl<T: Default + RawDecoder> RawDecoder for AVector<T> {
             return Ok(DecodeStage { ..*stage });
         }
 
-        self.current_item_complete = true;
         return Ok(DecodeStage::COMPLETE);
     }
 }
