@@ -10,5 +10,6 @@ describe.skip('Integration', () => {
   const path = `m/44'/1234'/0'/0/0`
 
   // enable this for integration test
-  // TODO: add sign tx tests
+  it('should sign unsigned tx', async () => {
+  })
 })

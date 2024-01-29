@@ -25,11 +25,11 @@ build-debug:
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo build --no-default-features --features debug --target=nanos && \
+			cargo ledger build nanos -- --no-default-features --features debug && \
 			echo 'Building nanosplus app' && \
-			cargo build --no-default-features --features debug --target=nanosplus && \
+			cargo ledger build nanosplus -- --no-default-features --features debug && \
 			echo 'Building nanox app' && \
-			cargo build --no-default-features --features debug --target=nanox \
+			cargo ledger build nanox -- --no-default-features --features debug \
 		"
 
 check:
@@ -49,7 +49,7 @@ debug:
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 clean:
 	cd app && cargo clean
@@ -60,7 +60,7 @@ set-github-action:
 	make build-debug
 	docker run -d --rm -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 .PHONY: release clean
 
