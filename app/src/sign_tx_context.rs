@@ -31,15 +31,20 @@ pub struct SignTxContext {
 }
 
 impl SignTxContext {
-    pub fn new() -> Result<Self, ErrorCode> {
-        let mut hasher = Blake2bHasher::new();
-        hasher.init()?;
-        Ok(SignTxContext {
+    pub fn new() -> Self {
+        SignTxContext {
             path: [0; 5],
             unsigned_tx: PartialDecoder::default(),
             current_step: DecodeStep::Init,
-            hasher,
-        })
+            hasher: Blake2bHasher::new(),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.path = [0; 5];
+        self.unsigned_tx.reset();
+        self.current_step = DecodeStep::Init;
+        self.hasher.reset();
     }
 
     pub fn is_complete(&self) -> bool {

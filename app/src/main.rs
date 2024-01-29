@@ -99,7 +99,7 @@ extern "C" fn sample_main() {
     let mut ui_index = 0;
     let ui_page_num = 4;
 
-    let mut sign_tx_context: Option<SignTxContext> = None;
+    let mut sign_tx_context: SignTxContext = SignTxContext::new();
     // Draw some 'welcome' screen
     show_ui(ui_index);
 
@@ -176,7 +176,7 @@ use ledger_device_sdk::io::Reply;
 fn handle_apdu(
     comm: &mut io::Comm,
     ins: Ins,
-    sign_tx_context_opt: &mut Option<SignTxContext>,
+    sign_tx_context: &mut SignTxContext,
 ) -> Result<bool, Reply> {
     if comm.rx == 0 {
         return Err(io::StatusWords::NothingReceived.into());
@@ -221,10 +221,6 @@ fn handle_apdu(
             comm.append(hd_index.to_be_bytes().as_slice());
         }
         Ins::SignTx => {
-            if sign_tx_context_opt.is_none() {
-                *sign_tx_context_opt = Some(SignTxContext::new()?);
-            }
-            let sign_tx_context = sign_tx_context_opt.as_mut().unwrap();
             let data = comm.get_data()?;
             match sign_tx_context.handle_data(apdu_header, data) {
                 Ok(()) if !sign_tx_context.is_complete() => {
@@ -238,11 +234,11 @@ fn handle_apdu(
                         }
                         Err(code) => Err(code.into()),
                     };
-                    *sign_tx_context_opt = None;
+                    sign_tx_context.reset();
                     return result;
                 }
                 Err(code) => {
-                    *sign_tx_context_opt = None;
+                    sign_tx_context.reset();
                     return Err(code.into());
                 }
             }

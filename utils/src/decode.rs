@@ -123,16 +123,16 @@ impl<T: RawDecoder> PartialDecoder<T> {
 
 impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
     fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>> {
-        match self.try_decode_one_step(buffer) {
-            Ok(true) => {
-                if self.stage.is_complete() {
-                    Ok(Some(&self.inner))
-                } else {
-                    self.decode(buffer)
+        loop {
+            match self.try_decode_one_step(buffer) {
+                Ok(true) => {
+                    if self.stage.is_complete() {
+                        return Ok(Some(&self.inner));
+                    }
                 }
+                Ok(false) => return Ok(None),
+                Err(err) => return Err(err),
             }
-            Ok(false) => Ok(None),
-            Err(err) => Err(err),
         }
     }
 }
