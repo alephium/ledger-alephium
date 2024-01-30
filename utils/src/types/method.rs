@@ -13,6 +13,17 @@ pub struct Method {
     instrs: AVector<Instr>,
 }
 
+impl Reset for Method {
+    fn reset(&mut self) {
+        self.is_public.reset();
+        self.asset_modifier.reset();
+        self.args_length.reset();
+        self.locals_length.reset();
+        self.return_length.reset();
+        self.instrs.reset();
+    }
+}
+
 impl RawDecoder for Method {
     fn step_size(&self) -> u16 {
         5 + self.instrs.step_size()

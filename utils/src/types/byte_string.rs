@@ -9,6 +9,13 @@ pub struct ByteString {
     current_index: i32,
 }
 
+impl Reset for ByteString {
+    fn reset(&mut self) {
+        self.length.reset();
+        self.current_index = -1;
+    }
+}
+
 impl Default for ByteString {
     fn default() -> Self {
         Self {

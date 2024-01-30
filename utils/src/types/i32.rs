@@ -11,6 +11,13 @@ pub struct I32 {
     first_byte: u8,
 }
 
+impl Reset for I32 {
+    fn reset(&mut self) {
+        self.inner = 0;
+        self.first_byte = 0;
+    }
+}
+
 fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM], is_negative: bool) -> &'a [u8] {
     let mut index = 0;
     while index < dest.len() {

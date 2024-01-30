@@ -9,6 +9,13 @@ pub struct PublicKeyWithIndex {
     index: U16,
 }
 
+impl Reset for PublicKeyWithIndex {
+    fn reset(&mut self) {
+        self.public_key.reset();
+        self.index.reset();
+    }
+}
+
 impl RawDecoder for PublicKeyWithIndex {
     fn step_size(&self) -> u16 {
         2
@@ -34,6 +41,12 @@ pub enum UnlockScript {
     P2SH(PartialDecoder<(Script, AVector<Val>)>),
     SameAsPrevious,
     Unknown,
+}
+
+impl Reset for UnlockScript {
+    fn reset(&mut self) {
+        *self = Self::Unknown;
+    }
 }
 
 impl Default for UnlockScript {

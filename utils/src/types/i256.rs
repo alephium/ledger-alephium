@@ -7,6 +7,12 @@ pub struct I256 {
     bytes: [u8; 33], // TODO: improve this
 }
 
+impl Reset for I256 {
+    fn reset(&mut self) {
+        self.bytes = [0; 33];
+    }
+}
+
 impl Default for I256 {
     fn default() -> Self {
         I256 { bytes: [0u8; 33] }

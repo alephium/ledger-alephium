@@ -5,6 +5,12 @@ use crate::decode::*;
 #[derive(Default)]
 pub struct Bool(bool);
 
+impl Reset for Bool {
+    fn reset(&mut self) {
+        self.0 = false;
+    }
+}
+
 impl RawDecoder for Bool {
     fn step_size(&self) -> u16 {
         1

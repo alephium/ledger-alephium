@@ -10,6 +10,14 @@ pub struct TxInput {
     pub unlock_script: UnlockScript,
 }
 
+impl Reset for TxInput {
+    fn reset(&mut self) {
+        self.hint.reset();
+        self.key.reset();
+        self.unlock_script.reset();
+    }
+}
+
 impl RawDecoder for TxInput {
     fn step_size(&self) -> u16 {
         3

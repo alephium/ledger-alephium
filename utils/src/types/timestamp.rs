@@ -9,6 +9,12 @@ impl TimeStamp {
     const ENCODED_LENGTH: usize = 8;
 }
 
+impl Reset for TimeStamp {
+    fn reset(&mut self) {
+        self.0 = 0;
+    }
+}
+
 impl RawDecoder for TimeStamp {
     fn step_size(&self) -> u16 {
         1

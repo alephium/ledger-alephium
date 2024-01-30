@@ -194,6 +194,11 @@ pub enum Instr {
     LoadImmFieldByIndex,
     Unknown,
 }
+impl Reset for Instr {
+    fn reset(&mut self) {
+        *self = Self::Unknown;
+    }
+}
 impl Default for Instr {
     fn default() -> Self {
         Self::Unknown

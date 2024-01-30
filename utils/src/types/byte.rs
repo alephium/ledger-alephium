@@ -5,6 +5,12 @@ use crate::decode::*;
 #[derive(Default)]
 pub struct Byte(pub u8);
 
+impl Reset for Byte {
+    fn reset(&mut self) {
+        self.0 = 0;
+    }
+}
+
 impl RawDecoder for Byte {
     fn step_size(&self) -> u16 {
         1

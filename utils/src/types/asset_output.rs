@@ -12,6 +12,16 @@ pub struct AssetOutput {
     pub additional_data: ByteString,
 }
 
+impl Reset for AssetOutput {
+    fn reset(&mut self) {
+        self.amount.reset();
+        self.lockup_script.reset();
+        self.lock_time.reset();
+        self.tokens.reset();
+        self.additional_data.reset();
+    }
+}
+
 impl RawDecoder for AssetOutput {
     fn step_size(&self) -> u16 {
         3 + self.tokens.step_size() + self.additional_data.step_size()

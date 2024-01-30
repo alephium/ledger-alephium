@@ -11,6 +11,12 @@ pub enum LockupScript {
     Unknown,
 }
 
+impl Reset for LockupScript {
+    fn reset(&mut self) {
+        *self = Self::Unknown;
+    }
+}
+
 impl Default for LockupScript {
     fn default() -> Self {
         LockupScript::Unknown

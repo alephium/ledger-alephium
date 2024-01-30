@@ -12,6 +12,12 @@ macro_rules! fixed_bytes {
             }
         }
 
+        impl Reset for $struct_name {
+            fn reset(&mut self) {
+                self.0 = [0; $encoded_length];
+            }
+        }
+
         impl Default for $struct_name {
             fn default() -> Self {
                 Self([0; $encoded_length])

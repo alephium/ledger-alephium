@@ -49,6 +49,10 @@ pub trait Decoder<T>: Sized {
     fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>>;
 }
 
+pub trait Reset {
+    fn reset(&mut self);
+}
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct PartialDecoder<T> {
     pub inner: T,
@@ -62,9 +66,9 @@ impl<T> PartialDecoder<T> {
     }
 }
 
-impl<T: Default> PartialDecoder<T> {
+impl<T: Reset> PartialDecoder<T> {
     pub fn reset(&mut self) {
-        self.inner = T::default();
+        self.inner.reset();
         self.stage.index = 0;
         self.stage.step = 0;
     }

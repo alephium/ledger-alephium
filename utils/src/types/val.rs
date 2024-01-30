@@ -11,6 +11,12 @@ pub enum Val {
     Unknown,
 }
 
+impl Reset for Val {
+    fn reset(&mut self) {
+        *self = Self::Unknown;
+    }
+}
+
 impl Default for Val {
     fn default() -> Self {
         Val::Unknown

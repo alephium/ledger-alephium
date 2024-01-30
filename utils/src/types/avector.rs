@@ -11,6 +11,14 @@ pub struct AVector<T> {
     pub current_index: i16,
 }
 
+impl<T: Reset> Reset for AVector<T> {
+    fn reset(&mut self) {
+        self.current_item.reset();
+        self.total_size.reset();
+        self.current_index = -1;
+    }
+}
+
 #[cfg(test)]
 impl<T: PartialEq> PartialEq for AVector<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -77,7 +85,7 @@ impl<T: Default + RawDecoder> Default for AVector<T> {
     }
 }
 
-impl<T: Default + RawDecoder> RawDecoder for AVector<T> {
+impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
     fn step_size(&self) -> u16 {
         if self.total_size_decoded() {
             cmp::max(self.size() as u16, 1)

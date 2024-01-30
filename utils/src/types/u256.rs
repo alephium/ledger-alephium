@@ -11,6 +11,13 @@ pub struct U256 {
     first_byte: u8,
 }
 
+impl Reset for U256 {
+    fn reset(&mut self) {
+        self.inner = [0; 4];
+        self.first_byte = 0;
+    }
+}
+
 impl PartialEq for U256 {
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner

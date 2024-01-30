@@ -13,6 +13,12 @@ pub enum UnsignedTx {
     FixedOutputs(AVector<AssetOutput>),
 }
 
+impl Reset for UnsignedTx {
+    fn reset(&mut self) {
+        *self = Self::Version(Byte(0));
+    }
+}
+
 impl UnsignedTx {
     pub fn is_complete(&self) -> bool {
         match self {
@@ -21,6 +27,7 @@ impl UnsignedTx {
         }
     }
 
+    #[inline]
     pub fn next_step(&mut self) {
         match self {
             Self::Version(_) => *self = Self::NetworkId(Byte::default()),

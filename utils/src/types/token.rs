@@ -9,6 +9,13 @@ pub struct Token {
     pub amount: U256,
 }
 
+impl Reset for Token {
+    fn reset(&mut self) {
+        self.id.reset();
+        self.amount.reset();
+    }
+}
+
 impl Token {
     pub fn from(id: Hash, amount: U256) -> Self {
         Token { id, amount }

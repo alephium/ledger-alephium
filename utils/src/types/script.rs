@@ -6,6 +6,12 @@ use crate::decode::*;
 #[derive(Default)]
 pub struct Script(AVector<Method>);
 
+impl Reset for Script {
+    fn reset(&mut self) {
+        self.0.reset();
+    }
+}
+
 impl RawDecoder for Script {
     fn step_size(&self) -> u16 {
         self.0.step_size()

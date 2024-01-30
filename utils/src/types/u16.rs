@@ -9,6 +9,13 @@ pub struct U16 {
     first_byte: u8,
 }
 
+impl Reset for U16 {
+    fn reset(&mut self) {
+        self.inner = 0;
+        self.first_byte = 0;
+    }
+}
+
 impl U16 {
     #[inline]
     pub fn get_length(&self) -> usize {
