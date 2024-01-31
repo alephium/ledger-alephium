@@ -2,7 +2,7 @@ import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
 import blake from 'blakejs'
 import fetch from 'node-fetch'
-import { ALPH_TOKEN_ID, Account, Address, NodeProvider, ONE_ALPH, groupOfAddress, hexToBinUnsafe, transactionVerifySignature } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Account, Address, NodeProvider, ONE_ALPH, addressFromPublicKey, groupOfAddress, hexToBinUnsafe, transactionVerifySignature } from '@alephium/web3'
 import { getSigner, transfer } from '@alephium/web3-test'
 import { waitTxConfirmed } from '@alephium/cli'
 
@@ -101,14 +101,20 @@ describe('sdk', () => {
 
     const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
       fromPublicKey: testAccount.publicKey,
-      destinations: [{
-        address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
-        attoAlphAmount: (ONE_ALPH * 5n).toString(),
-      }]
+      destinations: [
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        },
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 3n).toString(),
+        },
+      ]
     })
 
     function approve(index: number) {
-      if (index >= 7) return
+      if (index >= 8) return
       if (index === 3) { // input
         setTimeout(async () => {
           await clickAndApprove(4)
@@ -152,25 +158,31 @@ describe('sdk', () => {
     const multiSigAddress = 'X3KYVteDjsKuUP1F68Nv9iEUecnnkMuwjbC985AnA6MvciDFJ5bAUEso2Sd7sGrwZ5rfNLj7Rp4n9XjcyzDiZsrPxfhNkPYcDm3ce8pQ9QasNFByEufMi3QJ3cS9Vk6cTpqNcq';
     const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
       fromPublicKey: testAccount.publicKey,
-      destinations: [{
-        address: multiSigAddress,
-        attoAlphAmount: (ONE_ALPH * 5n).toString(),
-      }]
+      destinations: [
+        {
+          address: multiSigAddress,
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        },
+        {
+          address: multiSigAddress,
+          attoAlphAmount: (ONE_ALPH * 3n).toString(),
+        },
+      ]
     })
 
     function approve(index: number) {
-      if (index >= 7) return
+      if (index >= 8) return
       if (index === 3) { // input
         setTimeout(async () => {
           await clickAndApprove(4)
           approve(index + 1)
         }, 1000)
-      } else if (index == 4) { // multi-sig output
+      } else if (index == 4 || index == 5) { // multi-sig outputs
         setTimeout(async () => {
           await clickAndApprove(10)
           approve(index + 1)
         }, 1000)
-      } else if (index > 4) { // change output and signature
+      } else if (index > 5) { // change output and signature
         setTimeout(async () => {
           await clickAndApprove(5)
           approve(index + 1)
