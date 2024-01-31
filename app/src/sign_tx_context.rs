@@ -6,7 +6,7 @@ use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
 use utils::base58::base58_encode_inputs;
 use utils::types::lockup_script::P2MPKH;
-use utils::types::{extend_slice, AssetOutput, LockupScript, TxInput, UnlockScript, I32, U256};
+use utils::types::{AssetOutput, LockupScript, TxInput, UnlockScript, I32, U256};
 use utils::TempData;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
@@ -195,42 +195,31 @@ fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
     from_utf8(bytes).map_err(|_| ErrorCode::InvalidParameter)
 }
 
-fn num_with_prefix<'a, const NUM: usize>(
+fn index_with_prefix<'a>(
     prefix: &[u8],
     num: &I32,
-    output: &'a mut [u8; NUM],
+    output: &'a mut [u8],
 ) -> Result<&'a str, ErrorCode> {
-    if NUM < 11 + prefix.len() {
-        return Err(ErrorCode::Overflow);
-    }
-    let mut num_output: [u8; 11] = output[prefix.len()..]
+    let mut num_output: [u8; 3] = output[prefix.len()..]
         .try_into()
         .map_err(|_| ErrorCode::Overflow)?;
     let num_str_bytes = num.to_str(&mut num_output);
     if num_str_bytes.is_none() {
         return Err(ErrorCode::Overflow);
     }
-    let mut size = extend_slice(output, 0, prefix);
-    size = extend_slice(output, size, num_str_bytes.unwrap());
-    bytes_to_string(&output[..size])
+    output[..prefix.len()].copy_from_slice(prefix);
+    let num_str = num_str_bytes.unwrap();
+    let total_size = prefix.len() + num_str.len();
+    output[prefix.len()..total_size].copy_from_slice(num_str);
+    bytes_to_string(&output[..total_size])
 }
 
-fn to_alph_str<'a, const NUM: usize>(
-    amount: &U256,
-    output: &'a mut [u8; NUM],
-) -> Result<&'a str, ErrorCode> {
-    let post_fix = b" ALPH";
-    if NUM < 17 + post_fix.len() {
-        return Err(ErrorCode::Overflow);
-    }
-    let mut num_output: [u8; 17] = output[0..17].try_into().map_err(|_| ErrorCode::Overflow)?;
-    let str_bytes = amount.to_alph(&mut num_output);
+fn to_alph_str<'a>(amount: &U256, output: &'a mut [u8]) -> Result<&'a str, ErrorCode> {
+    let str_bytes = amount.to_alph(output);
     if str_bytes.is_none() {
         return Err(ErrorCode::Overflow);
     }
-    let mut size = extend_slice(output, 0, str_bytes.unwrap());
-    size = extend_slice(output, size, post_fix);
-    bytes_to_string(&output[..size])
+    bytes_to_string(&str_bytes.unwrap())
 }
 
 fn to_address<'a, const NUM: usize>(
@@ -247,7 +236,11 @@ fn to_address<'a, const NUM: usize>(
 
 fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
     let mut output = [0; 11];
-    let value = num_with_prefix(b"", gas_amount, &mut output)?;
+    let num_str_bytes = gas_amount.to_str(&mut output);
+    if num_str_bytes.is_none() {
+        return Err(ErrorCode::Overflow);
+    }
+    let value = bytes_to_string(&num_str_bytes.unwrap())?;
     let fields = [Field {
         name: "GasAmount",
         value,
@@ -256,7 +249,7 @@ fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
 }
 
 fn review_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
-    let mut output = [0; 22];
+    let mut output = [0; 33];
     let value = to_alph_str(gas_price, &mut output)?;
     let fields = [Field {
         name: "GasPrice",
@@ -265,9 +258,13 @@ fn review_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
     review(&fields, "Review Gas Price")
 }
 
-fn review_tx_input(tx_input: &TxInput, current_index: usize, temp_data: Option<&[u8]>) -> Result<(), ErrorCode> {
-    let mut review_message_bytes = [0u8; 25]; // b"Review Input #".len() + 11
-    let review_message = num_with_prefix(
+fn review_tx_input(
+    tx_input: &TxInput,
+    current_index: usize,
+    temp_data: Option<&[u8]>,
+) -> Result<(), ErrorCode> {
+    let mut review_message_bytes = [0u8; 17]; // b"Review Input #".len() + 3
+    let review_message = index_with_prefix(
         b"Review Input #",
         &I32::unsafe_from(current_index),
         &mut review_message_bytes,
@@ -315,14 +312,14 @@ fn review_tx_output(
     current_index: usize,
     temp_data: Option<&[u8]>,
 ) -> Result<(), ErrorCode> {
-    let mut amount_output = [0u8; 22];
+    let mut amount_output = [0u8; 33];
     let amount_str = to_alph_str(&output.amount, &mut amount_output)?;
     let amount_field = Field {
         name: "Amount",
         value: amount_str,
     };
-    let mut review_message_bytes = [0u8; 26]; // b"Review Output #".len() + 11
-    let review_message = num_with_prefix(
+    let mut review_message_bytes = [0u8; 18]; // b"Review Output #".len() + 3
+    let review_message = index_with_prefix(
         b"Review Output #",
         &I32::unsafe_from(current_index),
         &mut review_message_bytes,

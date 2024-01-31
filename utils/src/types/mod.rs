@@ -50,23 +50,10 @@ pub use val::Val;
 
 pub type Hash = Byte32;
 
-fn reset<const NUM: usize>(dest: &mut [u8; NUM]) {
+fn reset(dest: &mut [u8]) {
     let mut index = 0;
     while index < dest.len() {
         dest[index] = b'0';
         index += 1;
     }
-}
-
-pub fn extend_slice<const NUM: usize>(
-    dest: &mut [u8; NUM],
-    from_index: usize,
-    source: &[u8],
-) -> usize {
-    let mut index = 0;
-    while index < source.len() {
-        dest[index + from_index] = source[index];
-        index += 1;
-    }
-    from_index + index
 }

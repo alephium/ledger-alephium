@@ -18,7 +18,7 @@ impl Reset for I32 {
     }
 }
 
-fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM], is_negative: bool) -> &'a [u8] {
+fn trim<'a>(dest: &'a mut [u8], is_negative: bool) -> &'a [u8] {
     let mut index = 0;
     while index < dest.len() {
         if dest[index] == b'0' {
@@ -62,7 +62,7 @@ impl I32 {
         is_fixed_size(self.first_byte)
     }
 
-    pub fn to_str<'a, const NUM: usize>(&self, output: &'a mut [u8; NUM]) -> Option<&'a [u8]> {
+    pub fn to_str<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
         if output.len() < 1 {
             return None;

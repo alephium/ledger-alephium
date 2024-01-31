@@ -2,7 +2,7 @@ use crate::buffer::Buffer;
 use crate::decode::*;
 use crate::types::compact_integer::*;
 
-use super::{extend_slice, reset};
+use super::reset;
 
 #[cfg_attr(test, derive(Debug))]
 #[derive(Default)]
@@ -24,7 +24,7 @@ impl PartialEq for U256 {
     }
 }
 
-fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM]) -> &'a [u8] {
+fn trim(dest: &[u8]) -> usize {
     let mut index = dest.len() - 1;
     while index != 0 {
         if dest[index] == b'0' {
@@ -34,9 +34,9 @@ fn trim<'a, const NUM: usize>(dest: &'a mut [u8; NUM]) -> &'a [u8] {
         }
     }
     if dest[index] == b'.' {
-        &dest[0..(index)]
+        index
     } else {
-        &dest[0..(index + 1)]
+        index + 1
     }
 }
 
@@ -98,55 +98,56 @@ impl U256 {
         Some(result)
     }
 
-    pub fn to_alph<'a, const NUM: usize>(&self, output: &'a mut [u8; NUM]) -> Option<&'a [u8]> {
+    pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
+        let postfix = b" ALPH";
+        if output.len() < 1 + postfix.len() {
+            return None;
+        }
 
         if self.is_zero() {
             output[0] = b'0';
-            return Some(&output[..1]);
+            let total_size = 1 + postfix.len();
+            output[1..total_size].copy_from_slice(postfix);
+            return Some(&output[..total_size]);
         }
 
         let mut raw_amount = self.to_u128()?;
         if raw_amount < Self::ALPH_MIN {
-            extend_slice(output, 0, b"<0.000001");
-            return Some(trim(output));
-        }
-
-        let mut bytes = [b'0'; 28];
-        let mut length = 0;
-        while raw_amount > 0 {
-            if length >= bytes.len() {
+            let str = b"<0.000001";
+            let total_size = str.len() + postfix.len();
+            if output.len() < total_size {
                 return None;
             }
-            let index = bytes.len() - length - 1;
-            bytes[index] = b'0' + ((raw_amount % 10) as u8);
-            raw_amount = raw_amount / 10;
-            length += 1;
+            output[..str.len()].copy_from_slice(str);
+            output[str.len()..total_size].copy_from_slice(postfix);
+            return Some(&output[..total_size]);
         }
 
-        let str_length = if length > Self::ALPH_DECIMALS {
-            length - 18 + 1 + Self::DECIMAL_PLACES
-        } else {
-            2 + Self::DECIMAL_PLACES
-        };
-        if str_length > output.len() {
+        if output.len() < 28 + postfix.len() {
+            // max ALPH amount
             return None;
         }
-
-        let decimal_index = bytes.len() - Self::ALPH_DECIMALS;
-        let from_index = if length > Self::ALPH_DECIMALS {
-            let str = &bytes[(bytes.len() - length)..decimal_index];
-            extend_slice(output, 0, str)
-        } else {
-            extend_slice(output, 0, b"0")
-        };
-        extend_slice(output, from_index, &[b'.']);
-        extend_slice(
-            output,
-            from_index + 1,
-            &bytes[decimal_index..(decimal_index + Self::DECIMAL_PLACES)],
-        );
-        Some(trim(output))
+        let mut length = 0;
+        while raw_amount > 0 || length < Self::ALPH_DECIMALS {
+            output[length] = b'0' + ((raw_amount % 10) as u8);
+            raw_amount = raw_amount / 10;
+            length += 1;
+            if length == Self::ALPH_DECIMALS {
+                output[length] = b'.';
+                length += 1;
+            }
+        }
+        if output[length - 1] == b'.' {
+            output[length] = b'0';
+            length += 1;
+        }
+        output[..length].reverse();
+        let index = output.iter().position(|v| *v == b'.').unwrap();
+        let amount_size = trim(&mut output[..(index + Self::DECIMAL_PLACES + 1)]);
+        let total_size = amount_size + postfix.len();
+        output[amount_size..total_size].copy_from_slice(postfix);
+        Some(&output[..total_size])
     }
 
     fn decode_u32(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
@@ -401,14 +402,15 @@ pub mod tests {
         ];
         for (number, str) in cases {
             let u256 = U256::from_u128(number);
-            let mut output = [0u8; 30];
+            let mut output = [0u8; 33];
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());
             let expected = from_utf8(result.unwrap()).unwrap();
-            assert_eq!(*str, *expected);
+            let amount_str = String::from(str) + " ALPH";
+            assert_eq!(amount_str, String::from(expected));
         }
 
-        let mut output = [0u8; 17];
+        let mut output = [0u8; 33];
         let value = U256::from([0, 1, 0, 0]);
         assert!(value.to_alph(&mut output).is_none());
     }
