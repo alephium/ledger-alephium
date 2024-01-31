@@ -4,12 +4,9 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
-use utils::base58::base58_encode;
 use utils::base58::base58_encode_inputs;
 use utils::types::lockup_script::P2MPKH;
-use utils::types::{
-    extend_slice, AssetOutput, Hash, LockupScript, TxInput, UnlockScript, I32, U256,
-};
+use utils::types::{extend_slice, AssetOutput, LockupScript, TxInput, UnlockScript, I32, U256};
 use utils::TempData;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
@@ -76,7 +73,11 @@ impl SignTxContext {
             UnsignedTx::Inputs(inputs) => {
                 let current_input = inputs.get_current_item();
                 if current_input.is_some() {
-                    review_tx_input(current_input.unwrap(), inputs.current_index as usize)
+                    review_tx_input(
+                        current_input.unwrap(),
+                        inputs.current_index as usize,
+                        self.get_temp_data(),
+                    )
                 } else {
                     Ok(())
                 }
@@ -234,13 +235,10 @@ fn to_alph_str<'a, const NUM: usize>(
 
 fn to_address<'a, const NUM: usize>(
     prefix: u8,
-    hash: &Hash,
+    hash: &[u8; 32],
     output: &'a mut [u8; NUM],
 ) -> Result<&'a str, ErrorCode> {
-    let mut encoded = [0u8; 33];
-    encoded[0] = prefix;
-    extend_slice(&mut encoded, 1, &hash.0);
-    let str_bytes = base58_encode(&encoded, output);
+    let str_bytes = base58_encode_inputs(&[&[prefix], hash], output);
     if str_bytes.is_none() {
         return Err(ErrorCode::Overflow);
     }
@@ -267,7 +265,7 @@ fn review_gas_price(gas_price: &U256) -> Result<(), ErrorCode> {
     review(&fields, "Review Gas Price")
 }
 
-fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), ErrorCode> {
+fn review_tx_input(tx_input: &TxInput, current_index: usize, temp_data: Option<&[u8]>) -> Result<(), ErrorCode> {
     let mut review_message_bytes = [0u8; 25]; // b"Review Input #".len() + 11
     let review_message = num_with_prefix(
         b"Review Input #",
@@ -278,7 +276,7 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
         UnlockScript::P2PKH(public_key) => {
             let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
             let mut bytes = [0u8; 46];
-            let value = to_address(0u8, &Hash::from_bytes(public_key_hash), &mut bytes)?;
+            let value = to_address(0u8, &public_key_hash, &mut bytes)?;
             let fields = [Field {
                 name: "Address",
                 value,
@@ -293,9 +291,18 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
             review(&fields, review_message)
         }
         UnlockScript::P2SH(_) => {
+            let default_value = "p2sh address";
+            let mut bytes = [0u8; 46];
+            let address = if temp_data.is_some() {
+                let script_bytes = temp_data.unwrap();
+                let script_hash = Blake2bHasher::hash(script_bytes)?;
+                to_address(2u8, &script_hash, &mut bytes)?
+            } else {
+                default_value
+            };
             let fields = [Field {
                 name: "Address",
-                value: "p2sh address", // TODO: display p2sh address
+                value: address,
             }];
             review(&fields, review_message)
         }
@@ -322,8 +329,8 @@ fn review_tx_output(
     )?;
     match &output.lockup_script {
         LockupScript::P2PKH(hash) | LockupScript::P2SH(hash) => {
-            let mut bytes = [0u8; 50];
-            let value = to_address(output.lockup_script.get_type(), hash, &mut bytes)?;
+            let mut bytes = [0u8; 46];
+            let value = to_address(output.lockup_script.get_type(), &hash.0, &mut bytes)?;
             let fields = [
                 amount_field,
                 Field {

@@ -35,10 +35,38 @@ impl RawDecoder for PublicKeyWithIndex {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
+pub struct P2SH(Script, AVector<Val>);
+
+impl RawDecoder for P2SH {
+    fn step_size(&self) -> u16 {
+        self.0.step_size() + self.0.step_size()
+    }
+
+    fn decode<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            step if step < self.0.step_size() => {
+                let from_index = buffer.get_index();
+                let result = self.0.decode(buffer, stage);
+                let to_index = buffer.get_index();
+                let bytes = buffer.get_range(from_index, to_index);
+                buffer.write_bytes_to_temp_data(bytes);
+                result
+            }
+            _ => self.1.decode(buffer, stage),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum UnlockScript {
     P2PKH(PublicKey),
     P2MPKH(PartialDecoder<AVector<PublicKeyWithIndex>>),
-    P2SH(PartialDecoder<(Script, AVector<Val>)>),
+    P2SH(PartialDecoder<P2SH>),
     SameAsPrevious,
     Unknown,
 }
@@ -113,6 +141,8 @@ mod tests {
     use crate::TempData;
     use std::vec;
 
+    use super::u256::tests::hex_to_bytes;
+
     #[test]
     fn test_decode_p2pkh() {
         let mut temp_data = TempData::new();
@@ -148,6 +178,31 @@ mod tests {
                 } else {
                     assert_eq!(result, None);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_p2sh() {
+        let mut temp_data = TempData::new();
+        let bytecode = hex_to_bytes("010100000000045814402000000000000000000000000000000000000000000000000000000000000000008685").unwrap();
+        let bytes = hex_to_bytes("0201010000000004581440200000000000000000000000000000000000000000000000000000000000000000868500").unwrap();
+
+        let mut length: usize = 0;
+        let mut decoder = new_decoder::<UnlockScript>();
+
+        while length < bytes.len() {
+            let remain = bytes.len() - length;
+            let size = random_usize(0, remain);
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            length += size;
+
+            let result = decoder.decode(&mut buffer).unwrap();
+            if length == bytes.len() {
+                assert_eq!(temp_data.get(), &bytecode);
+                assert!(decoder.stage.is_complete());
+            } else {
+                assert_eq!(result, None);
             }
         }
     }
