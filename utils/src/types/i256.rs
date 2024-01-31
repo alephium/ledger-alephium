@@ -82,6 +82,7 @@ mod tests {
     use super::*;
     use crate::types::i32::tests::random_usize;
     use crate::types::u256::tests::hex_to_bytes;
+    use crate::TempData;
 
     #[test]
     fn test_decode_i256() {
@@ -120,12 +121,13 @@ mod tests {
             "d5ff000000000000000000000000000000000000000000000000",
         ];
 
+        let mut temp_data = TempData::new();
         for item in arrays {
             let bytes = hex_to_bytes(item).unwrap();
 
             {
                 let mut decoder = new_decoder::<I256>();
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
                 let length = result.get_length();
                 assert_eq!(&bytes, &result.bytes[..length]);
@@ -138,7 +140,8 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

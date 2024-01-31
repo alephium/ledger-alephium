@@ -5,9 +5,12 @@ use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
 use utils::base58::base58_encode;
+use utils::base58::base58_encode_inputs;
+use utils::types::lockup_script::P2MPKH;
 use utils::types::{
     extend_slice, AssetOutput, Hash, LockupScript, TxInput, UnlockScript, I32, U256,
 };
+use utils::TempData;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::blind_signing::is_blind_signing_enabled;
@@ -28,6 +31,7 @@ pub struct SignTxContext {
     unsigned_tx: PartialDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
+    temp_data: TempData,
 }
 
 impl SignTxContext {
@@ -37,6 +41,7 @@ impl SignTxContext {
             unsigned_tx: PartialDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
+            temp_data: TempData::new(),
         }
     }
 
@@ -45,6 +50,7 @@ impl SignTxContext {
         self.unsigned_tx.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
+        self.temp_data.reset();
     }
 
     pub fn is_complete(&self) -> bool {
@@ -53,6 +59,13 @@ impl SignTxContext {
 
     pub fn get_tx_id(&mut self) -> Result<[u8; BLAKE2B_HASH_SIZE], ErrorCode> {
         self.hasher.finalize()
+    }
+
+    fn get_temp_data(&self) -> Option<&[u8]> {
+        if self.temp_data.is_overflow() {
+            return None;
+        }
+        return Some(self.temp_data.get());
     }
 
     fn review(&mut self) -> Result<(), ErrorCode> {
@@ -71,7 +84,11 @@ impl SignTxContext {
             UnsignedTx::FixedOutputs(outputs) => {
                 let current_output = outputs.get_current_item();
                 if current_output.is_some() {
-                    review_tx_output(current_output.unwrap(), outputs.current_index as usize)
+                    review_tx_output(
+                        current_output.unwrap(),
+                        outputs.current_index as usize,
+                        self.get_temp_data(),
+                    )
                 } else {
                     Ok(())
                 }
@@ -106,6 +123,7 @@ impl SignTxContext {
                     } else {
                         self.unsigned_tx.inner.next_step();
                         self.unsigned_tx.reset_stage();
+                        self.temp_data.reset();
                     }
                 }
                 Ok(false) => return Ok(()),
@@ -119,7 +137,7 @@ impl SignTxContext {
         if data.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
-        let mut buffer = Buffer::new(data).unwrap();
+        let mut buffer = Buffer::new(data, &mut self.temp_data as *mut TempData).unwrap();
         let from_index = buffer.get_index();
         let result = self._decode_tx(&mut buffer);
         let to_index = buffer.get_index();
@@ -259,7 +277,7 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
     match &tx_input.unlock_script {
         UnlockScript::P2PKH(public_key) => {
             let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
-            let mut bytes = [0u8; 50];
+            let mut bytes = [0u8; 46];
             let value = to_address(0u8, &Hash::from_bytes(public_key_hash), &mut bytes)?;
             let fields = [Field {
                 name: "Address",
@@ -285,7 +303,11 @@ fn review_tx_input(tx_input: &TxInput, current_index: usize) -> Result<(), Error
     }
 }
 
-fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), ErrorCode> {
+fn review_tx_output(
+    output: &AssetOutput,
+    current_index: usize,
+    temp_data: Option<&[u8]>,
+) -> Result<(), ErrorCode> {
     let mut amount_output = [0u8; 22];
     let amount_str = to_alph_str(&output.amount, &mut amount_output)?;
     let amount_field = Field {
@@ -312,12 +334,27 @@ fn review_tx_output(output: &AssetOutput, current_index: usize) -> Result<(), Er
             // TODO: review tokens
             review(&fields, review_message)
         }
-        LockupScript::P2MPKH(_) => {
+        LockupScript::P2MPKH(p2mpkh) => {
+            let mut bs58_str = [0u8; P2MPKH::BASE58_OUTPUT_SIZE];
+            let default_address = "multi-sig address";
+            let address = if p2mpkh.inner.is_reviewable() && temp_data.is_some() {
+                let encoded = temp_data.unwrap();
+                let prefix = [0x01u8, p2mpkh.inner.size.inner as u8];
+                let postfix = [p2mpkh.inner.m.inner as u8];
+                let result = base58_encode_inputs(&[&prefix, encoded, &postfix], &mut bs58_str);
+                if result.is_none() {
+                    default_address
+                } else {
+                    bytes_to_string(result.unwrap())?
+                }
+            } else {
+                default_address
+            };
             let fields = [
                 amount_field,
                 Field {
                     name: "Address",
-                    value: "multi-sig address", // TODO: display multi-sig address
+                    value: address,
                 },
             ];
             review(&fields, review_message)

@@ -50,6 +50,7 @@ mod tests {
     use super::{new_decoder, Hash, Token, U256};
     use crate::buffer::Buffer;
     use crate::decode::Decoder;
+    use crate::TempData;
 
     fn copy_u256(u256: &U256) -> U256 {
         U256::from([u256.inner[0], u256.inner[1], u256.inner[2], u256.inner[3]])
@@ -58,6 +59,7 @@ mod tests {
     #[test]
     fn test_decode_token() {
         let u256_data = get_test_vector();
+        let mut temp_data = TempData::new();
 
         for _ in 0..10 {
             let idx = random_usize(0, u256_data.len() - 1);
@@ -73,7 +75,7 @@ mod tests {
 
             {
                 let mut decoder = new_decoder::<Token>();
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 assert_eq!(decoder.decode(&mut buffer), Ok(Some(&token)));
             }
 
@@ -83,7 +85,8 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

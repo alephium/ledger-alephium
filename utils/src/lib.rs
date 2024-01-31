@@ -3,10 +3,12 @@
 pub mod base58;
 pub mod buffer;
 pub mod decode;
+pub mod temp_data;
 pub mod types;
 
 use core::char;
 use core::num::Wrapping;
+pub use temp_data::TempData;
 
 #[inline]
 pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {

@@ -84,6 +84,8 @@ impl RawDecoder for U16 {
 pub mod tests {
     extern crate std;
 
+    use crate::TempData;
+
     use super::*;
     use std::vec;
 
@@ -97,8 +99,9 @@ pub mod tests {
             (vec![0x00u8], 0x00),
         ];
 
+        let mut temp_data = TempData::new();
         for (bytes, num) in items {
-            let mut buffer = Buffer::new(&bytes).unwrap();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
             let mut decoder = new_decoder::<U16>();
             let result = decoder.decode(&mut buffer).unwrap().unwrap();
             assert_eq!(result.inner, num);

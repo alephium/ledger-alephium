@@ -235,8 +235,8 @@ pub mod tests {
     extern crate std;
 
     use crate::buffer::Buffer;
-    use crate::decode::*;
     use crate::types::u256::U256;
+    use crate::{decode::*, TempData};
     use core::str::from_utf8;
     use rand::Rng;
     use std::string::String;
@@ -329,12 +329,13 @@ pub mod tests {
     #[test]
     fn test_decode_u256() {
         let arrays = get_test_vector();
+        let mut temp_data = TempData::new();
         for item in arrays {
             let bytes = hex_to_bytes(item.0).unwrap();
 
             {
                 let mut decoder = new_decoder::<U256>();
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&item.1));
                 assert!(decoder.stage.is_complete())
@@ -346,7 +347,8 @@ pub mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();
@@ -399,7 +401,7 @@ pub mod tests {
         ];
         for (number, str) in cases {
             let u256 = U256::from_u128(number);
-            let mut output = [0u8; 17];
+            let mut output = [0u8; 30];
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());
             let expected = from_utf8(result.unwrap()).unwrap();

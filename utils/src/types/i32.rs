@@ -181,6 +181,8 @@ pub mod tests {
     extern crate alloc;
     extern crate std;
 
+    use crate::TempData;
+
     use super::*;
     use core::str::from_utf8;
     use rand::Rng;
@@ -229,12 +231,13 @@ pub mod tests {
             TestCase("c0c0000000", -1073741824),
         ];
 
+        let mut temp_data = TempData::new();
         for item in arrays {
             let bytes = hex_to_bytes(item.0).unwrap();
 
             {
                 let mut decoder = new_decoder::<I32>();
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&I32::from(item.1)));
                 assert!(decoder.stage.is_complete())
@@ -246,7 +249,8 @@ pub mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

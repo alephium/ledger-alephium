@@ -1,14 +1,21 @@
+use crate::TempData;
+
 pub struct Buffer<'a> {
     index: u8,
     data: &'a [u8],
+    temp_data: *mut TempData,
 }
 
 impl<'a> Buffer<'a> {
-    pub fn new(data: &'a [u8]) -> Option<Buffer<'a>> {
+    pub fn new(data: &'a [u8], temp_data: *mut TempData) -> Option<Buffer<'a>> {
         if data.len() > (u8::MAX as usize) {
             return None;
         }
-        Some(Buffer { index: 0, data })
+        Some(Buffer {
+            index: 0,
+            data,
+            temp_data,
+        })
     }
 
     pub fn next_byte(&mut self) -> Option<u8> {
@@ -59,5 +66,13 @@ impl<'a> Buffer<'a> {
 
     pub fn get_range(&self, from_index: u8, to_index: u8) -> &[u8] {
         &self.data[(from_index as usize)..(to_index as usize)]
+    }
+
+    pub fn write_byte_to_temp_data(&self, byte: u8) {
+        unsafe { self.temp_data.as_mut().unwrap().write_byte(byte) };
+    }
+
+    pub fn write_bytes_to_temp_data(&self, bytes: &[u8]) {
+        unsafe { self.temp_data.as_mut().unwrap().write(bytes) };
     }
 }

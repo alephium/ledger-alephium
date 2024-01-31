@@ -134,19 +134,21 @@ mod tests {
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
     use crate::types::{Hash, U16, U256};
+    use crate::TempData;
     use std::vec;
     use std::vec::Vec;
 
     #[test]
     fn test_decode_empty_avector() {
+        let mut temp_data = TempData::new();
         let empty_avector_encoded = vec![0u8];
-        let mut buffer0 = Buffer::new(&empty_avector_encoded).unwrap();
+        let mut buffer0 = Buffer::new(&empty_avector_encoded, &mut temp_data).unwrap();
         let mut decoder0 = new_decoder::<AVector<Hash>>();
         let result0 = decoder0.decode(&mut buffer0).unwrap().unwrap();
         assert!(result0.get_current_item().is_none());
         assert!(result0.is_complete());
 
-        let mut buffer1 = Buffer::new(&empty_avector_encoded).unwrap();
+        let mut buffer1 = Buffer::new(&empty_avector_encoded, &mut temp_data).unwrap();
         let mut decoder1 = new_decoder::<AVector<U256>>();
         let result1 = decoder1.decode(&mut buffer1).unwrap().unwrap();
         assert!(result1.get_current_item().is_none());
@@ -156,6 +158,7 @@ mod tests {
     #[test]
     fn test_decode_avector() {
         let max_size: usize = 0x1f;
+        let mut temp_data = TempData::new();
         for _ in 0..10 {
             let size = random_usize(1, max_size);
             let mut hashes: Vec<Hash> = Vec::with_capacity(size);
@@ -167,7 +170,7 @@ mod tests {
             }
 
             if bytes.len() <= (u8::MAX as usize) {
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let mut decoder = new_decoder::<AVector<Hash>>();
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
                 assert_eq!(result.total_size, U16::from(size as u16));
@@ -180,7 +183,8 @@ mod tests {
 
             while length < bytes.len() {
                 let size = if length == 0 { 33 } else { 32 };
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

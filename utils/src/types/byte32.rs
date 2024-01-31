@@ -11,6 +11,7 @@ pub mod tests {
     use super::Byte32;
     use crate::buffer::Buffer;
     use crate::decode::{new_decoder, Decoder};
+    use crate::TempData;
     use rand::Rng;
     use std::vec;
     use std::vec::Vec;
@@ -25,12 +26,13 @@ pub mod tests {
 
     #[test]
     fn test_decode_byte32() {
+        let mut temp_data = TempData::new();
         let mut bytes = vec![0u8; 0];
         let mut decoder = new_decoder::<Byte32>();
 
         while bytes.len() < Byte32::ENCODED_LENGTH {
             let data = gen_bytes(0, Byte32::ENCODED_LENGTH * 2);
-            let mut buffer = Buffer::new(data.as_slice()).unwrap();
+            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data).unwrap();
             bytes.extend(&data);
 
             let result = decoder.decode(&mut buffer);

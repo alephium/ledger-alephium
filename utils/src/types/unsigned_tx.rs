@@ -88,6 +88,7 @@ mod tests {
     use crate::types::i32::tests::random_usize;
     use crate::types::u256::tests::hex_to_bytes;
     use crate::types::{AVector, Hash, Hint, LockupScript, PublicKey, UnlockScript, I32, U256};
+    use crate::TempData;
     use blake2::{Blake2b, Digest};
     use core::cmp::min;
     use digest::consts::U32;
@@ -235,11 +236,13 @@ mod tests {
         let mut length: usize = 0;
         let mut decoder = new_decoder::<UnsignedTx>();
         let mut hasher = Blake2b256::new();
+        let mut temp_data = TempData::new();
 
         while length < encoded_tx.len() {
             let remain = encoded_tx.len() - length;
             let size = min(random_usize(0, u8::MAX as usize), remain);
-            let mut buffer = Buffer::new(&encoded_tx[length..(length + size)]).unwrap();
+            let mut buffer =
+                Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data).unwrap();
             length += size;
 
             let mut continue_decode = true;

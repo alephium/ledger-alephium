@@ -110,10 +110,12 @@ mod tests {
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
     use crate::types::{PublicKey, UnlockScript};
+    use crate::TempData;
     use std::vec;
 
     #[test]
     fn test_decode_p2pkh() {
+        let mut temp_data = TempData::new();
         for _ in 0..10 {
             let mut bytes = vec![0u8];
             let hash_bytes = gen_bytes(33, 33);
@@ -123,7 +125,7 @@ mod tests {
             ));
 
             {
-                let mut buffer = Buffer::new(&bytes).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let mut decoder = new_decoder::<UnlockScript>();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&unlock_script));
@@ -135,7 +137,8 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer = Buffer::new(&bytes[length..(length + size)]).unwrap();
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

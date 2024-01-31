@@ -85,14 +85,17 @@ impl RawDecoder for ByteString {
 #[cfg(test)]
 mod tests {
     extern crate std;
+    use crate::TempData;
+
     use super::*;
     use std::vec;
 
     #[test]
     fn test_decode_empty_byte_string() {
+        let mut temp_data = TempData::new();
         let bytes = vec![0u8];
         let mut decoder = new_decoder::<ByteString>();
-        let mut buffer = Buffer::new(&bytes).unwrap();
+        let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
 
         let result = decoder.decode(&mut buffer).unwrap().unwrap();
         assert_eq!(result.size(), 0);
@@ -101,9 +104,10 @@ mod tests {
 
     #[test]
     fn test_decode_byte_string() {
+        let mut temp_data = TempData::new();
         let bytes = vec![4u8, 0, 1, 2, 3];
         let mut decoder = new_decoder::<ByteString>();
-        let mut buffer = Buffer::new(&bytes).unwrap();
+        let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
 
         let result = decoder.decode(&mut buffer).unwrap().unwrap();
         assert_eq!(result.size(), 4);

@@ -5,7 +5,7 @@ macro_rules! fixed_bytes {
         pub struct $struct_name(pub [u8; $encoded_length]);
 
         impl $struct_name {
-            const ENCODED_LENGTH: usize = $encoded_length;
+            pub const ENCODED_LENGTH: usize = $encoded_length;
 
             pub fn from_bytes(bytes: [u8; $encoded_length]) -> Self {
                 $struct_name(bytes)

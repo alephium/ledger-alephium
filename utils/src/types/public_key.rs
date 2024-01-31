@@ -11,6 +11,7 @@ mod tests {
     use super::PublicKey;
     use crate::buffer::Buffer;
     use crate::decode::{new_decoder, Decoder};
+    use crate::TempData;
     use rand::Rng;
     use std::vec;
     use std::vec::Vec;
@@ -27,10 +28,11 @@ mod tests {
     fn test_decode_public_key() {
         let mut bytes = vec![0u8; 0];
         let mut decoder = new_decoder::<PublicKey>();
+        let mut temp_data = TempData::new();
 
         while bytes.len() < PublicKey::ENCODED_LENGTH {
             let data = gen_bytes(0, PublicKey::ENCODED_LENGTH * 2);
-            let mut buffer = Buffer::new(data.as_slice()).unwrap();
+            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data).unwrap();
             bytes.extend(&data);
 
             let result = decoder.decode(&mut buffer);
