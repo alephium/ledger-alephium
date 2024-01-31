@@ -10,14 +10,13 @@ use ledger_device_sdk::ui::layout::StringPlace;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use sign_tx_context::SignTxContext;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
-mod app_utils;
 mod blake2b_hasher;
 mod blind_signing;
+mod debug;
 mod error_code;
 mod sign_tx_context;
 
-use app_utils::print::{println, println_array, println_slice};
-use app_utils::*;
+use debug::print::{println, println_array, println_slice};
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io;
 use ledger_device_sdk::ui::bagls;
@@ -173,6 +172,8 @@ impl TryFrom<io::ApduHeader> for Ins {
 
 use ledger_device_sdk::io::Reply;
 
+use crate::blake2b_hasher::Blake2bHasher;
+
 fn handle_apdu(
     comm: &mut io::Comm,
     ins: Ins,
@@ -284,7 +285,7 @@ pub fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     println("compressed");
     println_slice::<66>(&compressed);
 
-    let pub_key_hash = blake2b(&compressed);
+    let pub_key_hash = Blake2bHasher::hash(&compressed).unwrap();
     println("blake2b done");
     let script_hint = djb_hash(&pub_key_hash) | 1;
     println("hint done");

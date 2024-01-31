@@ -1,6 +1,7 @@
 use ledger_device_sdk::io::Reply;
 use ledger_device_sdk::io::StatusWords;
 
+#[derive(Debug)]
 #[repr(u16)]
 pub enum ErrorCode {
     Ok = StatusWords::Ok as u16,
