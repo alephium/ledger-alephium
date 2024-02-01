@@ -1,9 +1,8 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
-import blake from 'blakejs'
 import fetch from 'node-fetch'
-import { ALPH_TOKEN_ID, Account, Address, NodeProvider, ONE_ALPH, addressFromPublicKey, groupOfAddress, hexToBinUnsafe, transactionVerifySignature } from '@alephium/web3'
-import { getSigner, transfer } from '@alephium/web3-test'
+import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, groupOfAddress, transactionVerifySignature } from '@alephium/web3'
+import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { waitTxConfirmed } from '@alephium/cli'
 
 function sleep(ms) {
@@ -209,4 +208,81 @@ describe('sdk', () => {
 
     await app.close()
   }, 60000)
+
+  it('should transfer token to multisig address', async () => {
+    const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToTestAccount(testAccount.address)
+
+    const tokenInfo = await mintToken(testAccount.address, 2222222222222222222222222n);
+
+    const multiSigAddress = 'X3KYVteDjsKuUP1F68Nv9iEUecnnkMuwjbC985AnA6MvciDFJ5bAUEso2Sd7sGrwZ5rfNLj7Rp4n9XjcyzDiZsrPxfhNkPYcDm3ce8pQ9QasNFByEufMi3QJ3cS9Vk6cTpqNcq';
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: multiSigAddress,
+          attoAlphAmount: (ONE_ALPH * 5n).toString(),
+          tokens: [
+            {
+              id: tokenInfo.contractId,
+              amount: "1111111111111111111111111",
+            }
+          ]
+        }
+      ]
+    })
+
+    function approve(index: number) {
+      if (index > 11) return
+      if (index <= 2) {
+        setTimeout(async () => {
+          await clickAndApprove(2)
+          approve(index + 1)
+        }, 1000)
+      } else if (index === 3 || index === 4) {
+        setTimeout(async () => {
+          await clickAndApprove(4)
+          approve(index + 1)
+        }, 1000)
+      } else if (index === 5 || index === 7) {
+        setTimeout(async () => {
+          await clickAndApprove(10)
+          approve(index + 1)
+        }, 1000)
+      } else if (index === 6 || index === 9) {
+        setTimeout(async () => {
+          await clickAndApprove(7)
+          approve(index + 1)
+        }, 1000)
+      } else if (index === 8 || index >= 10) {
+        setTimeout(async () => {
+          await clickAndApprove(5)
+          approve(index + 1)
+        }, 1000)
+      }
+    }
+
+    approve(0);
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    const balances = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
+    const alphBalance = BigInt(balances.balance)
+    expect(alphBalance < (ONE_ALPH * 5n)).toEqual(true)
+
+    expect(balances.tokenBalances!.length).toEqual(1)
+    const token = balances.tokenBalances![0]
+    expect(token.id).toEqual(tokenInfo.contractId)
+    expect(token.amount).toEqual('1111111111111111111111111')
+
+    await app.close()
+  }, 90000)
 })

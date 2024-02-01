@@ -85,11 +85,9 @@ impl SignTxContext {
             UnsignedTx::FixedOutputs(outputs) => {
                 let current_output = outputs.get_current_item();
                 if current_output.is_some() {
-                    review_tx_output(
-                        current_output.unwrap(),
-                        outputs.current_index as usize,
-                        self.get_temp_data(),
-                    )
+                    let output = current_output.unwrap();
+                    review_tx_output(output, outputs.current_index as usize, self.get_temp_data())?;
+                    review_token(output)
                 } else {
                     Ok(())
                 }
@@ -369,6 +367,38 @@ fn review_tx_output(
         }
         _ => Err(ErrorCode::NotSupported),
     }
+}
+
+fn review_token(output: &AssetOutput) -> Result<(), ErrorCode> {
+    if output.tokens.is_empty() {
+        return Ok(());
+    }
+    let token_opt = output.tokens.get_current_item();
+    if token_opt.is_none() {
+        return Ok(());
+    }
+    let token = token_opt.unwrap();
+    let mut amount_output = [0u8; 39]; // u128 max
+    let amount_str_bytes = token.amount.to_str(&mut amount_output);
+    let amount_str = if amount_str_bytes.is_none() {
+        check_blind_signing()?;
+        "number too large"
+    } else {
+        bytes_to_string(&amount_str_bytes.unwrap())?
+    };
+    let token_id_bytes: [u8; 64] = utils::to_hex(&token.id.0).unwrap();
+    let token_id_hex = bytes_to_string(&token_id_bytes)?;
+    let fields = [
+        Field {
+            name: "Token Id",
+            value: token_id_hex,
+        },
+        Field {
+            name: "Token Amount",
+            value: amount_str,
+        },
+    ];
+    review(&fields, "Review Output Token")
 }
 
 fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {

@@ -90,12 +90,45 @@ impl U256 {
         }
     }
 
+    #[inline]
+    fn is_reviewable(&self) -> bool {
+        self.inner[0] == 0 && self.inner[1] == 0
+    }
+
     pub fn to_u128(&self) -> Option<u128> {
-        if self.inner[0] != 0 || self.inner[1] != 0 {
+        if self.inner[0] == 0 && self.inner[1] == 0 {
+            return Some(((self.inner[2] as u128) << 64) | (self.inner[3] as u128));
+        }
+        return None;
+    }
+
+    pub fn to_str<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
+        if output.len() == 0 || !self.is_reviewable() {
             return None;
         }
-        let result = ((self.inner[2] as u128) << 64) | (self.inner[3] as u128);
-        Some(result)
+        if self.is_zero() {
+            output[0] = b'0';
+            return Some(&output[..1]);
+        }
+        let mut bytes = [0u8; 16];
+        bytes[..8].copy_from_slice(&self.inner[2].to_be_bytes());
+        bytes[8..].copy_from_slice(&self.inner[3].to_be_bytes());
+        let mut index = output.len();
+        while !bytes.into_iter().all(|v| v == 0) {
+            if index == 0 {
+                return None;
+            }
+            index -= 1;
+            let mut carry = 0u16;
+            for i in 0..16 {
+                let v = (carry << 8) | (bytes[i] as u16);
+                let rem = v % 10;
+                bytes[i] = (v / 10) as u8;
+                carry = rem;
+            }
+            output[index] = b'0' + (carry as u8);
+        }
+        Some(&output[index..])
     }
 
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
@@ -413,5 +446,37 @@ pub mod tests {
         let mut output = [0u8; 33];
         let value = U256::from([0, 1, 0, 0]);
         assert!(value.to_alph(&mut output).is_none());
+    }
+
+    #[test]
+    fn test_to_str() {
+        let cases = [
+            (U256::from_u32(0), "0"),
+            (U256::from_u32(1), "1"),
+            (U256::from_u32(100), "100"),
+            (U256::from_u32(12345), "12345"),
+            (U256::from_u32(123456), "123456"),
+            (U256::from_u32(u32::MAX - 1), "4294967294"),
+            (U256::from_u32(u32::MAX), "4294967295"),
+            (U256::from_u64(1234567890), "1234567890"),
+            (U256::from_u64(u64::MAX - 1), "18446744073709551614"),
+            (U256::from_u64(u64::MAX), "18446744073709551615"),
+            (
+                U256::from_u128(u128::MAX),
+                "340282366920938463463374607431768211455",
+            ),
+        ];
+
+        for (u256, str) in cases {
+            let mut output = [0u8; 39];
+            let result = u256.to_str(&mut output).unwrap();
+            let expected = from_utf8(&result).unwrap();
+            assert_eq!(expected, str);
+        }
+
+        let u256 = U256::from_u64(u64::MAX);
+        let mut output = [0u8; 19];
+        let result = u256.to_str(&mut output);
+        assert!(result.is_none());
     }
 }
