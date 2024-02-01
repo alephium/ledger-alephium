@@ -225,7 +225,7 @@ fn handle_apdu(
             let data = comm.get_data()?;
             match sign_tx_context.handle_data(apdu_header, data) {
                 Ok(()) if !sign_tx_context.is_complete() => {
-                    return Ok(true);
+                    return Ok(false);
                 }
                 Ok(()) => {
                     let result = match sign_tx_context.review_tx_id_and_sign() {

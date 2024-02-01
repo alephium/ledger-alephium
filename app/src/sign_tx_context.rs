@@ -156,7 +156,6 @@ impl SignTxContext {
                     let tx_data = &data[20..];
                     if tx_data[2] == 0x01 {
                         check_blind_signing()?;
-                        return Err(ErrorCode::BlindSigningNotEnabled);
                     }
                     self.decode_tx(tx_data)
                 } else {
@@ -335,7 +334,6 @@ fn review_tx_output(
                     value,
                 },
             ];
-            // TODO: review tokens
             review(&fields, review_message)
         }
         LockupScript::P2MPKH(p2mpkh) => {
