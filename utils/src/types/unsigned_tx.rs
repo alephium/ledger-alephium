@@ -233,36 +233,39 @@ mod tests {
             }
         };
 
-        let mut length: usize = 0;
-        let mut decoder = new_decoder::<UnsignedTx>();
-        let mut hasher = Blake2b256::new();
-        let mut temp_data = TempData::new();
+        let frame_sizes = [1, u8::MAX as usize];
+        for frame_size in frame_sizes {
+            let mut length: usize = 0;
+            let mut decoder = new_decoder::<UnsignedTx>();
+            let mut hasher = Blake2b256::new();
+            let mut temp_data = TempData::new();
 
-        while length < encoded_tx.len() {
-            let remain = encoded_tx.len() - length;
-            let size = min(random_usize(0, u8::MAX as usize), remain);
-            let mut buffer =
-                Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data).unwrap();
-            length += size;
+            while length < encoded_tx.len() {
+                let remain = encoded_tx.len() - length;
+                let size = min(random_usize(0, frame_size), remain);
+                let mut buffer =
+                    Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data).unwrap();
+                length += size;
 
-            let mut continue_decode = true;
-            while continue_decode {
-                let result = decode(&mut buffer, &mut decoder, &mut hasher).unwrap();
-                if result {
-                    check(&decoder.inner);
-                    decoder.inner.next_step();
-                    decoder.reset_stage();
-                } else {
-                    continue_decode = false;
-                }
-                if decoder.inner.is_complete() {
-                    continue_decode = false;
+                let mut continue_decode = true;
+                while continue_decode {
+                    let result = decode(&mut buffer, &mut decoder, &mut hasher).unwrap();
+                    if result {
+                        check(&decoder.inner);
+                        decoder.inner.next_step();
+                        decoder.reset_stage();
+                    } else {
+                        continue_decode = false;
+                    }
+                    if decoder.inner.is_complete() {
+                        continue_decode = false;
+                    }
                 }
             }
-        }
 
-        let tx_id = hasher.finalize().to_vec();
-        assert_eq!(tx_id, hex_to_bytes(tx_id_hex).unwrap());
+            let tx_id = hasher.finalize().to_vec();
+            assert_eq!(tx_id, hex_to_bytes(tx_id_hex).unwrap());
+        }
     }
 
     #[test]
@@ -445,6 +448,39 @@ mod tests {
             gas_amount,
             gas_price,
             true,
+            &all_inputs,
+            &all_outputs,
+        );
+    }
+
+    #[test]
+    fn test_decode_coinbase_tx() {
+        let tx_id_hex = "a720a161efca30b9378da93facf1fa5fc9340ffb17e1f859f1100fa1e0b61038";
+        let encoded_tx = hex_to_bytes("00000080004e20bb9aca000001c4212afc56552f000000edae9a1e22e324a9997a1dc522ee4b3a99bb38e3a35ee4ebd147396a4a9893160000018d1e54526c000a00000000018d1c8a8eec").unwrap();
+
+        let gas_amount = I32::from(20000);
+        let gas_price = U256::from_u64(1000000000);
+        let all_inputs = [];
+
+        let output = p2pkh_output(
+            "2390000000000000000",
+            "edae9a1e22e324a9997a1dc522ee4b3a99bb38e3a35ee4ebd147396a4a989316",
+        );
+        let all_outputs = [AssetOutput {
+            lock_time: TimeStamp(1705610859116),
+            additional_data: ByteString {
+                length: I32::from(10),
+                current_index: 10,
+            },
+            ..output
+        }];
+
+        decode_and_check_tx(
+            tx_id_hex,
+            encoded_tx,
+            gas_amount,
+            gas_price,
+            false,
             &all_inputs,
             &all_outputs,
         );

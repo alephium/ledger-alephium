@@ -5,8 +5,8 @@ use super::I32;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct ByteString {
-    length: I32,
-    current_index: i32,
+    pub length: I32,
+    pub current_index: i32,
 }
 
 impl Reset for ByteString {
@@ -64,7 +64,7 @@ impl RawDecoder for ByteString {
         if !self.total_size_decoded() {
             let result = self.length.decode(buffer, stage)?;
             if !result.is_complete() {
-                return Ok(DecodeStage { ..*stage });
+                return Ok(result);
             }
             self.current_index = 0;
         }
