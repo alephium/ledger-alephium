@@ -156,8 +156,8 @@ impl SignTxContext {
                     }
                     self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
-                    if tx_data[2] == 0x01 && !is_blind_signing_enabled() {
-                        blind_signing_warning();
+                    if tx_data[2] == 0x01 {
+                        check_blind_signing()?;
                         return Err(ErrorCode::BlindSigningNotEnabled);
                     }
                     self.decode_tx(tx_data)
@@ -281,6 +281,7 @@ fn review_tx_input(
             review(&fields, review_message)
         }
         UnlockScript::P2MPKH(_) => {
+            check_blind_signing()?;
             let fields = [Field {
                 name: "Address",
                 value: "multi-sig address",
@@ -295,6 +296,7 @@ fn review_tx_input(
                 let script_hash = Blake2bHasher::hash(script_bytes)?;
                 to_address(2u8, &script_hash, &mut bytes)?
             } else {
+                check_blind_signing()?;
                 default_value
             };
             let fields = [Field {
@@ -347,11 +349,13 @@ fn review_tx_output(
                 let postfix = [p2mpkh.inner.m.inner as u8];
                 let result = base58_encode_inputs(&[&prefix, encoded, &postfix], &mut bs58_str);
                 if result.is_none() {
+                    check_blind_signing()?;
                     default_address
                 } else {
                     bytes_to_string(result.unwrap())?
                 }
             } else {
+                check_blind_signing()?;
                 default_address
             };
             let fields = [
@@ -385,7 +389,11 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
     }
 }
 
-fn blind_signing_warning() {
+fn check_blind_signing() -> Result<(), ErrorCode> {
+    if is_blind_signing_enabled() {
+        return Ok(());
+    }
     let scroller = MessageScroller::new("Blind signing must be enabled");
     scroller.event_loop();
+    Err(ErrorCode::BlindSigningNotEnabled)
 }
