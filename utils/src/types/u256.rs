@@ -24,7 +24,7 @@ impl PartialEq for U256 {
     }
 }
 
-fn trim(dest: &[u8]) -> usize {
+fn trim(dest: &[u8]) -> &[u8] {
     let mut index = dest.len() - 1;
     while index != 0 {
         if dest[index] == b'0' {
@@ -34,16 +34,21 @@ fn trim(dest: &[u8]) -> usize {
         }
     }
     if dest[index] == b'.' {
-        index
+        &dest[..index]
     } else {
-        index + 1
+        &dest[..index + 1]
     }
 }
 
 impl U256 {
     const ALPH_DECIMALS: usize = 18;
     const DECIMAL_PLACES: usize = 6;
-    const ALPH_MIN: u128 = (10 as u128).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
+    const ALPH_MIN: u64 = (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
+
+    fn less_than_alph_min(&self) -> bool {
+        let array = &self.inner;
+        array[0] == 0 && array[1] == 0 && array[2] == 0 && array[3] < Self::ALPH_MIN
+    }
 
     #[inline]
     pub fn get_length(&self) -> usize {
@@ -128,16 +133,45 @@ impl U256 {
             }
             output[index] = b'0' + (carry as u8);
         }
-        Some(&output[index..])
+        output.copy_within(index..output.len(), 0);
+        Some(&output[..(output.len() - index)])
+    }
+
+    fn to_str_with_decimals<'a>(
+        &self,
+        output: &'a mut [u8],
+        decimals: usize,
+        decimal_places: usize,
+    ) -> Option<&'a [u8]> {
+        reset(output);
+        let str = self.to_str(output)?;
+        let str_length = str.len();
+        if decimals == 0 {
+            return Some(&output[..str_length]);
+        }
+
+        if str_length > decimals {
+            let decimal_index = str_length - decimals;
+            output.copy_within(decimal_index..str_length, decimal_index + 1);
+            output[decimal_index] = b'.';
+            return Some(trim(&output[..(decimal_index + decimal_places + 1)]));
+        }
+
+        let pad_size = decimals - str_length;
+        output.copy_within(0..str_length, 2 + pad_size);
+        for i in 0..(2 + pad_size) {
+            if i == 1 {
+                output[i] = b'.';
+            } else {
+                output[i] = b'0';
+            }
+        }
+        return Some(trim(&output[..(2 + decimal_places)]));
     }
 
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
         let postfix = b" ALPH";
-        if output.len() < 1 + postfix.len() {
-            return None;
-        }
-
         if self.is_zero() {
             output[0] = b'0';
             let total_size = 1 + postfix.len();
@@ -145,8 +179,7 @@ impl U256 {
             return Some(&output[..total_size]);
         }
 
-        let mut raw_amount = self.to_u128()?;
-        if raw_amount < Self::ALPH_MIN {
+        if self.less_than_alph_min() {
             let str = b"<0.000001";
             let total_size = str.len() + postfix.len();
             if output.len() < total_size {
@@ -161,26 +194,12 @@ impl U256 {
             // max ALPH amount
             return None;
         }
-        let mut length = 0;
-        while raw_amount > 0 || length < Self::ALPH_DECIMALS {
-            output[length] = b'0' + ((raw_amount % 10) as u8);
-            raw_amount = raw_amount / 10;
-            length += 1;
-            if length == Self::ALPH_DECIMALS {
-                output[length] = b'.';
-                length += 1;
-            }
-        }
-        if output[length - 1] == b'.' {
-            output[length] = b'0';
-            length += 1;
-        }
-        output[..length].reverse();
-        let index = output.iter().position(|v| *v == b'.').unwrap();
-        let amount_size = trim(&mut output[..(index + Self::DECIMAL_PLACES + 1)]);
-        let total_size = amount_size + postfix.len();
-        output[amount_size..total_size].copy_from_slice(postfix);
-        Some(&output[..total_size])
+
+        let str = self.to_str_with_decimals(output, Self::ALPH_DECIMALS, Self::DECIMAL_PLACES)?;
+        let str_length = str.len();
+        let total_size = str_length + postfix.len();
+        output[str_length..total_size].copy_from_slice(postfix);
+        return Some(&output[..total_size]);
     }
 
     fn decode_u32(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
@@ -419,9 +438,9 @@ pub mod tests {
 
         let cases = [
             (0, "0"),
-            (U256::ALPH_MIN, "0.000001"),
+            (U256::ALPH_MIN as u128, "0.000001"),
             ((10 as u128).pow(12), "0.000001"),
-            (U256::ALPH_MIN - 1, "<0.000001"),
+            ((U256::ALPH_MIN as u128) - 1, "<0.000001"),
             ((10 as u128).pow(13), "0.00001"),
             ((10 as u128).pow(14), "0.0001"),
             ((10 as u128).pow(17), "0.1"),
