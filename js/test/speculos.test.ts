@@ -54,21 +54,21 @@ describe('sdk', () => {
   it('should get public key for group', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
-    Array(GROUP_NUM).forEach(async (_, group) => {
+    for (let group = 0; group < GROUP_NUM; group++) {
       const [account, hdIndex] = await app.getAccount(path, group)
       expect(hdIndex >= pathIndex).toBe(true)
       expect(groupOfAddress(account.address)).toBe(group)
       expect(account.keyType).toBe('default')
-    })
+    }
     await app.close()
   })
 
   it('should get public key for group for Schnorr signature', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
-    Array(GROUP_NUM).forEach(async (_, group) => {
+    for (let group = 0; group < GROUP_NUM; group++) {
       await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
-    })
+    }
     await app.close()
   })
 
