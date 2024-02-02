@@ -99,7 +99,7 @@ impl SignTxContext {
     pub fn review_tx_id_and_sign(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
         let hex: [u8; 64] = utils::to_hex(&tx_id).unwrap();
-        let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InvalidParameter)?;
+        let hex_str = bytes_to_string(&hex)?;
         let fields = [Field {
             name: "TxId",
             value: hex_str,
@@ -159,14 +159,14 @@ impl SignTxContext {
                     }
                     self.decode_tx(tx_data)
                 } else {
-                    Err(ErrorCode::TxDecodeFail)
+                    Err(ErrorCode::BadLen)
                 }
             }
             _ => {
                 if apdu_header.p1 == 1 {
                     self.decode_tx(data)
                 } else {
-                    Err(ErrorCode::TxDecodeFail)
+                    Err(ErrorCode::BadP1P2)
                 }
             }
         }
@@ -189,7 +189,7 @@ fn review_network(id: u8) -> Result<(), ErrorCode> {
 
 #[inline]
 fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
-    from_utf8(bytes).map_err(|_| ErrorCode::InvalidParameter)
+    from_utf8(bytes).map_err(|_| ErrorCode::InternalError)
 }
 
 fn index_with_prefix<'a>(
@@ -302,7 +302,14 @@ fn review_tx_input(
             }];
             review(&fields, review_message)
         }
-        _ => Err(ErrorCode::NotSupported),
+        UnlockScript::SameAsPrevious => {
+            let fields = [Field {
+                name: "Address",
+                value: "same as previous",
+            }];
+            review(&fields, review_message)
+        }
+        _ => Err(ErrorCode::InternalError),
     }
 }
 
@@ -363,7 +370,7 @@ fn review_tx_output(
             ];
             review(&fields, review_message)
         }
-        _ => Err(ErrorCode::NotSupported),
+        _ => Err(ErrorCode::InternalError),
     }
 }
 

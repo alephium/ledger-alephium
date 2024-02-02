@@ -10,16 +10,12 @@ pub enum ErrorCode {
     BadP1P2 = StatusWords::BadP1P2 as u16,
     BadLen = StatusWords::BadLen as u16,
     UserCancelled = StatusWords::UserCancelled as u16,
-    TxDecodeFail = 0xF000,
-    TxSignFail = 0xF001,
-    InvalidHashLength = 0xF002,
-    InvalidParameter = 0xF003,
-    Overflow = 0xF004,
-    NotSupported = 0xF005,
-    DerivePathDecodeFail = 0xF006,
-    BlindSigningNotEnabled = 0xF007,
-    InternalError = 0xFF00,
-    Unknown = StatusWords::Unknown as u16,
+    TxDecodeFail = 0xE000,
+    TxSignFail = 0xE001,
+    Overflow = 0xE002,
+    DerivePathDecodeFail = 0xE003,
+    BlindSigningNotEnabled = 0xE004,
+    InternalError = 0xEF00,
 }
 
 impl From<ErrorCode> for Reply {

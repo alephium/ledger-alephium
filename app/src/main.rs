@@ -3,6 +3,7 @@
 
 use blind_signing::is_blind_signing_enabled;
 use blind_signing::update_blind_signing;
+use error_code::ErrorCode;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ui::layout;
 use ledger_device_sdk::ui::layout::Draw;
@@ -24,6 +25,8 @@ use ledger_device_sdk::ui::gadgets;
 use ledger_device_sdk::ui::screen_util;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
+
+const TOTAL_NUMBER_OF_GROUPS: u8 = 4;
 
 fn show_ui_common(draw: fn() -> ()) {
     gadgets::clear_screen();
@@ -159,13 +162,13 @@ enum Ins {
 }
 
 impl TryFrom<io::ApduHeader> for Ins {
-    type Error = ledger_device_sdk::io::StatusWords;
+    type Error = ErrorCode;
     fn try_from(header: io::ApduHeader) -> Result<Self, Self::Error> {
         match header.ins {
             0 => Ok(Ins::GetVersion),
             1 => Ok(Ins::GetPubKey),
             2 => Ok(Ins::SignTx),
-            _ => Err(ledger_device_sdk::io::StatusWords::Unknown),
+            _ => Err(ErrorCode::BadIns),
         }
     }
 }
@@ -174,19 +177,29 @@ use ledger_device_sdk::io::Reply;
 
 use crate::blake2b_hasher::Blake2bHasher;
 
+fn check_group(p1: u8, p2: u8) -> Result<(), Reply> {
+    if p1 == 0 && p2 == 0 {
+        return Ok(());
+    }
+    if p2 >= p1 || p1 != TOTAL_NUMBER_OF_GROUPS {
+        return Err(ErrorCode::BadP1P2.into());
+    }
+    return Ok(());
+}
+
 fn handle_apdu(
     comm: &mut io::Comm,
     ins: Ins,
     sign_tx_context: &mut SignTxContext,
 ) -> Result<bool, Reply> {
     if comm.rx == 0 {
-        return Err(io::StatusWords::NothingReceived.into());
+        return Err(ErrorCode::BadLen.into());
     }
 
     let mut path: [u32; 5] = [0; 5];
     let apdu_header = comm.get_apdu_metadata();
     if apdu_header.cla != 0x80 {
-        return Err(io::StatusWords::BadCla.into());
+        return Err(ErrorCode::BadCla.into());
     }
 
     match ins {
@@ -201,12 +214,13 @@ fn handle_apdu(
             println("raw path");
             println_slice::<40>(raw_path);
             if !deserialize_path(raw_path, &mut path) {
-                return Err(io::StatusWords::BadLen.into());
+                return Err(ErrorCode::BadLen.into());
             }
             println_slice::<40>(raw_path);
 
             let p1 = apdu_header.p1;
             let p2 = apdu_header.p2;
+            check_group(p1, p2)?;
 
             let (pk, hd_index) = if p1 == 0 {
                 (derive_pub_key(&path)?, path[path.len() - 1])
