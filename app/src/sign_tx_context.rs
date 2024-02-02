@@ -13,6 +13,8 @@ use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::Uns
 use crate::blind_signing::is_blind_signing_enabled;
 use crate::nvm_buffer::NvmBuffer;
 use crate::nvm_buffer::NVM;
+use crate::tx_reviewer;
+use crate::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
     error_code::ErrorCode,
@@ -65,25 +67,25 @@ impl SignTxContext {
         self.hasher.finalize()
     }
 
-    fn get_temp_data(&self) -> Option<&[u8]> {
+    fn get_temp_data(&self) -> Result<&[u8], ErrorCode> {
         if self.temp_data.is_overflow() {
-            return None;
+            return Err(ErrorCode::Overflow);
         }
-        return Some(self.temp_data.read());
+        return Ok(self.temp_data.read());
     }
 
-    fn review(&mut self) -> Result<(), ErrorCode> {
+    fn review(&mut self, tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
         match &self.unsigned_tx.inner {
-            UnsignedTx::NetworkId(byte) => review_network(byte.0),
-            UnsignedTx::GasAmount(amount) => review_gas_amount(amount),
-            UnsignedTx::GasPrice(amount) => review_gas_price(amount),
+            UnsignedTx::NetworkId(byte) => TxReviewer::review_network(byte.0),
+            UnsignedTx::GasAmount(amount) => TxReviewer::review_gas_amount(amount),
+            UnsignedTx::GasPrice(amount) => tx_reviewer.review_gas_price(amount),
             UnsignedTx::Inputs(inputs) => {
                 let current_input = inputs.get_current_item();
                 if current_input.is_some() {
-                    review_tx_input(
+                    tx_reviewer.review_input(
                         current_input.unwrap(),
                         inputs.current_index as usize,
-                        self.get_temp_data(),
+                        self.get_temp_data()?,
                     )
                 } else {
                     Ok(())
@@ -92,9 +94,11 @@ impl SignTxContext {
             UnsignedTx::FixedOutputs(outputs) => {
                 let current_output = outputs.get_current_item();
                 if current_output.is_some() {
-                    let output = current_output.unwrap();
-                    review_tx_output(output, outputs.current_index as usize, self.get_temp_data())?;
-                    review_token(output)
+                    tx_reviewer.review_output(
+                        current_output.unwrap(),
+                        outputs.current_index as usize,
+                        self.get_temp_data()?,
+                    )
                 } else {
                     Ok(())
                 }
@@ -105,13 +109,7 @@ impl SignTxContext {
 
     pub fn review_tx_id_and_sign(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
-        let hex: [u8; 64] = utils::to_hex(&tx_id).unwrap();
-        let hex_str = bytes_to_string(&hex)?;
-        let fields = [Field {
-            name: "TxId",
-            value: hex_str,
-        }];
-        review(&fields, "Review Tx Id")?;
+        TxReviewer::review_tx_id(&tx_id)?;
         let signature = Secp256k1::derive_from_path(&self.path)
             .deterministic_sign(&tx_id)
             .map_err(|_| ErrorCode::TxSignFail)?;
@@ -121,18 +119,20 @@ impl SignTxContext {
     fn _decode_tx<'a>(
         &mut self,
         buffer: &mut Buffer<'a, NvmBuffer<'static, SIZE>>,
+        tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {
             match self.unsigned_tx.try_decode_one_step(buffer) {
                 Ok(true) => {
-                    self.review()?;
+                    self.review(tx_reviewer)?;
+                    self.temp_data.reset();
+                    tx_reviewer.reset();
                     if self.unsigned_tx.inner.is_complete() {
                         self.current_step = DecodeStep::Complete;
                         return Ok(());
                     } else {
                         self.unsigned_tx.inner.next_step();
                         self.unsigned_tx.reset_stage();
-                        self.temp_data.reset();
                     }
                 }
                 Ok(false) => return Ok(()),
@@ -142,19 +142,24 @@ impl SignTxContext {
         Ok(())
     }
 
-    fn decode_tx(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+    fn decode_tx(&mut self, data: &[u8], tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
         if data.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
         let mut buffer = Buffer::new(data, &mut self.temp_data).unwrap();
         let from_index = buffer.get_index();
-        let result = self._decode_tx(&mut buffer);
+        let result = self._decode_tx(&mut buffer, tx_reviewer);
         let to_index = buffer.get_index();
         self.hasher.update(buffer.get_range(from_index, to_index))?;
         result
     }
 
-    pub fn handle_data(&mut self, apdu_header: &ApduHeader, data: &[u8]) -> Result<(), ErrorCode> {
+    pub fn handle_data(
+        &mut self,
+        apdu_header: &ApduHeader,
+        data: &[u8],
+        tx_reviewer: &mut TxReviewer,
+    ) -> Result<(), ErrorCode> {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
@@ -167,14 +172,14 @@ impl SignTxContext {
                     if tx_data[2] == 0x01 {
                         check_blind_signing()?;
                     }
-                    self.decode_tx(tx_data)
+                    self.decode_tx(tx_data, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadLen)
                 }
             }
             _ => {
                 if apdu_header.p1 == 1 {
-                    self.decode_tx(data)
+                    self.decode_tx(data, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)
                 }

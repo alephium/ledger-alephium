@@ -10,6 +10,7 @@ use ledger_device_sdk::ui::layout::Draw;
 use ledger_device_sdk::ui::layout::StringPlace;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use sign_tx_context::SignTxContext;
+use tx_reviewer::TxReviewer;
 use utils::{self, deserialize_path, djb_hash, xor_bytes};
 mod blake2b_hasher;
 mod blind_signing;
@@ -17,6 +18,7 @@ mod debug;
 mod error_code;
 mod nvm_buffer;
 mod sign_tx_context;
+mod tx_reviewer;
 
 use debug::print::{println, println_array, println_slice};
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
@@ -103,6 +105,7 @@ extern "C" fn sample_main() {
     let ui_page_num = 4;
 
     let mut sign_tx_context: SignTxContext = SignTxContext::new();
+    let mut tx_reviewer: TxReviewer = TxReviewer::new();
     // Draw some 'welcome' screen
     show_ui(ui_index);
 
@@ -136,7 +139,7 @@ extern "C" fn sample_main() {
             io::Event::Command(ins) => {
                 println("=== Before event");
                 println_array::<1, 2>(&[ui_index]);
-                match handle_apdu(&mut comm, ins, &mut sign_tx_context) {
+                match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
                     Ok(ui_changed) => {
                         comm.reply_ok();
                         if ui_changed {
@@ -192,6 +195,7 @@ fn handle_apdu(
     comm: &mut io::Comm,
     ins: Ins,
     sign_tx_context: &mut SignTxContext,
+    tx_reviewer: &mut TxReviewer,
 ) -> Result<bool, Reply> {
     if comm.rx == 0 {
         return Err(ErrorCode::BadLen.into());
@@ -238,7 +242,7 @@ fn handle_apdu(
         }
         Ins::SignTx => {
             let data = comm.get_data()?;
-            match sign_tx_context.handle_data(apdu_header, data) {
+            match sign_tx_context.handle_data(apdu_header, data, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
                     return Ok(false);
                 }

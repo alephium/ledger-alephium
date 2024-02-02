@@ -36,14 +36,19 @@ impl RawDecoder for P2MPKH {
         buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        match stage.step {
-            0 => self.size.decode(buffer, stage),
+        let from_index = buffer.get_index();
+        let result = match stage.step {
+            0 => {
+                if stage.index == 0 {
+                    buffer.write_bytes_to_temp_data(&[1u8]); // write prefix
+                }
+                self.size.decode(buffer, stage)
+            }
             1 => {
                 let total_length = (self.size.inner as usize) * Byte32::ENCODED_LENGTH;
                 let mut index = stage.index;
                 while !buffer.is_empty() && (index as usize) < total_length {
-                    let byte = buffer.next_byte().unwrap();
-                    buffer.write_bytes_to_temp_data(&[byte]); // TODO: improve this
+                    let _ = buffer.next_byte().unwrap();
                     index += 1;
                 }
                 if (index as usize) == total_length {
@@ -57,6 +62,14 @@ impl RawDecoder for P2MPKH {
             }
             2 => self.m.decode(buffer, stage),
             _ => Err(DecodeError::InternalError),
+        };
+        match result {
+            Err(err) => Err(err),
+            Ok(value) => {
+                let to_index = buffer.get_index();
+                buffer.write_bytes_to_temp_data(&buffer.get_range(from_index, to_index));
+                Ok(value)
+            }
         }
     }
 }
@@ -146,6 +159,7 @@ mod tests {
     use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
+    use crate::types::u256::tests::hex_to_bytes;
     use crate::types::{Hash, LockupScript};
     use crate::TempData;
     use std::vec;
@@ -181,6 +195,43 @@ mod tests {
                 if length == bytes.len() {
                     assert_eq!(result, Some(&lockup_script));
                     assert!(decoder.stage.is_complete())
+                } else {
+                    assert_eq!(result, None);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_decode_p2mpkh() {
+        let bytes = hex_to_bytes("0103a3cd757be03c7dac8d48bf79e2a7d6e735e018a9c054b99138c7b29738c437ecef51c98556924afa1cd1a8026c3d2d33ee1d491e1fe77c73a75a2d0129f061951dd2aa371711d1faea1c96d395f08eb94de1f388993e8be3f4609dc327ab513a02").unwrap();
+        for _ in 0..10 {
+            {
+                let mut temp_data = TempData::new();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut decoder = new_decoder::<LockupScript>();
+                let result = decoder.decode(&mut buffer).unwrap();
+                assert!(result.is_some());
+                assert!(decoder.stage.is_complete());
+                assert_eq!(temp_data.get(), &bytes);
+            }
+
+            let mut temp_data = TempData::new();
+            let mut length: usize = 0;
+            let mut decoder = new_decoder::<LockupScript>();
+
+            while length < bytes.len() {
+                let remain = bytes.len() - length;
+                let size = random_usize(0, remain);
+                let mut buffer =
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                length += size;
+
+                let result = decoder.decode(&mut buffer).unwrap();
+                if length == bytes.len() {
+                    assert!(result.is_some());
+                    assert!(decoder.stage.is_complete());
+                    assert_eq!(temp_data.get(), &bytes);
                 } else {
                     assert_eq!(result, None);
                 }

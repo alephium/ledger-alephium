@@ -1,5 +1,5 @@
 // from: https://github.com/Nullus157/bs58-rs/blob/main/src/encode.rs
-const ALPHABET: &'static [u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+pub const ALPHABET: &'static [u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 pub fn base58_encode_inputs<'a>(inputs: &[&[u8]], output: &'a mut [u8]) -> Option<&'a [u8]> {
     let mut index = 0;
