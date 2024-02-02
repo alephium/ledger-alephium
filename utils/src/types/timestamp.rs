@@ -1,4 +1,4 @@
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -20,9 +20,9 @@ impl RawDecoder for TimeStamp {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         let remain = Self::ENCODED_LENGTH - (stage.index as usize);

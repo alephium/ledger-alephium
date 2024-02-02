@@ -1,3 +1,5 @@
+use crate::buffer::Writable;
+
 pub struct TempData {
     pub data: [u8; TempData::MAX_SIZE],
     pub size: usize,
@@ -33,23 +35,25 @@ impl TempData {
         self.size += 1;
     }
 
-    pub fn write(&mut self, bytes: &[u8]) {
+    pub fn get(&self) -> &[u8] {
+        &self.data[..self.size]
+    }
+}
+
+impl Writable for TempData {
+    fn write(&mut self, bytes: &[u8]) {
         for byte in bytes {
             self.write_byte(*byte)
         }
-    }
-
-    pub fn get(&self) -> &[u8] {
-        &self.data[..self.size]
     }
 }
 
 #[cfg(test)]
 mod tests {
     extern crate std;
-    use crate::types::byte32::tests::gen_bytes;
-
     use super::TempData;
+    use crate::buffer::Writable;
+    use crate::types::byte32::tests::gen_bytes;
     use std::vec::Vec;
 
     fn gen_fixed_bytes(size: usize) -> Vec<u8> {

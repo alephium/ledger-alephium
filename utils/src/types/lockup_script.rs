@@ -1,5 +1,5 @@
 use super::{Byte32, Hash, U16};
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -31,9 +31,9 @@ impl RawDecoder for P2MPKH {
         3
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -43,7 +43,7 @@ impl RawDecoder for P2MPKH {
                 let mut index = stage.index;
                 while !buffer.is_empty() && (index as usize) < total_length {
                     let byte = buffer.next_byte().unwrap();
-                    buffer.write_byte_to_temp_data(byte);
+                    buffer.write_bytes_to_temp_data(&[byte]); // TODO: improve this
                     index += 1;
                 }
                 if (index as usize) == total_length {
@@ -109,9 +109,9 @@ impl RawDecoder for LockupScript {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

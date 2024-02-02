@@ -1,3 +1,4 @@
+use crate::buffer::Writable;
 use crate::decode::*;
 use crate::types::*;
 
@@ -48,9 +49,9 @@ impl RawDecoder for Val {
         }
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut crate::buffer::Buffer<'a>,
+        buffer: &mut crate::buffer::Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

@@ -1,4 +1,4 @@
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 use super::I32;
@@ -56,9 +56,9 @@ impl RawDecoder for ByteString {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if !self.total_size_decoded() {

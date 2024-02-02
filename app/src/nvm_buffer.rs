@@ -1,9 +1,7 @@
 use core::str::from_utf8;
 use ledger_device_sdk::Pic;
 use ledger_secure_sdk_sys::nvm_write;
-use utils::types::U256;
-
-use crate::error_code::ErrorCode;
+use utils::{buffer::Writable, types::U256};
 
 #[repr(align(64))]
 pub struct NVM<const N: usize>(pub [u8; N]);
@@ -40,18 +38,29 @@ impl<'a, const N: usize> NvmBuffer<'a, N> {
         Self { data, index: 0 }
     }
 
-    pub fn write(&mut self, bytes: &[u8]) -> Result<(), ErrorCode> {
-        let data = self.data.get_mut();
-        if data.write(self.index, bytes) {
-            self.index += bytes.len();
-            Ok(())
-        } else {
-            Err(ErrorCode::Overflow)
-        }
+    pub fn read(&self) -> &[u8] {
+        &self.data.get_ref().0[..self.index]
     }
 
     #[inline]
     pub fn reset(&mut self) {
         self.index = 0;
+    }
+
+    pub fn is_overflow(&self) -> bool {
+        self.index > N
+    }
+}
+
+impl<'a, const N: usize> Writable for NvmBuffer<'a, N> {
+    fn write(&mut self, bytes: &[u8]) {
+        if self.index + bytes.len() > N {
+            self.index = N + 1;
+            return;
+        }
+        let nvm_data = self.data.get_mut();
+        let result = nvm_data.write(self.index, bytes);
+        assert!(result);
+        self.index += bytes.len();
     }
 }

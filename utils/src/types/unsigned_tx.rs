@@ -1,5 +1,5 @@
 use super::*;
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug))]
@@ -60,9 +60,9 @@ impl RawDecoder for UnsignedTx {
         }
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match self {
@@ -97,8 +97,8 @@ mod tests {
 
     type Blake2b256 = Blake2b<U32>;
 
-    fn decode<'a>(
-        buffer: &mut Buffer<'a>,
+    fn decode<'a, W: Writable>(
+        buffer: &mut Buffer<'a, W>,
         decoder: &mut PartialDecoder<UnsignedTx>,
         hasher: &mut Blake2b256,
     ) -> DecodeResult<bool> {

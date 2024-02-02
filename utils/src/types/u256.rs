@@ -1,4 +1,4 @@
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 use crate::types::compact_integer::*;
 
@@ -202,7 +202,12 @@ impl U256 {
         return Some(&output[..total_size]);
     }
 
-    fn decode_u32(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
+    fn decode_u32<'a, W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'a, W>,
+        length: usize,
+        from_index: usize,
+    ) -> usize {
         let mut index = from_index;
         while !buffer.is_empty() && index < length {
             let byte = buffer.next_byte().unwrap() as u32;
@@ -212,9 +217,9 @@ impl U256 {
         index
     }
 
-    fn decode_multi_bytes(
+    fn decode_multi_bytes<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer,
+        buffer: &mut Buffer<'a, W>,
         length: usize,
         from_index: usize,
     ) -> usize {
@@ -240,9 +245,9 @@ impl RawDecoder for U256 {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

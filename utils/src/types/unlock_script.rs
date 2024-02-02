@@ -1,5 +1,5 @@
 use super::*;
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -21,9 +21,9 @@ impl RawDecoder for PublicKeyWithIndex {
         2
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -43,9 +43,9 @@ impl RawDecoder for P2SH {
         self.0.step_size() + self.0.step_size()
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -100,9 +100,9 @@ impl RawDecoder for UnlockScript {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

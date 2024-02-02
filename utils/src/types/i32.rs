@@ -1,4 +1,4 @@
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 use crate::types::compact_integer::*;
 
@@ -97,9 +97,9 @@ impl I32 {
         Some(trim(output, self.inner < 0))
     }
 
-    fn decode_fixed_size(
+    fn decode_fixed_size<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer,
+        buffer: &mut Buffer<'a, W>,
         length: usize,
         from_index: usize,
     ) -> usize {
@@ -117,7 +117,12 @@ impl I32 {
         }
     }
 
-    fn decode_i32(&mut self, buffer: &mut Buffer, length: usize, from_index: usize) -> usize {
+    fn decode_i32<'a, W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'a, W>,
+        length: usize,
+        from_index: usize,
+    ) -> usize {
         let mut index = from_index;
         while !buffer.is_empty() && index < length {
             let byte = buffer.next_byte().unwrap() as u32;
@@ -139,9 +144,9 @@ impl RawDecoder for I32 {
         1
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

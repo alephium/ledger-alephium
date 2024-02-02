@@ -3,11 +3,13 @@
 pub mod base58;
 pub mod buffer;
 pub mod decode;
+#[cfg(test)]
 pub mod temp_data;
 pub mod types;
 
 use core::char;
 use core::num::Wrapping;
+#[cfg(test)]
 pub use temp_data::TempData;
 
 #[inline]

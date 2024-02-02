@@ -29,9 +29,9 @@ macro_rules! fixed_bytes {
                 1
             }
 
-            fn decode<'a>(
+            fn decode<'a, W: crate::buffer::Writable>(
                 &mut self,
-                buffer: &mut Buffer<'a>,
+                buffer: &mut Buffer<'a, W>,
                 stage: &DecodeStage,
             ) -> DecodeResult<DecodeStage> {
                 let remain = $struct_name::ENCODED_LENGTH - (stage.index as usize);

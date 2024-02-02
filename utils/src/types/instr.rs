@@ -1,6 +1,6 @@
 // auto-generated, do not edit
 use super::*;
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Instr {
@@ -420,9 +420,9 @@ impl RawDecoder for Instr {
             _ => 1,
         }
     }
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {

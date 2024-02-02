@@ -1,4 +1,4 @@
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum DecodeError {
@@ -38,15 +38,15 @@ impl DecodeStage {
 pub trait RawDecoder: Sized {
     fn step_size(&self) -> u16;
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage>;
 }
 
 pub trait Decoder<T>: Sized {
-    fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>>;
+    fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>>;
 }
 
 pub trait Reset {
@@ -84,7 +84,10 @@ impl<T: Default> Default for PartialDecoder<T> {
 }
 
 impl<T: RawDecoder> PartialDecoder<T> {
-    pub fn try_decode_one_step<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<bool> {
+    pub fn try_decode_one_step<'a, W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'a, W>,
+    ) -> DecodeResult<bool> {
         if buffer.is_empty() {
             return Ok(false);
         }
@@ -110,9 +113,9 @@ impl<T: RawDecoder> PartialDecoder<T> {
         }
     }
 
-    pub fn decode_children<'a>(
+    pub fn decode_children<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         parent_stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         self.decode(buffer).map(|result| {
@@ -126,7 +129,7 @@ impl<T: RawDecoder> PartialDecoder<T> {
 }
 
 impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
-    fn decode<'a>(&mut self, buffer: &mut Buffer<'a>) -> DecodeResult<Option<&T>> {
+    fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>> {
         loop {
             match self.try_decode_one_step(buffer) {
                 Ok(true) => {
@@ -149,9 +152,9 @@ impl<T: Default + RawDecoder> RawDecoder for Option<T> {
         }
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
@@ -181,9 +184,9 @@ impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
         self.0.step_size() + self.1.step_size()
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {

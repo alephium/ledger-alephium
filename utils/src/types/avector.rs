@@ -1,7 +1,7 @@
 use core::cmp;
 
 use super::U16;
-use crate::buffer::Buffer;
+use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug))]
@@ -94,9 +94,9 @@ impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
         }
     }
 
-    fn decode<'a>(
+    fn decode<'a, W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a>,
+        buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if !self.total_size_decoded() {

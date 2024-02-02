@@ -4,17 +4,24 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 use ledger_device_sdk::ui::gadgets::{Field, MessageScroller, MultiFieldReview};
+use ledger_device_sdk::Pic;
 use utils::base58::base58_encode_inputs;
 use utils::types::lockup_script::P2MPKH;
 use utils::types::{AssetOutput, LockupScript, TxInput, UnlockScript, I32, U256};
-use utils::TempData;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::blind_signing::is_blind_signing_enabled;
+use crate::nvm_buffer::NvmBuffer;
+use crate::nvm_buffer::NVM;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
     error_code::ErrorCode,
 };
+
+const SIZE: usize = 2048;
+
+#[link_section = ".rodata.N_"]
+static mut DATA: Pic<NVM<SIZE>> = Pic::new(NVM::zeroed());
 
 #[derive(PartialEq)]
 enum DecodeStep {
@@ -28,7 +35,7 @@ pub struct SignTxContext {
     unsigned_tx: PartialDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
-    temp_data: TempData,
+    temp_data: NvmBuffer<'static, SIZE>,
 }
 
 impl SignTxContext {
@@ -38,7 +45,7 @@ impl SignTxContext {
             unsigned_tx: PartialDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
-            temp_data: TempData::new(),
+            temp_data: unsafe { NvmBuffer::new(&mut DATA) },
         }
     }
 
@@ -62,7 +69,7 @@ impl SignTxContext {
         if self.temp_data.is_overflow() {
             return None;
         }
-        return Some(self.temp_data.get());
+        return Some(self.temp_data.read());
     }
 
     fn review(&mut self) -> Result<(), ErrorCode> {
@@ -111,7 +118,10 @@ impl SignTxContext {
         Ok(signature)
     }
 
-    fn _decode_tx(&mut self, buffer: &mut Buffer) -> Result<(), ErrorCode> {
+    fn _decode_tx<'a>(
+        &mut self,
+        buffer: &mut Buffer<'a, NvmBuffer<'static, SIZE>>,
+    ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {
             match self.unsigned_tx.try_decode_one_step(buffer) {
                 Ok(true) => {
@@ -136,7 +146,7 @@ impl SignTxContext {
         if data.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
-        let mut buffer = Buffer::new(data, &mut self.temp_data as *mut TempData).unwrap();
+        let mut buffer = Buffer::new(data, &mut self.temp_data).unwrap();
         let from_index = buffer.get_index();
         let result = self._decode_tx(&mut buffer);
         let to_index = buffer.get_index();
