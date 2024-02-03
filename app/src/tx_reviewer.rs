@@ -1,5 +1,5 @@
 use crate::{blake2b_hasher::Blake2bHasher, error_code::ErrorCode, nvm_buffer::NVM};
-use core::{cmp, str::from_utf8};
+use core::str::from_utf8;
 use ledger_device_sdk::{
     ui::{
         bitmaps::{CHECKMARK, CROSS, EYE},
@@ -9,7 +9,7 @@ use ledger_device_sdk::{
 };
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
-    types::{AssetOutput, Byte32, Hash, LockupScript, TxInput, UnlockScript, I32, U256},
+    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, I32, U256},
 };
 
 const SIZE: usize = 2048;

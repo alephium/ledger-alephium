@@ -16,16 +16,6 @@ impl Reset for P2MPKH {
     }
 }
 
-impl P2MPKH {
-    const MAX_KEY_NUM: usize = 4;
-    // from: https://github.com/bitcoin/libbase58/blob/b1dd03fa8d1be4be076bb6152325c6b5cf64f678/base58.c#L155
-    pub const BASE58_OUTPUT_SIZE: usize = 181;
-
-    pub fn is_reviewable(&self) -> bool {
-        (self.size.inner as usize) <= Self::MAX_KEY_NUM
-    }
-}
-
 impl RawDecoder for P2MPKH {
     fn step_size(&self) -> u16 {
         3

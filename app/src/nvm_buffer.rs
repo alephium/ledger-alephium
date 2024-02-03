@@ -1,7 +1,6 @@
-use core::str::from_utf8;
 use ledger_device_sdk::Pic;
 use ledger_secure_sdk_sys::nvm_write;
-use utils::{buffer::Writable, types::U256};
+use utils::buffer::Writable;
 
 #[repr(align(64))]
 pub struct NVM<const N: usize>(pub [u8; N]);
