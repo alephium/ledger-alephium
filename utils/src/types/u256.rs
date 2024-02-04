@@ -5,22 +5,25 @@ use crate::types::compact_integer::*;
 use super::reset;
 
 #[cfg_attr(test, derive(Debug))]
-#[derive(Default)]
 pub struct U256 {
-    pub inner: [u64; 4],
-    first_byte: u8,
+    pub bytes: [u8; 33],
+}
+
+impl Default for U256 {
+    fn default() -> Self {
+        Self { bytes: [0; 33] }
+    }
 }
 
 impl Reset for U256 {
     fn reset(&mut self) {
-        self.inner = [0; 4];
-        self.first_byte = 0;
+        self.bytes = [0; 33];
     }
 }
 
 impl PartialEq for U256 {
     fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
+        self.bytes == other.bytes
     }
 }
 
@@ -43,81 +46,59 @@ fn trim(dest: &[u8]) -> &[u8] {
 impl U256 {
     const ALPH_DECIMALS: usize = 18;
     const DECIMAL_PLACES: usize = 6;
-    const ALPH_MIN: u64 = (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
-
-    fn less_than_alph_min(&self) -> bool {
-        let array = &self.inner;
-        array[0] == 0 && array[1] == 0 && array[2] == 0 && array[3] < Self::ALPH_MIN
-    }
+    const _1000_NANO_ALPH: u64 =
+        (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
 
     #[inline]
     pub fn get_length(&self) -> usize {
-        decode_length(self.first_byte)
+        decode_length(self.bytes[0])
     }
 
     #[inline]
     pub fn is_fixed_size(&self) -> bool {
-        is_fixed_size(self.first_byte)
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.inner.iter().all(|x| *x == 0)
-    }
-
-    pub fn from(array: [u64; 4]) -> U256 {
-        U256 {
-            inner: array,
-            first_byte: 0,
-        }
-    }
-
-    pub fn from_u32(value: u32) -> U256 {
-        Self::from_u64(value as u64)
-    }
-
-    pub fn from_u64(value: u64) -> U256 {
-        U256 {
-            inner: [0, 0, 0, value],
-            first_byte: 0,
-        }
+        is_fixed_size(self.bytes[0])
     }
 
     #[cfg(test)]
-    pub fn from_u128(value: u128) -> U256 {
-        U256 {
-            inner: [
-                0,
-                0,
-                ((value >> 64) & (u64::MAX as u128)) as u64,
-                (value & (u64::MAX as u128)) as u64,
-            ],
-            first_byte: 0,
-        }
+    pub fn from_encoded_bytes(bytes: &[u8]) -> Self {
+        let mut bs = [0u8; 33];
+        bs[..bytes.len()].copy_from_slice(bytes);
+        Self { bytes: bs }
     }
 
-    #[inline]
-    fn is_reviewable(&self) -> bool {
-        self.inner[0] == 0 && self.inner[1] == 0
+    pub fn is_zero(&self) -> bool {
+        self.get_length() == 1 && self.bytes.iter().all(|v| *v == 0)
     }
 
-    pub fn to_u128(&self) -> Option<u128> {
-        if self.inner[0] == 0 && self.inner[1] == 0 {
-            return Some(((self.inner[2] as u128) << 64) | (self.inner[3] as u128));
+    fn decode_fixed_size(bytes: &[u8]) -> u32 {
+        assert!(bytes.len() <= 4);
+        let mut result: u32 = ((bytes[0] as u32) & MASK_MODE) << ((bytes.len() - 1) * 8);
+        let mut index = 1;
+        while index < bytes.len() {
+            let byte = bytes[index];
+            result |= ((byte & 0xff) as u32) << ((bytes.len() - index - 1) * 8);
+            index += 1;
         }
-        return None;
+        result
     }
 
     pub fn to_str<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
-        if output.len() == 0 || !self.is_reviewable() {
+        if output.len() == 0 {
             return None;
         }
         if self.is_zero() {
             output[0] = b'0';
             return Some(&output[..1]);
         }
-        let mut bytes = [0u8; 16];
-        bytes[..8].copy_from_slice(&self.inner[2].to_be_bytes());
-        bytes[8..].copy_from_slice(&self.inner[3].to_be_bytes());
+
+        let length = self.get_length();
+        let mut bytes = [0u8; 32];
+        if self.is_fixed_size() {
+            let value = Self::decode_fixed_size(&self.bytes[..length]);
+            bytes[28..].copy_from_slice(&value.to_be_bytes());
+        } else {
+            bytes[(33 - length)..].copy_from_slice(&self.bytes[1..length])
+        }
         let mut index = output.len();
         while !bytes.into_iter().all(|v| v == 0) {
             if index == 0 {
@@ -125,7 +106,7 @@ impl U256 {
             }
             index -= 1;
             let mut carry = 0u16;
-            for i in 0..16 {
+            for i in 0..32 {
                 let v = (carry << 8) | (bytes[i] as u16);
                 let rem = v % 10;
                 bytes[i] = (v / 10) as u8;
@@ -169,6 +150,27 @@ impl U256 {
         return Some(trim(&output[..(2 + decimal_places)]));
     }
 
+    fn is_less_than_1000_nano(&self) -> bool {
+        if self.is_fixed_size() {
+            return true;
+        }
+        let length = self.get_length();
+        if length > 8 {
+            return false;
+        }
+        let mut value: u64 = 0;
+        let mut index = 1;
+        while index < length {
+            let byte = self.bytes[index];
+            value = (value << 8) | ((byte & 0xff) as u64);
+            if value >= Self::_1000_NANO_ALPH {
+                return false;
+            }
+            index += 1
+        }
+        return true;
+    }
+
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
         let postfix = b" ALPH";
@@ -179,7 +181,7 @@ impl U256 {
             return Some(&output[..total_size]);
         }
 
-        if self.less_than_alph_min() {
+        if self.is_less_than_1000_nano() {
             let str = b"<0.000001";
             let total_size = str.len() + postfix.len();
             if output.len() < total_size {
@@ -201,43 +203,6 @@ impl U256 {
         output[str_length..total_size].copy_from_slice(postfix);
         return Some(&output[..total_size]);
     }
-
-    fn decode_u32<'a, W: Writable>(
-        &mut self,
-        buffer: &mut Buffer<'a, W>,
-        length: usize,
-        from_index: usize,
-    ) -> usize {
-        let mut index = from_index;
-        while !buffer.is_empty() && index < length {
-            let byte = buffer.next_byte().unwrap() as u32;
-            self.inner[3] |= ((byte & 0xff) as u64) << ((length - index - 1) * 8);
-            index += 1;
-        }
-        index
-    }
-
-    fn decode_multi_bytes<'a, W: Writable>(
-        &mut self,
-        buffer: &mut Buffer<'a, W>,
-        length: usize,
-        from_index: usize,
-    ) -> usize {
-        let mut index = from_index;
-        while !buffer.is_empty() && index < length {
-            let byte = buffer.next_byte().unwrap() as u32;
-            let remain = length - index - 1;
-            let pos = remain - ((remain / 8) * 8);
-            let u64_index = 3 - (remain / 8);
-            self.inner[u64_index] |= ((byte & 0xff) as u64) << (pos * 8);
-            index += 1;
-        }
-        index
-    }
-
-    pub fn eq(&self, value: &U256) -> bool {
-        self.inner == value.inner
-    }
 }
 
 impl RawDecoder for U256 {
@@ -253,30 +218,19 @@ impl RawDecoder for U256 {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        if stage.index == 0 {
-            self.first_byte = buffer.next_byte().unwrap();
-        }
-        let length = self.get_length();
-        let new_index = if self.is_fixed_size() {
-            if stage.index == 0 {
-                self.inner[3] =
-                    (((self.first_byte as u32) & MASK_MODE) << ((length - 1) * 8)) as u64;
-                self.decode_u32(buffer, length, (stage.index as usize) + 1)
-            } else {
-                self.decode_u32(buffer, length, stage.index as usize)
-            }
+        let from_index = if stage.index == 0 {
+            self.bytes[0] = buffer.next_byte().unwrap();
+            1
         } else {
-            let from_index = if stage.index == 0 {
-                stage.index + 1
-            } else {
-                stage.index
-            };
-            if length == 5 {
-                self.decode_u32(buffer, length, from_index as usize)
-            } else {
-                self.decode_multi_bytes(buffer, length, from_index as usize)
-            }
+            stage.index
         };
+        let length = self.get_length();
+        let mut idx = 0;
+        while !buffer.is_empty() && idx < (length - (from_index as usize)) {
+            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
+            idx += 1;
+        }
+        let new_index = (from_index as usize) + idx;
         if new_index == length {
             Ok(DecodeStage::COMPLETE)
         } else {
@@ -312,74 +266,81 @@ pub mod tests {
         rng.gen_range(from..=to)
     }
 
-    pub struct TestCase<'a>(pub &'a str, pub U256);
-    pub fn get_test_vector<'a>() -> [TestCase<'a>; 32] {
-        let u64_max: u64 = u64::MAX;
+    pub struct TestCase<'a>(pub Vec<u8>, pub &'a str);
+    pub fn get_test_vector<'a>() -> [TestCase<'a>; 31] {
         [
-            TestCase("00", U256::from_u32(0)),
-            TestCase("01", U256::from_u32(1)),
-            TestCase("02", U256::from_u32(2)),
-            TestCase("3e", U256::from_u32(62)),
-            TestCase("3f", U256::from_u32(63)),
-            TestCase("4040", U256::from_u32(64)),
-            TestCase("4041", U256::from_u32(65)),
-            TestCase("4042", U256::from_u32(66)),
-            TestCase("7ffe", U256::from_u32(16382)),
-            TestCase("7fff", U256::from_u32(16383)),
-            TestCase("80004000", U256::from_u32(16384)),
-            TestCase("80004001", U256::from_u32(16385)),
-            TestCase("80004002", U256::from_u32(16386)),
-            TestCase("bffffffe", U256::from_u32(1073741822)),
-            TestCase("bfffffff", U256::from_u32(1073741823)),
-            TestCase("c040000000", U256::from_u32(1073741824)),
-            TestCase("c040000001", U256::from_u32(1073741825)),
-            TestCase("c040000002", U256::from_u32(1073741826)),
-            TestCase("c5010000000000000000", U256::from([0, 0, 1, 0])),
-            TestCase("c5010000000000000001", U256::from([0, 0, 1, 1])),
-            TestCase("c4ffffffffffffffff", U256::from([0, 0, 0, u64_max])),
+            TestCase(hex_to_bytes("00").unwrap(), "0"),
+            TestCase(hex_to_bytes("01").unwrap(), "1"),
+            TestCase(hex_to_bytes("02").unwrap(), "2"),
+            TestCase(hex_to_bytes("3e").unwrap(), "62"),
+            TestCase(hex_to_bytes("3f").unwrap(), "63"),
+            TestCase(hex_to_bytes("4040").unwrap(), "64"),
+            TestCase(hex_to_bytes("4041").unwrap(), "65"),
+            TestCase(hex_to_bytes("4042").unwrap(), "66"),
+            TestCase(hex_to_bytes("7ffe").unwrap(), "16382"),
+            TestCase(hex_to_bytes("7fff").unwrap(), "16383"),
+            TestCase(hex_to_bytes("80004000").unwrap(), "16384"),
+            TestCase(hex_to_bytes("80004001").unwrap(), "16385"),
+            TestCase(hex_to_bytes("80004002").unwrap(), "16386"),
+            TestCase(hex_to_bytes("bffffffe").unwrap(), "1073741822"),
+            TestCase(hex_to_bytes("bfffffff").unwrap(), "1073741823"),
+            TestCase(hex_to_bytes("c040000000").unwrap(), "1073741824"),
+            TestCase(hex_to_bytes("c040000001").unwrap(), "1073741825"),
+            TestCase(hex_to_bytes("c040000002").unwrap(), "1073741826"),
             TestCase(
-                "cd00000000000000ff00000000000000ff00",
-                U256::from([0, 0, 0xff00, 0xff00]),
+                hex_to_bytes("c5010000000000000000").unwrap(),
+                "18446744073709551616",
             ),
             TestCase(
-                "cd0100000000000000000000000000000001",
-                U256::from([0, 1, 0, 1]),
+                hex_to_bytes("c5010000000000000001").unwrap(),
+                "18446744073709551617",
             ),
             TestCase(
-                "cd0100000000000000000000000000000000",
-                U256::from([0, 1, 0, 0]),
+                hex_to_bytes("c4ffffffffffffffff").unwrap(),
+                "18446744073709551615",
             ),
             TestCase(
-                "cd0100000000000000000000000000000001",
-                U256::from([0, 1, 0, 1]),
+                hex_to_bytes("cd00000000000000ff00000000000000ff00").unwrap(),
+                "1204203453131759529557760",
             ),
             TestCase(
-                "ccffffffffffffffffffffffffffffffff",
-                U256::from([0, 0, u64_max, u64_max]),
+                hex_to_bytes("cd0100000000000000000000000000000000").unwrap(),
+                "340282366920938463463374607431768211456",
             ),
             TestCase(
-                "d501000000000000000000000000000000000000000000000000",
-                U256::from([1, 0, 0, 0]),
+                hex_to_bytes("cd0100000000000000000000000000000001").unwrap(),
+                "340282366920938463463374607431768211457",
             ),
             TestCase(
-                "d501000000000000000000000000000000000000000000000001",
-                U256::from([1, 0, 0, 1]),
+                hex_to_bytes("ccffffffffffffffffffffffffffffffff").unwrap(),
+                "340282366920938463463374607431768211455",
             ),
             TestCase(
-                "d4ffffffffffffffffffffffffffffffffffffffffffffffff",
-                U256::from([0, u64_max, u64_max, u64_max]),
+                hex_to_bytes("d501000000000000000000000000000000000000000000000000").unwrap(),
+                "6277101735386680763835789423207666416102355444464034512896",
             ),
             TestCase(
-                "dcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-                U256::from([u64_max; 4]),
+                hex_to_bytes("d501000000000000000000000000000000000000000000000001").unwrap(),
+                "6277101735386680763835789423207666416102355444464034512897",
             ),
             TestCase(
-                "dcfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe",
-                U256::from([u64_max, u64_max, u64_max, u64_max - 1]),
+                hex_to_bytes("d4ffffffffffffffffffffffffffffffffffffffffffffffff").unwrap(),
+                "6277101735386680763835789423207666416102355444464034512895",
             ),
             TestCase(
-                "dcfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd",
-                U256::from([u64_max, u64_max, u64_max, u64_max - 2]),
+                hex_to_bytes("dcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                    .unwrap(),
+                "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            ),
+            TestCase(
+                hex_to_bytes("dcfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe")
+                    .unwrap(),
+                "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+            ),
+            TestCase(
+                hex_to_bytes("dcfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd")
+                    .unwrap(),
+                "115792089237316195423570985008687907853269984665640564039457584007913129639933",
             ),
         ]
     }
@@ -389,14 +350,17 @@ pub mod tests {
         let arrays = get_test_vector();
         let mut temp_data = TempData::new();
         for item in arrays {
-            let bytes = hex_to_bytes(item.0).unwrap();
+            let bytes = item.0.as_slice();
 
             {
                 let mut decoder = new_decoder::<U256>();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(bytes, &mut temp_data).unwrap();
                 let result = decoder.decode(&mut buffer).unwrap();
-                assert_eq!(result, Some(&item.1));
-                assert!(decoder.stage.is_complete())
+                assert!(result.is_some());
+                let result = result.unwrap();
+                let length = result.get_length();
+                assert_eq!(bytes, &result.bytes[..length]);
+                assert!(decoder.stage.is_complete());
             }
 
             let mut length: usize = 0;
@@ -411,14 +375,63 @@ pub mod tests {
 
                 let result = decoder.decode(&mut buffer).unwrap();
                 if length == bytes.len() {
-                    assert_eq!(result, Some(&item.1));
-                    assert!(decoder.stage.is_complete())
+                    assert!(result.is_some());
+                    let result = result.unwrap();
+                    let length = result.get_length();
+                    assert_eq!(bytes, &result.bytes[..length]);
+                    assert!(decoder.stage.is_complete());
                 } else {
                     assert_eq!(result, None);
                     assert_eq!(decoder.stage.index as usize, length);
                 }
             }
         }
+    }
+
+    const MAX_OF_4_BYTES_ENCODED: u128 = 1073741823;
+    fn encode_fixed_bytes(n: u32) -> U256 {
+        if n < 0x40 {
+            U256::from_encoded_bytes(&[n as u8])
+        } else if n < (0x40 << 8) {
+            U256::from_encoded_bytes(&[((n >> 8) + 0x40) as u8, n as u8])
+        } else if n < (0x40 << 24) {
+            U256::from_encoded_bytes(&[
+                ((n >> 24) + 0x40) as u8,
+                (n >> 16) as u8,
+                (n >> 8) as u8,
+                n as u8,
+            ])
+        } else {
+            panic!()
+        }
+    }
+
+    fn encode_u128(value: u128) -> U256 {
+        if value <= MAX_OF_4_BYTES_ENCODED {
+            encode_fixed_bytes(value as u32)
+        } else {
+            let mut bytes: Vec<u8> = value
+                .to_be_bytes()
+                .iter()
+                .cloned()
+                .skip_while(|&b| b == 0)
+                .collect();
+            let header: u8 = ((bytes.len() - 4) as u8) | 0xc0;
+            bytes.insert(0, header);
+            U256::from_encoded_bytes(&bytes)
+        }
+    }
+
+    #[test]
+    fn test_is_less_than_1000_nano_alph() {
+        let u2560 = encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
+        let u2561 = encode_u128((U256::_1000_NANO_ALPH) as u128);
+        let u2562 = encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
+
+        assert!(u2560.is_less_than_1000_nano());
+        assert!(!u2561.is_less_than_1000_nano());
+        assert!(!u2562.is_less_than_1000_nano());
+        assert!(!encode_u128(u128::MAX).is_less_than_1000_nano())
     }
 
     #[test]
@@ -443,9 +456,9 @@ pub mod tests {
 
         let cases = [
             (0, "0"),
-            (U256::ALPH_MIN as u128, "0.000001"),
+            (U256::_1000_NANO_ALPH as u128, "0.000001"),
             ((10 as u128).pow(12), "0.000001"),
-            ((U256::ALPH_MIN as u128) - 1, "<0.000001"),
+            ((U256::_1000_NANO_ALPH as u128) - 1, "<0.000001"),
             ((10 as u128).pow(13), "0.00001"),
             ((10 as u128).pow(14), "0.0001"),
             ((10 as u128).pow(17), "0.1"),
@@ -458,7 +471,7 @@ pub mod tests {
             (alph("1.9999999"), "1.999999"),
         ];
         for (number, str) in cases {
-            let u256 = U256::from_u128(number);
+            let u256 = encode_u128(number);
             let mut output = [0u8; 33];
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());
@@ -467,38 +480,26 @@ pub mod tests {
             assert_eq!(amount_str, String::from(expected));
         }
 
+        let test_vector = get_test_vector();
+        let u256 = U256::from_encoded_bytes(&test_vector[test_vector.len() - 1].0);
         let mut output = [0u8; 33];
-        let value = U256::from([0, 1, 0, 0]);
-        assert!(value.to_alph(&mut output).is_none());
+        assert!(u256.to_alph(&mut output).is_none());
     }
 
     #[test]
     fn test_to_str() {
-        let cases = [
-            (U256::from_u32(0), "0"),
-            (U256::from_u32(1), "1"),
-            (U256::from_u32(100), "100"),
-            (U256::from_u32(12345), "12345"),
-            (U256::from_u32(123456), "123456"),
-            (U256::from_u32(u32::MAX - 1), "4294967294"),
-            (U256::from_u32(u32::MAX), "4294967295"),
-            (U256::from_u64(1234567890), "1234567890"),
-            (U256::from_u64(u64::MAX - 1), "18446744073709551614"),
-            (U256::from_u64(u64::MAX), "18446744073709551615"),
-            (
-                U256::from_u128(u128::MAX),
-                "340282366920938463463374607431768211455",
-            ),
-        ];
+        let test_vector = get_test_vector();
 
-        for (u256, str) in cases {
-            let mut output = [0u8; 39];
+        for case in test_vector.iter() {
+            let u256 = U256::from_encoded_bytes(&case.0);
+            let mut output = [0u8; 78];
             let result = u256.to_str(&mut output).unwrap();
             let expected = from_utf8(&result).unwrap();
-            assert_eq!(expected, str);
+            assert_eq!(expected, case.1);
         }
 
-        let u256 = U256::from_u64(u64::MAX);
+        let case = &test_vector[test_vector.len() - 1];
+        let u256 = U256::from_encoded_bytes(&case.0);
         let mut output = [0u8; 19];
         let result = u256.to_str(&mut output);
         assert!(result.is_none());

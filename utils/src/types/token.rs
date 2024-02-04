@@ -52,10 +52,6 @@ mod tests {
     use crate::decode::Decoder;
     use crate::TempData;
 
-    fn copy_u256(u256: &U256) -> U256 {
-        U256::from([u256.inner[0], u256.inner[1], u256.inner[2], u256.inner[3]])
-    }
-
     #[test]
     fn test_decode_token() {
         let u256_data = get_test_vector();
@@ -65,8 +61,8 @@ mod tests {
             let idx = random_usize(0, u256_data.len() - 1);
             let mut bytes = gen_bytes(32, 32);
             let hash = Hash::from_bytes(bytes.as_slice().try_into().unwrap());
-            let u256_encoded = super::u256::tests::hex_to_bytes(u256_data[idx].0).unwrap();
-            let u256 = copy_u256(&u256_data[idx].1);
+            let u256_encoded = &u256_data[idx].0;
+            let u256 = U256::from_encoded_bytes(u256_encoded);
             let token = Token {
                 id: hash,
                 amount: u256,

@@ -4,7 +4,7 @@ use crate::types::compact_integer::*;
 
 #[cfg_attr(test, derive(Debug))]
 pub struct I256 {
-    bytes: [u8; 33], // TODO: improve this
+    bytes: [u8; 33],
 }
 
 impl Reset for I256 {
