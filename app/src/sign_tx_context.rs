@@ -2,10 +2,10 @@ use ledger_device_sdk::ecc::Secp256k1;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::gadgets::MessageScroller;
-use ledger_device_sdk::Pic;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::blind_signing::is_blind_signing_enabled;
+use crate::nvm_buffer::NVMData;
 use crate::nvm_buffer::NvmBuffer;
 use crate::nvm_buffer::NVM;
 use crate::tx_reviewer::TxReviewer;
@@ -16,8 +16,8 @@ use crate::{
 
 const SIZE: usize = 2048;
 
-#[link_section = ".rodata.N_"]
-static mut DATA: Pic<NVM<SIZE>> = Pic::new(NVM::zeroed());
+#[link_section = ".nvm_data"]
+static mut DATA: NVMData<NVM<SIZE>> = NVMData::new(NVM::zeroed());
 
 #[derive(PartialEq)]
 enum DecodeStep {

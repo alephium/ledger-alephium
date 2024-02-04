@@ -1,11 +1,12 @@
-use crate::{blake2b_hasher::Blake2bHasher, error_code::ErrorCode, nvm_buffer::NVM};
+use crate::{
+    blake2b_hasher::Blake2bHasher,
+    error_code::ErrorCode,
+    nvm_buffer::{NVMData, NVM},
+};
 use core::str::from_utf8;
-use ledger_device_sdk::{
-    ui::{
-        bitmaps::{CHECKMARK, CROSS, EYE},
-        gadgets::{Field, MultiFieldReview},
-    },
-    Pic,
+use ledger_device_sdk::ui::{
+    bitmaps::{CHECKMARK, CROSS, EYE},
+    gadgets::{Field, MultiFieldReview},
 };
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
@@ -14,11 +15,11 @@ use utils::{
 
 const SIZE: usize = 2048;
 
-#[link_section = ".rodata.N_"]
-static mut DATA: Pic<NVM<SIZE>> = Pic::new(NVM::zeroed());
+#[link_section = ".nvm_data"]
+static mut DATA: NVMData<NVM<SIZE>> = NVMData::new(NVM::zeroed());
 
 pub struct TxReviewer {
-    data: &'static mut Pic<NVM<SIZE>>,
+    data: &'static mut NVMData<NVM<SIZE>>,
     index: usize,
 }
 
