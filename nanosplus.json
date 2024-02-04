@@ -1,7 +1,7 @@
 {
   "apiLevel": "5",
   "binary": "nanosplus.hex",
-  "dataSize": 512,
+  "dataSize": 4608,
   "derivationPath": {
     "curves": [
       "secp256k1"
