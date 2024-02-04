@@ -54,8 +54,7 @@ impl TxReviewer {
     }
 
     fn write_token_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
-        // TODO: improve this
-        let mut amount_output = [0u8; 39]; // u128 max
+        let mut amount_output = [0u8; 78]; // u256 max
         let amount_str = u256.to_str(&mut amount_output).unwrap();
         self.write_str(amount_str)
     }
