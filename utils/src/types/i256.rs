@@ -1,39 +1,14 @@
+use super::BigInt;
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
-use crate::types::compact_integer::*;
 
 #[cfg_attr(test, derive(Debug))]
-pub struct I256 {
-    bytes: [u8; 33],
-}
+#[derive(Default, PartialEq)]
+pub struct I256(pub BigInt);
 
 impl Reset for I256 {
     fn reset(&mut self) {
-        self.bytes = [0; 33];
-    }
-}
-
-impl Default for I256 {
-    fn default() -> Self {
-        I256 { bytes: [0u8; 33] }
-    }
-}
-
-impl PartialEq for I256 {
-    fn eq(&self, other: &Self) -> bool {
-        self.bytes == other.bytes
-    }
-}
-
-impl I256 {
-    #[inline]
-    pub fn get_length(&self) -> usize {
-        decode_length(self.bytes[0])
-    }
-
-    #[inline]
-    pub fn is_fixed_size(&self) -> bool {
-        is_fixed_size(self.bytes[0])
+        self.0.reset()
     }
 }
 
@@ -47,30 +22,7 @@ impl RawDecoder for I256 {
         buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        if buffer.is_empty() {
-            return Ok(DecodeStage { ..*stage });
-        }
-        let from_index = if stage.index == 0 {
-            self.bytes[0] = buffer.next_byte().unwrap();
-            1
-        } else {
-            stage.index
-        };
-        let length = self.get_length();
-        let mut idx = 0;
-        while !buffer.is_empty() && idx < (length - (from_index as usize)) {
-            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
-            idx += 1;
-        }
-        let new_index = (from_index as usize) + idx;
-        if new_index == length {
-            Ok(DecodeStage::COMPLETE)
-        } else {
-            Ok(DecodeStage {
-                step: stage.step,
-                index: new_index as u16,
-            })
-        }
+        self.0.decode(buffer, stage)
     }
 }
 
@@ -129,8 +81,8 @@ mod tests {
                 let mut decoder = new_decoder::<I256>();
                 let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
-                let length = result.get_length();
-                assert_eq!(&bytes, &result.bytes[..length]);
+                let length = result.0.get_length();
+                assert_eq!(&bytes, &result.0.bytes[..length]);
                 assert!(decoder.stage.is_complete());
             }
 
@@ -147,8 +99,8 @@ mod tests {
                 let result = decoder.decode(&mut buffer).unwrap();
                 if length == bytes.len() {
                     let result = result.unwrap();
-                    let length = result.get_length();
-                    assert_eq!(&bytes, &result.bytes[..length]);
+                    let length = result.0.get_length();
+                    assert_eq!(&bytes, &result.0.bytes[..length]);
                     assert!(decoder.stage.is_complete());
                 } else {
                     assert_eq!(result, None);

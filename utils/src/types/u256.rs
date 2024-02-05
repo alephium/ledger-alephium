@@ -2,28 +2,15 @@ use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 use crate::types::compact_integer::*;
 
-use super::reset;
+use super::{reset, BigInt};
 
 #[cfg_attr(test, derive(Debug))]
-pub struct U256 {
-    pub bytes: [u8; 33],
-}
-
-impl Default for U256 {
-    fn default() -> Self {
-        Self { bytes: [0; 33] }
-    }
-}
+#[derive(Default, PartialEq)]
+pub struct U256(pub BigInt);
 
 impl Reset for U256 {
     fn reset(&mut self) {
-        self.bytes = [0; 33];
-    }
-}
-
-impl PartialEq for U256 {
-    fn eq(&self, other: &Self) -> bool {
-        self.bytes == other.bytes
+        self.0.reset();
     }
 }
 
@@ -49,25 +36,15 @@ impl U256 {
     const _1000_NANO_ALPH: u64 =
         (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
 
-    #[inline]
-    pub fn get_length(&self) -> usize {
-        decode_length(self.bytes[0])
-    }
-
-    #[inline]
-    pub fn is_fixed_size(&self) -> bool {
-        is_fixed_size(self.bytes[0])
-    }
-
     #[cfg(test)]
     pub fn from_encoded_bytes(bytes: &[u8]) -> Self {
         let mut bs = [0u8; 33];
         bs[..bytes.len()].copy_from_slice(bytes);
-        Self { bytes: bs }
+        Self(BigInt { bytes: bs })
     }
 
     pub fn is_zero(&self) -> bool {
-        self.get_length() == 1 && self.bytes.iter().all(|v| *v == 0)
+        self.0.get_length() == 1 && self.0.bytes.iter().all(|v| *v == 0)
     }
 
     fn decode_fixed_size(bytes: &[u8]) -> u32 {
@@ -91,13 +68,13 @@ impl U256 {
             return Some(&output[..1]);
         }
 
-        let length = self.get_length();
+        let length = self.0.get_length();
         let mut bytes = [0u8; 32];
-        if self.is_fixed_size() {
-            let value = Self::decode_fixed_size(&self.bytes[..length]);
+        if self.0.is_fixed_size() {
+            let value = Self::decode_fixed_size(&self.0.bytes[..length]);
             bytes[28..].copy_from_slice(&value.to_be_bytes());
         } else {
-            bytes[(33 - length)..].copy_from_slice(&self.bytes[1..length])
+            bytes[(33 - length)..].copy_from_slice(&self.0.bytes[1..length])
         }
         let mut index = output.len();
         while !bytes.into_iter().all(|v| v == 0) {
@@ -151,17 +128,17 @@ impl U256 {
     }
 
     fn is_less_than_1000_nano(&self) -> bool {
-        if self.is_fixed_size() {
+        if self.0.is_fixed_size() {
             return true;
         }
-        let length = self.get_length();
+        let length = self.0.get_length();
         if length > 8 {
             return false;
         }
         let mut value: u64 = 0;
         let mut index = 1;
         while index < length {
-            let byte = self.bytes[index];
+            let byte = self.0.bytes[index];
             value = (value << 8) | ((byte & 0xff) as u64);
             if value >= Self::_1000_NANO_ALPH {
                 return false;
@@ -215,30 +192,7 @@ impl RawDecoder for U256 {
         buffer: &mut Buffer<'a, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
-        if buffer.is_empty() {
-            return Ok(DecodeStage { ..*stage });
-        }
-        let from_index = if stage.index == 0 {
-            self.bytes[0] = buffer.next_byte().unwrap();
-            1
-        } else {
-            stage.index
-        };
-        let length = self.get_length();
-        let mut idx = 0;
-        while !buffer.is_empty() && idx < (length - (from_index as usize)) {
-            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
-            idx += 1;
-        }
-        let new_index = (from_index as usize) + idx;
-        if new_index == length {
-            Ok(DecodeStage::COMPLETE)
-        } else {
-            Ok(DecodeStage {
-                step: stage.step,
-                index: new_index as u16,
-            })
-        }
+        self.0.decode(buffer, stage)
     }
 }
 
@@ -358,8 +312,8 @@ pub mod tests {
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert!(result.is_some());
                 let result = result.unwrap();
-                let length = result.get_length();
-                assert_eq!(bytes, &result.bytes[..length]);
+                let length = result.0.get_length();
+                assert_eq!(bytes, &result.0.bytes[..length]);
                 assert!(decoder.stage.is_complete());
             }
 
@@ -377,8 +331,8 @@ pub mod tests {
                 if length == bytes.len() {
                     assert!(result.is_some());
                     let result = result.unwrap();
-                    let length = result.get_length();
-                    assert_eq!(bytes, &result.bytes[..length]);
+                    let length = result.0.get_length();
+                    assert_eq!(bytes, &result.0.bytes[..length]);
                     assert!(decoder.stage.is_complete());
                 } else {
                     assert_eq!(result, None);

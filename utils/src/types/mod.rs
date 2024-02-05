@@ -21,6 +21,7 @@ pub mod unsigned_tx;
 pub mod val;
 #[macro_use]
 pub mod macros;
+pub mod bigint;
 pub mod byte_string;
 pub mod u16;
 
@@ -33,6 +34,7 @@ pub use self::i32::I32;
 pub use self::u16::U16;
 pub use asset_output::AssetOutput;
 pub use avector::AVector;
+pub use bigint::BigInt;
 pub use byte::Byte;
 pub use byte_string::ByteString;
 pub use hint::Hint;
