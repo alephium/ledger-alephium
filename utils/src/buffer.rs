@@ -30,36 +30,12 @@ impl<'a, W> Buffer<'a, W> {
         Some(byte)
     }
 
-    pub fn write(&mut self, dest: &mut [u8]) -> usize {
-        self.write_with_size(dest, self.len())
-    }
-
-    pub fn write_with_size(&mut self, dest: &mut [u8], size: usize) -> usize {
-        let mut index = 0;
-        while !self.is_empty() && index < size {
-            dest[index] = self.next_byte().unwrap();
-            index += 1;
-        }
-        index
-    }
-
     pub fn len(&self) -> usize {
         self.data.len() - (self.index as usize)
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    pub fn get_raw_buffer(&self) -> &[u8] {
-        &self.data[(self.index as usize)..]
-    }
-
-    pub fn read_length(&mut self, length: usize) -> &[u8] {
-        let to = (self.index as usize) + length;
-        let result = &self.data[(self.index as usize)..to];
-        self.index = to as u8;
-        result
     }
 
     pub fn get_index(&self) -> u8 {
