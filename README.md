@@ -11,13 +11,13 @@ You will need to install the tool `ledgerctl` to load Alphium app. The official 
 To install the app for Nano S:
 
 ```
-ledgerctl install nanos.json
+make install_nanos
 ```
 
 To install the app for Nano S+:
 
 ```
-ledgerctl install nanosplus.json
+make install_nanosplus
 ```
 
 Nano X manual installation isn't supported. The device no longer supports application side-loading.

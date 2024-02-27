@@ -17,7 +17,7 @@ _release:
 			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
 			cp ./target/$(device)/release/app.hex ../$(device).hex && \
 			mv ./app_$(device).json ../$(device).json && \
-			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../$(device).json \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
 build-debug:
@@ -66,10 +66,7 @@ set-github-action:
 .PHONY: release clean
 
 install_nanos:
-	@make _install device=nanos
+	ledgerctl install -f nanos.json
 
 install_nanosplus:
-	@make _install device=nanosplus
-
-_install:
-	cd app && cargo ledger build $(device) -l && cd ..
+	ledgerctl install -f nanosplus.json
