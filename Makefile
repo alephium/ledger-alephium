@@ -17,7 +17,7 @@ _release:
 			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
 			cp ./target/$(device)/release/app.hex ../$(device).hex && \
 			mv ./app_$(device).json ../$(device).json && \
-			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../$(device).json \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
 build-debug:
@@ -25,11 +25,11 @@ build-debug:
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo build --no-default-features --features debug --target=nanos && \
+			cargo ledger build nanos -- --no-default-features --features debug && \
 			echo 'Building nanosplus app' && \
-			cargo build --no-default-features --features debug --target=nanosplus && \
+			cargo ledger build nanosplus -- --no-default-features --features debug && \
 			echo 'Building nanox app' && \
-			cargo build --no-default-features --features debug --target=nanox \
+			cargo ledger build nanox -- --no-default-features --features debug \
 		"
 
 check:
@@ -49,7 +49,7 @@ debug:
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 clean:
 	cd app && cargo clean
@@ -58,8 +58,15 @@ set-github-action:
 	make app-builder-image
 	make speculos-image
 	make build-debug
+	cd js/docker && docker compose up -d && cd ../..
 	docker run -d --rm -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 .PHONY: release clean
+
+install_nanos:
+	ledgerctl install -f nanos.json
+
+install_nanosplus:
+	ledgerctl install -f nanosplus.json

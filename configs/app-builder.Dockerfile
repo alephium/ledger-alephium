@@ -16,7 +16,7 @@ RUN rustup component add rust-src rustfmt clippy
 
 # Adding ARMV6M target to the default toolchain
 RUN rustup target add thumbv6m-none-eabi
-RUN cargo install --version 1.2.3 cargo-ledger
+RUN cargo install --version 1.2.3 cargo-ledger --locked
 RUN cargo ledger setup
 
 # Add a global Cargo config file (includes mandatory unstable features used to build our apps)
