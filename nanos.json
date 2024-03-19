@@ -10,7 +10,7 @@
     ]
   },
   "flags": "0",
-  "icon": "alph.gif",
+  "icon": "./app/alph.gif",
   "name": "Alephium",
   "targetId": "0x31100004",
   "version": "0.2.0"

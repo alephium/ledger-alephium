@@ -12,13 +12,12 @@ release:
 _release:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
 		bash -c " \
-			cargo install --git https://github.com/LedgerHQ/cargo-ledger --rev cf4eab6312218e9bf07e8d68bb9fd4d981647471 && \
 			cd app && \
 			echo 'Building $(device) app' && \
-			LEDGER_TARGETS=../configs/ RUST_BACKTRACE=1 cargo ledger $(device) -- -Z unstable-options && \
+			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
 			cp ./target/$(device)/release/app.hex ../$(device).hex && \
 			mv ./app_$(device).json ../$(device).json && \
-			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g' ../$(device).json \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
 build-debug:
@@ -26,11 +25,11 @@ build-debug:
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanos.json && \
+			cargo ledger build nanos -- --no-default-features --features debug && \
 			echo 'Building nanosplus app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanosplus.json && \
+			cargo ledger build nanosplus -- --no-default-features --features debug && \
 			echo 'Building nanox app' && \
-			cargo bembed --no-default-features --features debug --target=../configs/nanox.json \
+			cargo ledger build nanox -- --no-default-features --features debug \
 		"
 
 check:
@@ -40,23 +39,17 @@ check:
 			echo 'Cargo fmt' && \
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
-			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --features=debug --target=../configs/nanos.json \
+			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=nanos \
 		"
 
 debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest
 
-TARGET_HOST=https://raw.githubusercontent.com/LedgerHQ/ledger-nanos-sdk/master
-update-configs:
-	curl $(TARGET_HOST)/nanos.json --output configs/nanos.json
-	curl $(TARGET_HOST)/nanosplus.json --output configs/nanosplus.json
-	curl $(TARGET_HOST)/nanox.json --output configs/nanox.json
-
 # Webui: http://localhost:25000
 run-speculos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 clean:
 	cd app && cargo clean
@@ -67,6 +60,12 @@ set-github-action:
 	make build-debug
 	docker run -d --rm -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/debug/app
+		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 .PHONY: release clean
+
+install_nanos:
+	ledgerctl install -f nanos.json
+
+install_nanosplus:
+	ledgerctl install -f nanosplus.json
