@@ -1,9 +1,16 @@
 #![no_std]
 
-pub mod transaction;
+pub mod base58;
+pub mod buffer;
+pub mod decode;
+#[cfg(test)]
+pub mod temp_data;
+pub mod types;
 
 use core::char;
 use core::num::Wrapping;
+#[cfg(test)]
+pub use temp_data::TempData;
 
 #[inline]
 pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {
@@ -35,7 +42,6 @@ pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> Result<[u8; 
     }
     Ok(hex)
 }
-
 
 pub fn djb_hash(data: &[u8]) -> i32 {
     let mut hash = Wrapping(5381 as i32);
@@ -104,7 +110,7 @@ mod tests {
     fn test_hex_string() {
         let input = "0123456789abcdef";
         let x = to_hex_string(&from_hex_string(input));
-        assert_eq!(input, x);
+        assert_eq!(input, &x.as_str()[0..16]);
     }
 
     #[test]

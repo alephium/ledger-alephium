@@ -9,7 +9,7 @@ export const CLA = 0x80
 export enum INS {
   GET_VERSION = 0x00,
   GET_PUBLIC_KEY = 0x01,
-  SIGN_HASH = 0x02
+  SIGN_TX = 0x02
 }
 
 export const GROUP_NUM = 4
@@ -53,22 +53,37 @@ export default class AlephiumApp {
     return [{ publicKey: publicKey, address: address, group: group, keyType: keyType ?? 'default' }, hdIndex] as const
   }
 
-  async signHash(path: string, hash: Buffer): Promise<string> {
-    if (hash.length !== HASH_LEN) {
-      throw new Error('Invalid hash length')
+  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
+    console.log(`unsigned tx size: ${unsignedTx.length}`)
+    const encodedPath = serde.serializePath(path)
+    const firstFrameTxLength = 256 - 25;
+    const txData = unsignedTx.slice(0, unsignedTx.length > firstFrameTxLength ? firstFrameTxLength : unsignedTx.length)
+    const data = Buffer.concat([encodedPath, txData])
+    let response = await this.transport.send(CLA, INS.SIGN_TX, 0x00, 0x00, data, [StatusCodes.OK])
+    if (unsignedTx.length <= firstFrameTxLength) {
+      return decodeSignature(response)
     }
 
-    const data = Buffer.concat([serde.serializePath(path), hash])
-    console.log(`data ${data.length}`)
-    const response = await this.transport.send(CLA, INS.SIGN_HASH, 0x00, 0x00, data, [StatusCodes.OK])
-    console.log(`response ${response.length} - ${response.toString('hex')}`)
+    const frameLength = 256 - 5
+    let fromIndex = firstFrameTxLength
+    while (fromIndex < unsignedTx.length) {
+      const remain = unsignedTx.length - fromIndex
+      const toIndex = remain > frameLength ? (fromIndex + frameLength) : unsignedTx.length
+      const data = unsignedTx.slice(fromIndex, toIndex)
+      response = await this.transport.send(CLA, INS.SIGN_TX, 0x01, 0x00, data, [StatusCodes.OK])
+      fromIndex = toIndex
+    }
 
-    // Decode signature: https://bitcoin.stackexchange.com/a/12556
-    const rLen = response.slice(3, 4)[0]
-    const r = response.slice(4, 4 + rLen)
-    const sLen = response.slice(5 + rLen, 6 + rLen)[0]
-    const s = response.slice(6 + rLen, 6 + rLen + sLen)
-    console.log(`${rLen} - ${r.toString('hex')}\n${sLen} - ${s.toString('hex')}`)
-    return encodeHexSignature(r.toString('hex'), s.toString('hex'))
+    return decodeSignature(response)
   }
+}
+
+function decodeSignature(response: Buffer): string {
+  // Decode signature: https://bitcoin.stackexchange.com/a/12556
+  const rLen = response.slice(3, 4)[0]
+  const r = response.slice(4, 4 + rLen)
+  const sLen = response.slice(5 + rLen, 6 + rLen)[0]
+  const s = response.slice(6 + rLen, 6 + rLen + sLen)
+  console.log(`${rLen} - ${r.toString('hex')}\n${sLen} - ${s.toString('hex')}`)
+  return encodeHexSignature(r.toString('hex'), s.toString('hex'))
 }
