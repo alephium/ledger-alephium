@@ -194,6 +194,7 @@ mod tests {
     fn decode_and_check_tx(
         tx_id_hex: &str,
         encoded_tx: Vec<u8>,
+        network_id: u8,
         gas_amount: I32,
         gas_price: U256,
         is_script_tx: bool,
@@ -202,7 +203,7 @@ mod tests {
     ) {
         let check = |tx: &UnsignedTx| match tx {
             UnsignedTx::Version(byte) => assert_eq!(byte.0, 0),
-            UnsignedTx::NetworkId(byte) => assert_eq!(byte.0, 0),
+            UnsignedTx::NetworkId(byte) => assert_eq!(byte.0, network_id),
             UnsignedTx::ScriptOpt(script) => {
                 if is_script_tx {
                     assert!(script.inner.is_some())
@@ -341,6 +342,7 @@ mod tests {
         decode_and_check_tx(
             tx_id_hex,
             encoded_tx,
+            0,
             gas_amount,
             gas_price,
             false,
@@ -400,6 +402,7 @@ mod tests {
         decode_and_check_tx(
             tx_id_hex,
             encoded_tx,
+            0,
             gas_amount,
             gas_price,
             false,
@@ -444,6 +447,7 @@ mod tests {
         decode_and_check_tx(
             tx_id_hex,
             encoded_tx,
+            0,
             gas_amount,
             gas_price,
             true,
@@ -477,9 +481,39 @@ mod tests {
         decode_and_check_tx(
             tx_id_hex,
             encoded_tx,
+            0,
             gas_amount,
             gas_price,
             false,
+            &all_inputs,
+            &all_outputs,
+        );
+    }
+
+    #[test]
+    fn test_decode_rhone_tx() {
+        let tx_id_hex = "7a6d9e62e4deeae2f85d0675ba3c371fc2c23102270adf69eaa41824df37d944";
+        let encoded_tx = hex_to_bytes("0002010101030002000f144020923e3a6a5136338eed4fe14d96f219b192cea5c0c38a00b24186dc377b6b8b5c13016413006417011700150070f425d78af36c5c555b99098089da6a7ba34af9128e6e5d2dff1d457422a42d13c4016345785d8a0000a214409f0101409b01010000001cd38d0b363615036e06d76427087982b93922f578c6be64e0e69d60cfe6866f810a5877971d14008c0c2f0c7b15036e06d76427087982b93922f578c6be64e0e69d60cfe6866f810a5877971d1400d1a2140a5f5f6d61705f5f305f5f0c40440c0db1d20300b281d015036e06d76427087982b93922f578c6be64e0e69d60cfe6866f810a5877971d1400d1a20c0cce00d41e406a2f16001601ad1880030d40c1174876e80001b6b24f4b6b75d1147849306d23c316f1403d5af88be1d8a99a40c2f98c2ca146bfd938240003566752c71be4772a5c3a9d613cdf5e2dbe249cd6af46909c8272a91fe42c715100").unwrap();
+
+        let gas_amount = I32::from(200000);
+        let gas_price = U256::from_encoded_bytes(&[0xc1, 0x17, 0x48, 0x76, 0xe8, 0x00]);
+        let all_inputs = [{
+            p2pkh_input(
+                -1229828277,
+                "6b75d1147849306d23c316f1403d5af88be1d8a99a40c2f98c2ca146bfd93824",
+                "03566752c71be4772a5c3a9d613cdf5e2dbe249cd6af46909c8272a91fe42c7151",
+            )
+        }];
+
+        let all_outputs = [];
+
+        decode_and_check_tx(
+            tx_id_hex,
+            encoded_tx,
+            2,
+            gas_amount,
+            gas_price,
+            true,
             &all_inputs,
             &all_outputs,
         );

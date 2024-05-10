@@ -1,11 +1,10 @@
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
-use crate::fixed_integer;
 
-fixed_integer!(TimeStamp, 8, u64);
+fixed_integer!(MethodSelector, 4, i32);
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     extern crate std;
 
     use crate::buffer::Buffer;
@@ -13,24 +12,24 @@ mod tests {
     use crate::TempData;
     use rand::Rng;
 
-    use super::TimeStamp;
+    use super::MethodSelector;
 
-    fn gen_data() -> ([u8; 8], u64) {
+    fn gen_data() -> ([u8; 4], i32) {
         let mut rng = rand::thread_rng();
-        let mut bytes = [0u8; 8];
+        let mut bytes = [0u8; 4];
         rng.fill(&mut bytes[..]);
-        let number = u64::from_be_bytes(bytes);
+        let number = i32::from_be_bytes(bytes);
         (bytes, number)
     }
 
     #[test]
-    fn test_decode_timestamp() {
+    fn test_decode_method_selector() {
         let (bytes, number) = gen_data();
-        let steps = [1, 2, 4, 8];
+        let steps = [1, 2, 3, 4];
         let mut temp_data = TempData::new();
 
         for step in steps {
-            let mut decoder = new_decoder::<TimeStamp>();
+            let mut decoder = new_decoder::<MethodSelector>();
             let mut buffer = Buffer::new(&bytes[..0], &mut temp_data).unwrap();
             assert_eq!(decoder.decode(&mut buffer), Ok(None));
 
@@ -42,7 +41,7 @@ mod tests {
             }
 
             let mut buffer = Buffer::new(&bytes[(bytes.len() - step)..], &mut temp_data).unwrap();
-            assert_eq!(decoder.decode(&mut buffer), Ok(Some(&TimeStamp(number))));
+            assert_eq!(decoder.decode(&mut buffer), Ok(Some(&MethodSelector(number))));
         }
     }
 }

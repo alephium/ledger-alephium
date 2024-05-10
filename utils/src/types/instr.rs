@@ -1,5 +1,6 @@
 // auto-generated, do not edit
 use super::*;
+use crate::types::method_selector::MethodSelector;
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -144,6 +145,7 @@ pub enum Instr {
     U256ToString,
     I256ToString,
     BoolToString,
+    GroupOfAddress,
     LoadMutField(Byte),
     StoreMutField(Byte),
     ApproveAlph,
@@ -192,7 +194,12 @@ pub enum Instr {
     ALPHTokenId,
     LoadImmField(Byte),
     LoadImmFieldByIndex,
-    Unknown,
+    PayGasFee,
+    MinimalContractDeposit,
+    CreateMapEntry(Byte, Byte),
+    MethodSelector(MethodSelector),
+    CallExternalBySelector(MethodSelector),
+    Unknown
 }
 impl Reset for Instr {
     fn reset(&mut self) {
@@ -347,6 +354,7 @@ impl Instr {
             137 => Some(Self::U256ToString),
             138 => Some(Self::I256ToString),
             139 => Some(Self::BoolToString),
+            140 => Some(Self::GroupOfAddress),
             160 => Some(Self::LoadMutField(Byte::default())),
             161 => Some(Self::StoreMutField(Byte::default())),
             162 => Some(Self::ApproveAlph),
@@ -395,7 +403,12 @@ impl Instr {
             205 => Some(Self::ALPHTokenId),
             206 => Some(Self::LoadImmField(Byte::default())),
             207 => Some(Self::LoadImmFieldByIndex),
-            _ => None,
+            208 => Some(Self::PayGasFee),
+            209 => Some(Self::MinimalContractDeposit),
+            210 => Some(Self::CreateMapEntry(Byte::default(), Byte::default())),
+            211 => Some(Self::MethodSelector(MethodSelector::default())),
+            212 => Some(Self::CallExternalBySelector(MethodSelector::default())),
+            _ => None
         }
     }
 }
@@ -417,6 +430,9 @@ impl RawDecoder for Instr {
             Self::LoadMutField(v0) => v0.step_size(),
             Self::StoreMutField(v0) => v0.step_size(),
             Self::LoadImmField(v0) => v0.step_size(),
+            Self::CreateMapEntry(v0, v1) => v0.step_size() + v1.step_size(),
+            Self::MethodSelector(v0) => v0.step_size(),
+            Self::CallExternalBySelector(v0) => v0.step_size(),
             _ => 1,
         }
     }
@@ -436,7 +452,7 @@ impl RawDecoder for Instr {
                     return Err(DecodeError::InvalidData);
                 }
                 *self = result.unwrap();
-            }
+            },
             _ => (),
         };
         match self {
@@ -455,6 +471,9 @@ impl RawDecoder for Instr {
             Self::LoadMutField(v0) => v0.decode(buffer, stage),
             Self::StoreMutField(v0) => v0.decode(buffer, stage),
             Self::LoadImmField(v0) => v0.decode(buffer, stage),
+            Self::CreateMapEntry(v0, v1) => if stage.step < v0.step_size() { v0.decode(buffer, stage) } else { v1.decode(buffer, stage) },
+            Self::MethodSelector(v0) => v0.decode(buffer, stage),
+            Self::CallExternalBySelector(v0) => v0.decode(buffer, stage),
             Self::Unknown => Err(DecodeError::InternalError),
             _ => Ok(DecodeStage::COMPLETE),
         }

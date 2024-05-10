@@ -24,6 +24,7 @@ pub mod macros;
 pub mod bigint;
 pub mod byte_string;
 pub mod u16;
+pub mod method_selector;
 
 pub use byte32::Byte32;
 pub use i256::I256;
