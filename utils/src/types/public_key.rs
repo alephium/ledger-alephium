@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
 use crate::decode::*;
-use crate::fixed_bytes;
+use crate::fixed_size_bytes;
 
-fixed_bytes!(PublicKey, 33);
+fixed_size_bytes!(PublicKey, 33);
 
 #[cfg(test)]
 mod tests {

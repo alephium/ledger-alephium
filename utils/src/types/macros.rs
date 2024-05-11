@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! fixed_bytes {
+macro_rules! fixed_size_bytes {
     ($struct_name:ident, $encoded_length:expr) => {
         #[cfg_attr(test, derive(Debug, PartialEq))]
         pub struct $struct_name(pub [u8; $encoded_length]);
@@ -55,7 +55,7 @@ macro_rules! fixed_bytes {
 }
 
 #[macro_export]
-macro_rules! fixed_integer {
+macro_rules! fixed_size_integer {
     ($struct_name:ident, $encoded_length:expr, $tpe:ty) => {
         #[cfg_attr(test, derive(Debug, PartialEq))]
         #[derive(Default)]

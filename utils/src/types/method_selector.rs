@@ -1,7 +1,8 @@
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
+use crate::fixed_size_integer;
 
-fixed_integer!(MethodSelector, 4, i32);
+fixed_size_integer!(MethodSelector, 4, i32);
 
 #[cfg(test)]
 pub mod tests {

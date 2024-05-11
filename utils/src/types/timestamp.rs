@@ -1,8 +1,8 @@
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
-use crate::fixed_integer;
+use crate::fixed_size_integer;
 
-fixed_integer!(TimeStamp, 8, u64);
+fixed_size_integer!(TimeStamp, 8, u64);
 
 #[cfg(test)]
 mod tests {
