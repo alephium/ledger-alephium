@@ -132,7 +132,7 @@ describe('sdk', () => {
       }
     }
 
-    approve(0)
+    // approve(0)
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -194,7 +194,7 @@ describe('sdk', () => {
       }
     }
 
-    approve(0);
+    // approve(0);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -270,7 +270,7 @@ describe('sdk', () => {
       }
     }
 
-    approve(0);
+    // approve(0);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 

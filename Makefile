@@ -46,10 +46,15 @@ debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest
 
 # Webui: http://localhost:25000
-run-speculos:
+run-speculos-nanos:
 	docker run --rm -it -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
 		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
+
+run-speculos-nanosplus:
+	docker run --rm -it -v $(shell pwd):/speculos/app \
+		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
+		ledger-speculos --model nanosp --display headless --vnc-port 41000 app/app/target/nanosplus/release/app
 
 clean:
 	cd app && cargo clean
