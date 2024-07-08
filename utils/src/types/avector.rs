@@ -155,14 +155,30 @@ mod tests {
         assert!(result1.is_complete());
     }
 
+    pub fn encode_size(size: usize) -> Vec<u8> {
+        if size < 0x20 {
+            return vec![(size & 0xff) as u8];
+        }
+        if size < (0x20 << 8) {
+            return vec![(((size >> 8) & 0xff) as u8) + 0x40, (size & 0xff) as u8];
+        }
+        return vec![
+            (((size >> 24) & 0xff) as u8) + 0x80,
+            ((size >> 16) & 0xff) as u8,
+            ((size >> 8) & 0xff) as u8,
+            (size & 0xff) as u8
+        ]
+    }
+
     #[test]
     fn test_decode_avector() {
-        let max_size: usize = 0x1f;
+        let max_size: i16 = i16::MAX - 1;
         let mut temp_data = TempData::new();
         for _ in 0..10 {
-            let size = random_usize(1, max_size);
+            let size = random_usize(1, max_size as usize);
             let mut hashes: Vec<Hash> = Vec::with_capacity(size);
-            let mut bytes = vec![size as u8];
+            let mut bytes = encode_size(size);
+            let prefix_length = bytes.len();
             for _ in 0..size {
                 let hash_bytes = gen_bytes(32, 32);
                 hashes.push(Hash::from_bytes(hash_bytes.as_slice().try_into().unwrap()));
@@ -182,7 +198,7 @@ mod tests {
             let mut decoder = new_decoder::<AVector<Hash>>();
 
             while length < bytes.len() {
-                let size = if length == 0 { 33 } else { 32 };
+                let size = if length == 0 { 32 + prefix_length } else { 32 };
                 let mut buffer =
                     Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
                 length += size;

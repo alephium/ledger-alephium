@@ -32,7 +32,7 @@ impl Blake2bHasher {
         if rc == CX_OK {
             Ok(())
         } else {
-            Err(ErrorCode::TxSignFail)
+            Err(ErrorCode::TxSigningFailed)
         }
     }
 
@@ -47,7 +47,7 @@ impl Blake2bHasher {
         if rc == CX_OK {
             Ok(result)
         } else {
-            Err(ErrorCode::TxSignFail)
+            Err(ErrorCode::TxSigningFailed)
         }
     }
 }

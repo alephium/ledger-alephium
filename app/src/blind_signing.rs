@@ -12,7 +12,7 @@ pub fn is_blind_signing_enabled() -> bool {
 
 pub fn update_blind_signing() {
     let blind_signing = unsafe { BLIND_SIGNING.get_mut() };
-    if *blind_signing.get_ref() == 1 {
+    if *blind_signing.get_ref() != 0 {
         blind_signing.update(&0);
     } else {
         blind_signing.update(&1);

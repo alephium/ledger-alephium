@@ -11,18 +11,9 @@ mod tests {
     use super::{new_decoder, Hint};
     use crate::buffer::Buffer;
     use crate::decode::Decoder;
+    use crate::types::byte32::tests::gen_bytes;
     use crate::TempData;
-    use rand::Rng;
     use std::vec;
-    use std::vec::Vec;
-
-    fn gen_bytes(min_length: usize, max_length: usize) -> Vec<u8> {
-        let mut rng = rand::thread_rng();
-        let length = rng.gen_range(min_length..=max_length);
-        let mut random_bytes = vec![0u8; length];
-        rng.fill(&mut random_bytes[..]);
-        random_bytes
-    }
 
     #[test]
     fn test_decode_hint() {

@@ -10,11 +10,11 @@ pub enum ErrorCode {
     BadP1P2 = StatusWords::BadP1P2 as u16,
     BadLen = StatusWords::BadLen as u16,
     UserCancelled = StatusWords::UserCancelled as u16,
-    TxDecodeFail = 0xE000,
-    TxSignFail = 0xE001,
+    TxDecodingFailed = 0xE000,
+    TxSigningFailed = 0xE001,
     Overflow = 0xE002,
-    DerivePathDecodeFail = 0xE003,
-    BlindSigningNotEnabled = 0xE004,
+    HDPathDecodingFailed = 0xE003,
+    BlindSigningDisabled = 0xE004,
     InternalError = 0xEF00,
 }
 

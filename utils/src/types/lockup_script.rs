@@ -154,14 +154,12 @@ mod tests {
     use crate::TempData;
     use std::vec;
 
-    #[test]
-    fn test_decode_p2pkh() {
+    fn test(prefix: u8, ctor: fn(Hash) -> LockupScript) {
         for _ in 0..10 {
-            let mut bytes = vec![0u8];
+            let mut bytes = vec![prefix];
             let hash_bytes = gen_bytes(32, 32);
             bytes.extend(&hash_bytes);
-            let lockup_script =
-                LockupScript::P2PKH(Hash::from_bytes(hash_bytes.as_slice().try_into().unwrap()));
+            let lockup_script = ctor(Hash::from_bytes(hash_bytes.as_slice().try_into().unwrap()));
             let mut temp_data = TempData::new();
 
             {
@@ -193,38 +191,51 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_p2pkh() {
+        test(0, |hash| LockupScript::P2PKH(hash))
+    }
+
+    #[test]
+    fn test_decode_p2sh() {
+        test(2, |hash| LockupScript::P2SH(hash))
+    }
+
+    #[test]
+    fn test_decode_p2c() {
+        test(3, |hash| LockupScript::P2C(hash))
+    }
+
+    #[test]
     fn test_decode_p2mpkh() {
         let bytes = hex_to_bytes("0103a3cd757be03c7dac8d48bf79e2a7d6e735e018a9c054b99138c7b29738c437ecef51c98556924afa1cd1a8026c3d2d33ee1d491e1fe77c73a75a2d0129f061951dd2aa371711d1faea1c96d395f08eb94de1f388993e8be3f4609dc327ab513a02").unwrap();
-        for _ in 0..10 {
-            {
-                let mut temp_data = TempData::new();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
-                let mut decoder = new_decoder::<LockupScript>();
-                let result = decoder.decode(&mut buffer).unwrap();
+        {
+            let mut temp_data = TempData::new();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+            let mut decoder = new_decoder::<LockupScript>();
+            let result = decoder.decode(&mut buffer).unwrap();
+            assert!(result.is_some());
+            assert!(decoder.stage.is_complete());
+            assert_eq!(temp_data.get(), &bytes);
+        }
+
+        let mut temp_data = TempData::new();
+        let mut length: usize = 0;
+        let mut decoder = new_decoder::<LockupScript>();
+
+        while length < bytes.len() {
+            let remain = bytes.len() - length;
+            let size = random_usize(0, remain);
+            let mut buffer =
+                Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            length += size;
+
+            let result = decoder.decode(&mut buffer).unwrap();
+            if length == bytes.len() {
                 assert!(result.is_some());
                 assert!(decoder.stage.is_complete());
                 assert_eq!(temp_data.get(), &bytes);
-            }
-
-            let mut temp_data = TempData::new();
-            let mut length: usize = 0;
-            let mut decoder = new_decoder::<LockupScript>();
-
-            while length < bytes.len() {
-                let remain = bytes.len() - length;
-                let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
-                length += size;
-
-                let result = decoder.decode(&mut buffer).unwrap();
-                if length == bytes.len() {
-                    assert!(result.is_some());
-                    assert!(decoder.stage.is_complete());
-                    assert_eq!(temp_data.get(), &bytes);
-                } else {
-                    assert_eq!(result, None);
-                }
+            } else {
+                assert_eq!(result, None);
             }
         }
     }

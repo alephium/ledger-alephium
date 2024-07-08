@@ -103,7 +103,7 @@ mod tests {
         hasher: &mut Blake2b256,
     ) -> DecodeResult<bool> {
         let from_index = buffer.get_index();
-        let result = decoder.try_decode_one_step(buffer);
+        let result = decoder.step(buffer);
         let to_index = buffer.get_index();
         hasher.update(buffer.get_range(from_index, to_index));
         result

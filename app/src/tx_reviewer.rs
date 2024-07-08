@@ -1,7 +1,7 @@
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
-    nvm_buffer::{NVMData, NVM},
+    nvm_buffer::{NVMData, NVMBuffer, NVM, NVM_DATA_SIZE},
 };
 use core::str::from_utf8;
 use ledger_device_sdk::ui::{
@@ -10,16 +10,14 @@ use ledger_device_sdk::ui::{
 };
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
-    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, I32, U256},
+    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
 };
 
-const SIZE: usize = 2048;
-
 #[link_section = ".nvm_data"]
-static mut DATA: NVMData<NVM<SIZE>> = NVMData::new(NVM::zeroed());
+static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 pub struct TxReviewer {
-    data: &'static mut NVMData<NVM<SIZE>>,
+    data: &'static mut NVMData<NVM<NVM_DATA_SIZE>>,
     index: usize,
 }
 
@@ -34,17 +32,8 @@ impl TxReviewer {
     }
 
     #[inline]
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.index = 0;
-    }
-
-    fn write_from(&mut self, from_index: usize, bytes: &[u8]) -> Result<(), ErrorCode> {
-        let data = self.data.get_mut();
-        if data.write(from_index, bytes) {
-            Ok(())
-        } else {
-            Err(ErrorCode::Overflow)
-        }
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -61,7 +50,7 @@ impl TxReviewer {
 
     fn write_str(&mut self, str: &[u8]) -> Result<usize, ErrorCode> {
         let size = get_memory_size(str.len());
-        self.write_from(self.index, str)?;
+        self.data.write_from(self.index, str)?;
         let to_index = self.index + str.len();
         self.index += size;
         Ok(to_index)
@@ -92,7 +81,7 @@ impl TxReviewer {
                 bytes[index] = (new_carry % 58) as u8;
                 new_carry /= 58;
             }
-            self.write_from(from_index, &bytes)?;
+            self.data.write_from(from_index, &bytes)?;
             bytes = [0; 64];
             from_index += 64;
         }
@@ -112,7 +101,7 @@ impl TxReviewer {
                 for i in 0..length {
                     temp0[length - i - 1] = ALPHABET[stored[i] as usize];
                 }
-                self.write_from(begin, &temp0[..length])?;
+                self.data.write_from(begin, &temp0[..length])?;
                 return Ok(());
             }
 
@@ -123,8 +112,8 @@ impl TxReviewer {
                 temp0[index] = ALPHABET[left[i] as usize];
                 temp1[index] = ALPHABET[right[i] as usize];
             }
-            self.write_from(begin, &temp1)?;
-            self.write_from(end - 64, &temp0)?;
+            self.data.write_from(begin, &temp1)?;
+            self.data.write_from(end - 64, &temp0)?;
             end -= 64;
             begin += 64;
         }
@@ -149,7 +138,7 @@ impl TxReviewer {
             }
             while carry > 0 {
                 if (output_index - output_length) == output.len() {
-                    self.write_from(from_index + output_length, &output)?;
+                    self.data.write_from(from_index + output_length, &output)?;
                     output = [0u8; 64];
                     output_length += 64;
                 }
@@ -159,7 +148,7 @@ impl TxReviewer {
             }
         }
 
-        self.write_from(
+        self.data.write_from(
             from_index + output_length,
             &output[..(output_index - output_length)],
         )?;
@@ -390,6 +379,41 @@ impl TxReviewer {
         review(&fields, review_message)
     }
 
+    pub fn review_tx_details(&mut self, unsigned_tx: &UnsignedTx, temp_data: &NVMBuffer<'static, NVM_DATA_SIZE>) -> Result<(), ErrorCode> {
+        let result = match unsigned_tx {
+            UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
+            UnsignedTx::GasAmount(amount) => Self::review_gas_amount(amount),
+            UnsignedTx::GasPrice(amount) => self.review_gas_price(amount),
+            UnsignedTx::Inputs(inputs) => {
+                let current_input = inputs.get_current_item();
+                if current_input.is_some() {
+                    self.review_input(
+                        current_input.unwrap(),
+                        inputs.current_index as usize,
+                        temp_data.read()?,
+                    )
+                } else {
+                    Ok(())
+                }
+            }
+            UnsignedTx::FixedOutputs(outputs) => {
+                let current_output = outputs.get_current_item();
+                if current_output.is_some() {
+                    self.review_output(
+                        current_output.unwrap(),
+                        outputs.current_index as usize,
+                        temp_data.read()?,
+                    )
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        };
+        self.reset();
+        result
+    }
+
     pub fn review_tx_id(tx_id: &[u8; 32]) -> Result<(), ErrorCode> {
         let hex: [u8; 64] = utils::to_hex(&tx_id[..]).unwrap();
         let hex_str = bytes_to_string(&hex)?;
@@ -418,7 +442,7 @@ pub struct TokenIndexes {
     pub token_amount: (usize, usize),
 }
 
-// https://developers.ledger.com/docs/device-app/develop/sdk/memory/persistent-storage#flash-memory-endurance
+// https://developers.ledger.com/docs/device-app/architecture/memory/persistent-storage#flash-memory-endurance
 fn get_memory_size(num: usize) -> usize {
     let remainder = num % 64;
     if remainder == 0 {

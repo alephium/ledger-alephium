@@ -1,6 +1,10 @@
 use ledger_secure_sdk_sys::nvm_write;
 use utils::buffer::Writable;
 
+use crate::error_code::ErrorCode;
+
+pub const NVM_DATA_SIZE: usize = 2048;
+
 #[repr(align(64))]
 pub struct NVM<const N: usize>(pub [u8; N]);
 
@@ -18,9 +22,9 @@ impl<const N: usize> NVM<N> {
         unsafe {
             let dst = self.0[from..].as_mut_ptr() as *mut _;
             let src = slice.as_ptr() as *mut u8 as *mut _;
-            nvm_write(dst, src, len as u32); // TODO: handle error properly
+            nvm_write(dst, src, len as u32);
 
-            debug_assert_eq!(&self.0[from..], &slice[..]);
+            assert_eq!(&self.0[from..(from+len)], &slice[..]);
         };
         return true;
     }
@@ -99,18 +103,33 @@ impl<T> NVMData<T> {
     }
 }
 
-pub struct NvmBuffer<'a, const N: usize> {
+impl<const N: usize> NVMData<NVM<N>> {
+    pub fn write_from(&mut self, from_index: usize, bytes: &[u8]) -> Result<(), ErrorCode> {
+        let data = self.get_mut();
+        if data.write(from_index, bytes) {
+            Ok(())
+        } else {
+            Err(ErrorCode::Overflow)
+        }
+    }
+}
+
+pub struct NVMBuffer<'a, const N: usize> {
     data: &'a mut NVMData<NVM<N>>,
     pub index: usize,
 }
 
-impl<'a, const N: usize> NvmBuffer<'a, N> {
+impl<'a, const N: usize> NVMBuffer<'a, N> {
     pub fn new(data: &'a mut NVMData<NVM<N>>) -> Self {
         Self { data, index: 0 }
     }
 
-    pub fn read(&self) -> &[u8] {
-        &self.data.get_ref().0[..self.index]
+    pub fn read(&self) -> Result<&[u8], ErrorCode> {
+        if self.is_overflow() {
+            Err(ErrorCode::Overflow)
+        } else {
+            Ok(&self.data.get_ref().0[..self.index])
+        }
     }
 
     #[inline]
@@ -118,20 +137,17 @@ impl<'a, const N: usize> NvmBuffer<'a, N> {
         self.index = 0;
     }
 
-    pub fn is_overflow(&self) -> bool {
+    #[inline]
+    fn is_overflow(&self) -> bool {
         self.index > N
     }
 }
 
-impl<'a, const N: usize> Writable for NvmBuffer<'a, N> {
+impl<'a, const N: usize> Writable for NVMBuffer<'a, N> {
     fn write(&mut self, bytes: &[u8]) {
-        if self.index + bytes.len() > N {
-            self.index = N + 1;
-            return;
+        match self.data.write_from(self.index, bytes) {
+            Ok(()) => self.index += bytes.len(),
+            Err(_) => self.index = N + 1
         }
-        let nvm_data = self.data.get_mut();
-        let result = nvm_data.write(self.index, bytes);
-        assert!(result);
-        self.index += bytes.len();
     }
 }

@@ -83,7 +83,7 @@ impl<T: Default> Default for PartialDecoder<T> {
 }
 
 impl<T: RawDecoder> PartialDecoder<T> {
-    pub fn try_decode_one_step<'a, W: Writable>(
+    pub fn step<'a, W: Writable>(
         &mut self,
         buffer: &mut Buffer<'a, W>,
     ) -> DecodeResult<bool> {
@@ -130,7 +130,7 @@ impl<T: RawDecoder> PartialDecoder<T> {
 impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
     fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>> {
         loop {
-            match self.try_decode_one_step(buffer) {
+            match self.step(buffer) {
                 Ok(true) => {
                     if self.stage.is_complete() {
                         return Ok(Some(&self.inner));
