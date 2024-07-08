@@ -2,10 +2,9 @@ After upgrading from ledger rust sdk `1.4.1` to `1.11.1`, we encountered display
 
 To reproduce:
 
-1. `make app-builder-image && make speculos-image`
-2. `make release`
-3. `make run-speculos-nanosplus`
-4. `cd docker && docker compose up`
-5. `cd js && npm install && npm run test -- test/speculos.test.ts`
+1. `make release`
+2. `make run-speculos-nanosplus`
+3. `cd docker && docker compose up`
+4. `cd js && npm install && npm run test -- test/speculos.test.ts`
 
 Open `http://127.0.0.1:25000/` and test
