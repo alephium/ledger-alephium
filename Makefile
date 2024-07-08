@@ -1,6 +1,3 @@
-app-builder-image:
-	@docker build -t ledger-alephium-app-builder:latest -f ./configs/app-builder.Dockerfile configs
-
 speculos-image:
 	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
 
@@ -10,7 +7,7 @@ release:
 	@make _release device=nanosplus
 
 _release:
-	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
 		bash -c " \
 			cd app && \
 			echo 'Building $(device) app' && \
@@ -21,7 +18,7 @@ _release:
 		"
 
 build-debug:
-	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
 		bash -c " \
 			cd app && \
 			echo 'Building nanos app' && \
@@ -33,7 +30,7 @@ build-debug:
 		"
 
 check:
-	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest \
+	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
 		bash -c " \
 			cd app && \
 			echo 'Cargo fmt' && \
@@ -43,7 +40,7 @@ check:
 		"
 
 debug:
-	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ledger-alephium-app-builder:latest
+	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 
 # Webui: http://localhost:25000
 run-speculos-nanos:
@@ -60,7 +57,6 @@ clean:
 	cd app && cargo clean
 
 set-github-action:
-	make app-builder-image
 	make speculos-image
 	make build-debug
 	cd js/docker && docker compose up -d && cd ../..
