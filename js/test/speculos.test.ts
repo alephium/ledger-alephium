@@ -1,9 +1,8 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
 import fetch from 'node-fetch'
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, groupOfAddress, transactionVerifySignature } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, groupOfAddress, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
-import { waitTxConfirmed } from '@alephium/cli'
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -26,6 +25,7 @@ function getRandomInt(min, max) {
 describe('sdk', () => {
   const apduPort = 9999
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
+  web3.setCurrentNodeProvider(nodeProvider)
   let pathIndex: number
   let path: string
 
@@ -75,7 +75,7 @@ describe('sdk', () => {
   async function transferToTestAccount(address: Address) {
     const fromAccount = await getSigner()
     const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, ONE_ALPH * 10n)
-    await waitTxConfirmed(nodeProvider, transferResult.txId, 1, 1000)
+    await waitForTxConfirmation(transferResult.txId, 1, 1000)
     const balance0 = await getALPHBalance(address)
     expect(balance0).toEqual(ONE_ALPH * 10n)
   }
@@ -140,7 +140,7 @@ describe('sdk', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(testAccount.address)
     expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
 
@@ -202,7 +202,7 @@ describe('sdk', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(testAccount.address)
     expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
 
@@ -278,7 +278,7 @@ describe('sdk', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balances = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
     const alphBalance = BigInt(balances.balance)
     expect(alphBalance < (ONE_ALPH * 5n)).toEqual(true)

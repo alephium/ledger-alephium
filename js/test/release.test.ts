@@ -1,16 +1,16 @@
 import NodeTransport from '@ledgerhq/hw-transport-node-hid'
 import { listen } from '@ledgerhq/logs'
 
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, transactionVerifySignature, web3 } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, transactionVerifySignature, web3, waitForTxConfirmation } from '@alephium/web3'
 
 import AlephiumApp from '../src'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
-import { waitTxConfirmed } from '@alephium/cli'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 
 describe.skip('Integration', () => {
   const path = `m/44'/1234'/0'/0/0`
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
+  web3.setCurrentNodeProvider(nodeProvider)
 
   function randomP2PKHAddress(groupIndex: number): string {
     return PrivateKeyWallet.Random(groupIndex, nodeProvider).address
@@ -24,7 +24,7 @@ describe.skip('Integration', () => {
   async function transferToTestAccount(address: Address) {
     const fromAccount = await getSigner()
     const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, ONE_ALPH * 10n)
-    await waitTxConfirmed(nodeProvider, transferResult.txId, 1, 1000)
+    await waitForTxConfirmation(transferResult.txId, 1, 1000)
   }
 
   // enable this for integration test
@@ -57,7 +57,7 @@ describe.skip('Integration', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(testAccount.address)
     const gasFee = BigInt(buildTxResult.gasAmount) * BigInt(buildTxResult.gasPrice)
     expect(balance1).toEqual(balance0 - gasFee - ONE_ALPH * 5n)
@@ -95,7 +95,7 @@ describe.skip('Integration', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balances1 = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
     const gasFee = BigInt(buildTxResult.gasAmount) * BigInt(buildTxResult.gasPrice)
     const alphBalance = BigInt(balances1.balance)
@@ -138,7 +138,7 @@ describe.skip('Integration', () => {
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
-    await waitTxConfirmed(nodeProvider, submitResult.txId, 1, 1000)
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balances1 = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
     const gasFee = BigInt(buildTxResult.gasAmount) * BigInt(buildTxResult.gasPrice)
     const alphBalance = BigInt(balances1.balance)
