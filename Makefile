@@ -1,6 +1,3 @@
-speculos-image:
-	@docker build -t ledger-speculos:latest -f ./configs/speculos.Dockerfile configs
-
 release:
 	@make _release device=nanos
 	@make _release device=nanox
@@ -42,22 +39,22 @@ check:
 debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 
-# Webui: http://localhost:25000
+# FIXME: the command only works on macos
 run-speculos-nanos:
-	docker run --rm -it -v $(shell pwd):/speculos/app \
-		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
+	docker run --rm -it -v $(shell pwd):/app --publish 5001:5001 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
+		-v '/tmp/.X11-unix:/tmp/.X11-unix' --privileged ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools \
+		speculos -m nanos /app/app/target/nanos/release/app
 
+# FIXME: the command only works on macos
 run-speculos-nanosplus:
-	docker run --rm -it -v $(shell pwd):/speculos/app \
-		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ledger-speculos --model nanosp --display headless --vnc-port 41000 app/app/target/nanosplus/release/app
+	docker run --rm -it -v $(shell pwd):/app --publish 5001:5001 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
+		-v '/tmp/.X11-unix:/tmp/.X11-unix' --privileged ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools \
+		speculos -m nanosp /app/app/target/nanosplus/release/app
 
 clean:
 	cd app && cargo clean
 
 set-github-action:
-	make speculos-image
 	make build-debug
 	cd js/docker && docker compose up -d && cd ../..
 	docker run -d --rm -v $(shell pwd):/speculos/app \
