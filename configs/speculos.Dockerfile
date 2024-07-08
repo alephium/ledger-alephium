@@ -69,8 +69,7 @@ RUN tar xf d0bc304a132df43856d8302e15dabee97d3d8a95.tar.gz && \
 RUN git clone https://github.com/LedgerHQ/speculos.git ./speculos
 # ADD . /speculos
 WORKDIR /speculos
-# v0.5.0
-RUN git reset --hard 574648f3617b9a957fc40b5d8ba7695ef0ffb991
+RUN git reset --hard 836624da3cd12cc75f25eecfda0c214ff8517f4f
 
 RUN cmake -Bbuild -H. -DPRECOMPILED_DEPENDENCIES_DIR=/install -DWITH_VNC=1
 RUN make -C build
