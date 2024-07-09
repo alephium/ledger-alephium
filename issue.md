@@ -4,7 +4,7 @@ To reproduce:
 
 1. `make release`
 2. `make run-speculos-nanosplus`
-3. `cd docker && docker compose up`
+3. `cd js/docker && docker compose up`
 4. `cd js && npm install && npm run test -- test/speculos.test.ts`
 
 Open `http://127.0.0.1:25000/` and test
