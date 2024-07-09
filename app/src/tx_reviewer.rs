@@ -19,6 +19,7 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 pub struct TxReviewer {
     data: &'static mut NVMData<NVM<NVM_DATA_SIZE>>,
     index: usize,
+    last_input: Option<InputInfo>,
 }
 
 impl TxReviewer {
@@ -27,6 +28,7 @@ impl TxReviewer {
             Self {
                 data: &mut DATA,
                 index: 0,
+                last_input: None,
             }
         }
     }
@@ -34,6 +36,7 @@ impl TxReviewer {
     #[inline]
     fn reset(&mut self) {
         self.index = 0;
+        self.last_input = None;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -162,16 +165,12 @@ impl TxReviewer {
     fn write_index_with_prefix(&mut self, index: usize, prefix: &[u8]) -> Result<usize, ErrorCode> {
         let mut output = [0u8; 20];
         assert!(prefix.len() + 3 <= 20);
-        let num = I32::unsafe_from(index);
-        let mut num_output: [u8; 3] = [0u8; 3];
-        let num_str_bytes = num.to_str(&mut num_output);
+        output[..prefix.len()].copy_from_slice(prefix);
+        let num_str_bytes = I32::unsafe_from(index).to_str(&mut output[prefix.len()..]);
         if num_str_bytes.is_none() {
             return Err(ErrorCode::Overflow);
         }
-        output[..prefix.len()].copy_from_slice(prefix);
-        let num_str = num_str_bytes.unwrap();
-        let total_size = prefix.len() + num_str.len();
-        output[prefix.len()..total_size].copy_from_slice(num_str);
+        let total_size = prefix.len() + num_str_bytes.unwrap().len();
         self.write_str(&output[..total_size])
     }
 
@@ -189,13 +188,9 @@ impl TxReviewer {
         input: &TxInput,
         current_index: usize,
         temp_data: &[u8],
-    ) -> Result<InputIndexes, ErrorCode> {
-        let review_message_from_index = self.index;
-        let review_message_to_index =
-            self.write_index_with_prefix(current_index, b"Review Input #")?;
-
-        let address_from_index = self.index;
-        let address_to_index = match &input.unlock_script {
+    ) -> Result<InputInfo, ErrorCode> {
+        assert!(self.index == 0);
+        let length = match &input.unlock_script {
             UnlockScript::P2PKH(public_key) => {
                 let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
                 self.write_address(0u8, &public_key_hash)?
@@ -208,14 +203,11 @@ impl TxReviewer {
                 let script_hash = Blake2bHasher::hash(temp_data)?;
                 self.write_address(2u8, &script_hash)?
             }
-            UnlockScript::SameAsPrevious => self.write_str(b"same as previous")?,
+            UnlockScript::SameAsPrevious => panic!(), // dead branch
             _ => panic!(), // dead branch
         };
 
-        Ok(InputIndexes {
-            review_message: (review_message_from_index, review_message_to_index),
-            address: (address_from_index, address_to_index),
-        })
+        Ok(InputInfo { input_index: current_index as u16, length: length as u16 })
     }
 
     fn prepare_output(
@@ -294,7 +286,7 @@ impl TxReviewer {
         }
         let value = bytes_to_string(&num_str_bytes.unwrap())?;
         let fields = [Field {
-            name: "GasAmount",
+            name: "Gas Amount",
             value,
         }];
         review(&fields, "Review Gas Amount")
@@ -305,29 +297,83 @@ impl TxReviewer {
         let to_index = self.write_alph_amount(gas_price)?;
         let value = self.get_str_from_range((from_index, to_index))?;
         let fields = [Field {
-            name: "GasPrice",
+            name: "Gas Price",
             value,
         }];
-        review(&fields, "Review Gas Price")
+        review(&fields, "Review Gas Price")?;
+        self.reset();
+        Ok(())
+    }
+
+    fn review_inputs(&mut self, current_input_index: usize) -> Result<(), ErrorCode> {
+        match &self.last_input {
+            Some(last_input) => {
+                let last_input_index = last_input.input_index as usize;
+                let last_input_length = last_input.length as usize;
+                assert!(current_input_index > last_input_index);
+                let inputs_count = current_input_index - last_input_index;
+                let review_message_from_index = self.index;
+                let review_message_to_index = if inputs_count == 1 {
+                    self.write_index_with_prefix(last_input_index, b"Review Input #")?
+                } else {
+                    let prefix = b"Review Inputs #";
+                    let mut bytes = [0u8; 25];
+                    bytes[..prefix.len()].copy_from_slice(prefix);
+                    let mut index = prefix.len();
+                    let input_from_index = I32::unsafe_from(last_input_index).to_str(&mut bytes[index..]);
+                    if input_from_index.is_none() {
+                        return Err(ErrorCode::Overflow);
+                    }
+                    index += input_from_index.unwrap().len();
+
+                    bytes[index..(index+4)].copy_from_slice(b" - #");
+                    index += 4;
+                    let input_to_index = I32::unsafe_from(current_input_index - 1).to_str(&mut bytes[index..]);
+                    if input_to_index.is_none() {
+                        return Err(ErrorCode::Overflow);
+                    }
+                    index += input_to_index.unwrap().len();
+                    self.write_str(&bytes[..index])?
+                };
+                let address = self.get_str_from_range((0, last_input_length))?;
+                let review_message = self.get_str_from_range((review_message_from_index, review_message_to_index))?;
+                let fields = [Field {
+                    name: "Address",
+                    value: address,
+                }];
+                review(&fields, review_message)?;
+                self.reset();
+                Ok(())
+            }
+            None => Ok(())
+        }
     }
 
     pub fn review_input(
         &mut self,
         input: &TxInput,
         current_index: usize,
+        input_size: usize,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
-        let InputIndexes {
-            review_message,
-            address,
-        } = self.prepare_input(input, current_index, temp_data)?;
-        let review_message = self.get_str_from_range(review_message)?;
-        let address = self.get_str_from_range(address)?;
-        let fields = [Field {
-            name: "Address",
-            value: address,
-        }];
-        review(&fields, review_message)
+        let is_last_input = current_index == input_size - 1;
+        match &input.unlock_script {
+            UnlockScript::SameAsPrevious => {
+                if is_last_input {
+                    return self.review_inputs(input_size);
+                } else {
+                    return Ok(());
+                }
+            }
+            _ => self.review_inputs(current_index)?
+        }
+
+        self.last_input = Some(self.prepare_input(input, current_index, temp_data)?);
+        if current_index == input_size - 1 {
+            self.review_inputs(input_size)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn review_output(
@@ -368,19 +414,21 @@ impl TxReviewer {
             address_field,
             alph_amount_field,
             Field {
-                name: "TokenId",
+                name: "Token ID",
                 value: token_id,
             },
             Field {
-                name: "TokenAmount",
+                name: "Amount",
                 value: token_amount,
             },
         ];
-        review(&fields, review_message)
+        review(&fields, review_message)?;
+        self.reset();
+        Ok(())
     }
 
     pub fn review_tx_details(&mut self, unsigned_tx: &UnsignedTx, temp_data: &NVMBuffer<'static, NVM_DATA_SIZE>) -> Result<(), ErrorCode> {
-        let result = match unsigned_tx {
+        match unsigned_tx {
             UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
             UnsignedTx::GasAmount(amount) => Self::review_gas_amount(amount),
             UnsignedTx::GasPrice(amount) => self.review_gas_price(amount),
@@ -390,6 +438,7 @@ impl TxReviewer {
                     self.review_input(
                         current_input.unwrap(),
                         inputs.current_index as usize,
+                        inputs.size(),
                         temp_data.read()?,
                     )
                 } else {
@@ -409,25 +458,23 @@ impl TxReviewer {
                 }
             }
             _ => Ok(()),
-        };
-        self.reset();
-        result
+        }
     }
 
     pub fn review_tx_id(tx_id: &[u8; 32]) -> Result<(), ErrorCode> {
         let hex: [u8; 64] = utils::to_hex(&tx_id[..]).unwrap();
         let hex_str = bytes_to_string(&hex)?;
         let fields = [Field {
-            name: "TxId",
+            name: "Tx ID",
             value: hex_str,
         }];
-        review(&fields, "Review Tx Id")
+        review(&fields, "Review Tx ID")
     }
 }
 
-pub struct InputIndexes {
-    pub review_message: (usize, usize),
-    pub address: (usize, usize),
+pub struct InputInfo {
+    pub length: u16,
+    pub input_index: u16,
 }
 
 pub struct OutputIndexes {

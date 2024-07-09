@@ -27,12 +27,19 @@ fn trim<'a>(dest: &'a mut [u8], is_negative: bool) -> &'a [u8] {
             break;
         }
     }
-    if is_negative {
+    let from_index = if is_negative {
         dest[index - 1] = b'-';
-        &dest[(index - 1)..]
+        index - 1
     } else {
-        &dest[index..]
+        index
+    };
+    let length = dest.len() - from_index;
+    index = 0;
+    while index < length {
+        dest[index] = dest[from_index + index];
+        index += 1;
     }
+    &dest[..length]
 }
 
 impl I32 {
