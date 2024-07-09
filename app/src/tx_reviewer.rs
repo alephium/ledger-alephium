@@ -163,8 +163,8 @@ impl TxReviewer {
     }
 
     fn write_index_with_prefix(&mut self, index: usize, prefix: &[u8]) -> Result<usize, ErrorCode> {
-        let mut output = [0u8; 20];
-        assert!(prefix.len() + 3 <= 20);
+        let mut output = [0u8; 13];
+        assert!(prefix.len() + 3 <= 13);
         output[..prefix.len()].copy_from_slice(prefix);
         let num_str_bytes = I32::unsafe_from(index).to_str(&mut output[prefix.len()..]);
         if num_str_bytes.is_none() {
@@ -218,7 +218,7 @@ impl TxReviewer {
     ) -> Result<OutputIndexes, ErrorCode> {
         let review_message_from_index = self.index;
         let review_message_to_index =
-            self.write_index_with_prefix(current_index, b"Review Output #")?;
+            self.write_index_with_prefix(current_index, b"Output #")?;
 
         let alph_amount_from_index = self.index;
         let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
@@ -275,7 +275,7 @@ impl TxReviewer {
             name: "Network",
             value: network_type,
         }];
-        review(&fields, "Review Network")
+        review(&fields, "Network")
     }
 
     pub fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
@@ -289,7 +289,7 @@ impl TxReviewer {
             name: "Gas Amount",
             value,
         }];
-        review(&fields, "Review Gas Amount")
+        review(&fields, "Gas Amount")
     }
 
     pub fn review_gas_price(&mut self, gas_price: &U256) -> Result<(), ErrorCode> {
@@ -300,7 +300,7 @@ impl TxReviewer {
             name: "Gas Price",
             value,
         }];
-        review(&fields, "Review Gas Price")?;
+        review(&fields, "Gas Price")?;
         self.reset();
         Ok(())
     }
@@ -314,10 +314,10 @@ impl TxReviewer {
                 let inputs_count = current_input_index - last_input_index;
                 let review_message_from_index = self.index;
                 let review_message_to_index = if inputs_count == 1 {
-                    self.write_index_with_prefix(last_input_index, b"Review Input #")?
+                    self.write_index_with_prefix(last_input_index, b"Input #")?
                 } else {
-                    let prefix = b"Review Inputs #";
-                    let mut bytes = [0u8; 25];
+                    let prefix = b"Inputs #";
+                    let mut bytes = [0u8; 18];
                     bytes[..prefix.len()].copy_from_slice(prefix);
                     let mut index = prefix.len();
                     let input_from_index = I32::unsafe_from(last_input_index).to_str(&mut bytes[index..]);
@@ -468,7 +468,7 @@ impl TxReviewer {
             name: "Tx ID",
             value: hex_str,
         }];
-        review(&fields, "Review Tx ID")
+        review(&fields, "Tx ID")
     }
 }
 
