@@ -418,7 +418,7 @@ impl TxReviewer {
                 value: token_id,
             },
             Field {
-                name: "Amount",
+                name: "Token Amount",
                 value: token_amount,
             },
         ];
