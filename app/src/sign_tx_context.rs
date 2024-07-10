@@ -75,7 +75,7 @@ impl SignTxContext {
         while !buffer.is_empty() {
             match self.tx_decoder.step(buffer) {
                 Ok(true) => {
-                    tx_reviewer.review_tx_details(&self.tx_decoder.inner, &self.temp_data)?;
+                    tx_reviewer.review_tx_details(&self.tx_decoder.inner, &self.path, &self.temp_data)?;
                     self.temp_data.reset();
                     if self.tx_decoder.inner.is_complete() {
                         self.current_step = DecodeStep::Complete;

@@ -1,7 +1,5 @@
 use crate::{
-    blake2b_hasher::Blake2bHasher,
-    error_code::ErrorCode,
-    nvm_buffer::{NVMData, NVMBuffer, NVM, NVM_DATA_SIZE},
+    blake2b_hasher::Blake2bHasher, error_code::ErrorCode, nvm_buffer::{NVMBuffer, NVMData, NVM, NVM_DATA_SIZE}, public_key::{derive_pub_key_by_path, hash_of_public_key}
 };
 use core::str::from_utf8;
 use ledger_device_sdk::ui::{
@@ -19,7 +17,7 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 pub struct TxReviewer {
     data: &'static mut NVMData<NVM<NVM_DATA_SIZE>>,
     index: usize,
-    last_input: Option<InputInfo>,
+    previous_input: Option<InputInfo>,
 }
 
 impl TxReviewer {
@@ -28,7 +26,7 @@ impl TxReviewer {
             Self {
                 data: &mut DATA,
                 index: 0,
-                last_input: None,
+                previous_input: None,
             }
         }
     }
@@ -36,7 +34,7 @@ impl TxReviewer {
     #[inline]
     fn reset(&mut self) {
         self.index = 0;
-        self.last_input = None;
+        self.previous_input = None;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -176,38 +174,8 @@ impl TxReviewer {
 
     pub fn write_address(&mut self, prefix: u8, hash: &[u8; 32]) -> Result<usize, ErrorCode> {
         let mut output = [0u8; 46];
-        let str_bytes = base58_encode_inputs(&[&[prefix], &hash[..]], &mut output);
-        if str_bytes.is_none() {
-            return Err(ErrorCode::Overflow);
-        }
-        self.write_str(&str_bytes.unwrap())
-    }
-
-    fn prepare_input(
-        &mut self,
-        input: &TxInput,
-        current_index: usize,
-        temp_data: &[u8],
-    ) -> Result<InputInfo, ErrorCode> {
-        assert!(self.index == 0);
-        let length = match &input.unlock_script {
-            UnlockScript::P2PKH(public_key) => {
-                let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
-                self.write_address(0u8, &public_key_hash)?
-            }
-            UnlockScript::P2MPKH(_) => {
-                // TODO: we can't display this address, check if blind signing is enabled
-                self.write_str(b"multi-sig address")?
-            }
-            UnlockScript::P2SH(_) => {
-                let script_hash = Blake2bHasher::hash(temp_data)?;
-                self.write_address(2u8, &script_hash)?
-            }
-            UnlockScript::SameAsPrevious => panic!(), // dead branch
-            _ => panic!(), // dead branch
-        };
-
-        Ok(InputInfo { input_index: current_index as u16, length: length as u16 })
+        let str_bytes = to_base58_address(prefix, hash, &mut output)?;
+        self.write_str(str_bytes)
     }
 
     fn prepare_output(
@@ -216,6 +184,7 @@ impl TxReviewer {
         current_index: usize,
         temp_data: &[u8],
     ) -> Result<OutputIndexes, ErrorCode> {
+        assert!(self.index == 0);
         let review_message_from_index = self.index;
         let review_message_to_index =
             self.write_index_with_prefix(current_index, b"Output #")?;
@@ -306,21 +275,21 @@ impl TxReviewer {
     }
 
     fn review_inputs(&mut self, current_input_index: usize) -> Result<(), ErrorCode> {
-        match &self.last_input {
-            Some(last_input) => {
-                let last_input_index = last_input.input_index as usize;
-                let last_input_length = last_input.length as usize;
-                assert!(current_input_index > last_input_index);
-                let inputs_count = current_input_index - last_input_index;
+        match &self.previous_input {
+            Some(previous_input) => {
+                let previous_input_index = previous_input.input_index as usize;
+                let previous_input_length = previous_input.length as usize;
+                assert!(current_input_index > previous_input_index);
+                let inputs_count = current_input_index - previous_input_index;
                 let review_message_from_index = self.index;
                 let review_message_to_index = if inputs_count == 1 {
-                    self.write_index_with_prefix(last_input_index, b"Input #")?
+                    self.write_index_with_prefix(previous_input_index, b"Input #")?
                 } else {
                     let prefix = b"Inputs #";
                     let mut bytes = [0u8; 18];
                     bytes[..prefix.len()].copy_from_slice(prefix);
                     let mut index = prefix.len();
-                    let input_from_index = I32::unsafe_from(last_input_index).to_str(&mut bytes[index..]);
+                    let input_from_index = I32::unsafe_from(previous_input_index).to_str(&mut bytes[index..]);
                     if input_from_index.is_none() {
                         return Err(ErrorCode::Overflow);
                     }
@@ -335,7 +304,7 @@ impl TxReviewer {
                     index += input_to_index.unwrap().len();
                     self.write_str(&bytes[..index])?
                 };
-                let address = self.get_str_from_range((0, last_input_length))?;
+                let address = self.get_str_from_range((0, previous_input_length))?;
                 let review_message = self.get_str_from_range((review_message_from_index, review_message_to_index))?;
                 let fields = [Field {
                     name: "Address",
@@ -349,27 +318,91 @@ impl TxReviewer {
         }
     }
 
+    #[inline]
+    fn is_input_address_same_as_previous(&self, address: &[u8]) -> bool {
+        match &self.previous_input {
+            Some(previous_input) => self.read_from_range(0, previous_input.length as usize) == address,
+            None => false
+        }
+    }
+
+    fn is_same_as_device_address<'a>(
+        &self,
+        previous_address_length: usize,
+        address_bytes: &'a mut [u8],
+        path: &[u32]
+    ) -> Result<bool, ErrorCode> {
+        let previous_address = self.read_from_range(0, previous_address_length);
+        let device_public_key = derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
+        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
+        let device_address = to_base58_address(0u8, &public_key_hash, address_bytes)?;
+        Ok(previous_address == device_address)
+    }
+
+    #[inline]
+    fn update_previous_input(&mut self, input_index: usize, address: &[u8]) {
+        let _ = self.write_str(address);
+        self.previous_input = Some(InputInfo { input_index: input_index as u16, length: address.len() as u16 });
+    }
+
     pub fn review_input(
         &mut self,
         input: &TxInput,
         current_index: usize,
         input_size: usize,
+        path: &[u32],
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
-        let is_last_input = current_index == input_size - 1;
-        match &input.unlock_script {
-            UnlockScript::SameAsPrevious => {
-                if is_last_input {
-                    return self.review_inputs(input_size);
-                } else {
-                    return Ok(());
-                }
+        assert!(current_index < input_size);
+        let mut address_bytes = [0u8; 46];
+        let mut address_length = 0;
+        let is_same_as_previous = match &input.unlock_script {
+            UnlockScript::P2PKH(public_key) => {
+                let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
+                let address = to_base58_address(0u8, &public_key_hash, &mut address_bytes)?;
+                address_length = address.len();
+                self.is_input_address_same_as_previous(address)
             }
-            _ => self.review_inputs(current_index)?
+            UnlockScript::P2MPKH(_) => {
+                let multisig_address = b"multi-sig-address";
+                address_bytes.copy_from_slice(multisig_address);
+                address_length = multisig_address.len();
+                false
+            }
+            UnlockScript::P2SH(_) => {
+                let script_hash = Blake2bHasher::hash(temp_data)?;
+                let address = to_base58_address(2u8, &script_hash, &mut address_bytes)?;
+                address_length = address.len();
+                self.is_input_address_same_as_previous(address)
+            }
+            UnlockScript::SameAsPrevious => true,
+            _ => panic!()
+        };
+
+        let is_current_input_the_last_one = current_index == input_size - 1;
+        if is_same_as_previous && !is_current_input_the_last_one {
+            return Ok(());
         }
 
-        self.last_input = Some(self.prepare_input(input, current_index, temp_data)?);
-        if current_index == input_size - 1 {
+        if is_same_as_previous && is_current_input_the_last_one {
+            assert!(self.previous_input.is_some());
+            let previous_input = self.previous_input.as_ref().unwrap();
+            if previous_input.input_index == 0 && self.is_same_as_device_address(previous_input.length as usize, &mut address_bytes, path)? {
+                // No need to display inputs if all inputs come from the device address
+                self.reset();
+                return Ok(());
+            }
+            return self.review_inputs(input_size);
+        }
+
+        self.review_inputs(current_index)?;
+        self.update_previous_input(current_index, &address_bytes[..address_length]);
+        if input_size == 1 && self.is_same_as_device_address(address_length, &mut address_bytes, path)? {
+            self.reset();
+            return Ok(());
+        }
+
+        if is_current_input_the_last_one {
             self.review_inputs(input_size)
         } else {
             Ok(())
@@ -401,7 +434,9 @@ impl TxReviewer {
         };
         if token.is_none() {
             let fields = [address_field, alph_amount_field];
-            return review(&fields, review_message);
+            review(&fields, review_message)?;
+            self.reset();
+            return Ok(());
         }
 
         let TokenIndexes {
@@ -427,7 +462,12 @@ impl TxReviewer {
         Ok(())
     }
 
-    pub fn review_tx_details(&mut self, unsigned_tx: &UnsignedTx, temp_data: &NVMBuffer<'static, NVM_DATA_SIZE>) -> Result<(), ErrorCode> {
+    pub fn review_tx_details(
+        &mut self,
+        unsigned_tx: &UnsignedTx,
+        path: &[u32],
+        temp_data: &NVMBuffer<'static, NVM_DATA_SIZE>
+    ) -> Result<(), ErrorCode> {
         match unsigned_tx {
             UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
             UnsignedTx::GasAmount(amount) => Self::review_gas_amount(amount),
@@ -439,6 +479,7 @@ impl TxReviewer {
                         current_input.unwrap(),
                         inputs.current_index as usize,
                         inputs.size(),
+                        path,
                         temp_data.read()?,
                     )
                 } else {
@@ -519,5 +560,15 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
         Ok(())
     } else {
         Err(ErrorCode::UserCancelled)
+    }
+}
+
+#[inline]
+fn to_base58_address<'a>(prefix: u8, hash: &[u8; 32], output: &'a mut [u8]) -> Result<&'a [u8], ErrorCode> {
+    let str_bytes = base58_encode_inputs(&[&[prefix], &hash[..]], output);
+    if str_bytes.is_none() {
+        Err(ErrorCode::Overflow)
+    } else {
+        Ok(str_bytes.unwrap())
     }
 }

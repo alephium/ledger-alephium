@@ -2,7 +2,7 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
 use utils::{djb_hash, xor_bytes};
-use crate::blake2b_hasher::Blake2bHasher;
+use crate::blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE};
 use crate::debug::print::{println, println_slice};
 use crate::error_code::ErrorCode;
 
@@ -32,7 +32,7 @@ pub fn derive_pub_key(
   }
 }
 
-fn derive_pub_key_by_path(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
+pub fn derive_pub_key_by_path(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Reply> {
   let pk = Secp256k1::derive_from_path(path)
       .public_key()
       .map_err(|x| Reply(0x6eu16 | (x as u16 & 0xff)))?;
@@ -55,7 +55,7 @@ fn derive_pub_key_for_group(
   }
 }
 
-fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
+pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
   assert!(pub_key.len() == 65);
   println("pub_key 65");
   println_slice::<130>(pub_key);
@@ -69,7 +69,11 @@ fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
   println("compressed");
   println_slice::<66>(&compressed);
 
-  let pub_key_hash = Blake2bHasher::hash(&compressed).unwrap();
+  Blake2bHasher::hash(&compressed).unwrap()
+}
+
+fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
+  let pub_key_hash = hash_of_public_key(pub_key);
   println("blake2b done");
   let script_hint = djb_hash(&pub_key_hash) | 1;
   println("hint done");

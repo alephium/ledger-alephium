@@ -15,6 +15,7 @@ pub enum ErrorCode {
     Overflow = 0xE002,
     HDPathDecodingFailed = 0xE003,
     BlindSigningDisabled = 0xE004,
+    DerivingPublicKeyFailed = 0xE005,
     InternalError = 0xEF00,
 }
 
