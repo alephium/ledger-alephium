@@ -275,7 +275,7 @@ impl TxReviewer {
             name: "Network",
             value: network_type,
         }];
-        review(&fields, "Network")
+        review(&fields, "Network ")
     }
 
     pub fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
@@ -289,7 +289,7 @@ impl TxReviewer {
             name: "Gas Amount",
             value,
         }];
-        review(&fields, "Gas Amount")
+        review(&fields, "Gas Amount ")
     }
 
     pub fn review_gas_price(&mut self, gas_price: &U256) -> Result<(), ErrorCode> {
@@ -300,7 +300,7 @@ impl TxReviewer {
             name: "Gas Price",
             value,
         }];
-        review(&fields, "Gas Price")?;
+        review(&fields, "Gas Price ")?;
         self.reset();
         Ok(())
     }
@@ -505,7 +505,7 @@ fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
 }
 
 fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
-    let review_messages = [review_message];
+    let review_messages = ["Review ", review_message];
     let review = MultiFieldReview::new(
         fields,
         &review_messages,
