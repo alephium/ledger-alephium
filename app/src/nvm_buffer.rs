@@ -18,9 +18,9 @@ impl<const N: usize> NVM<N> {
         unsafe {
             let dst = self.0[from..].as_mut_ptr() as *mut _;
             let src = slice.as_ptr() as *mut u8 as *mut _;
-            nvm_write(dst, src, len as u32); // TODO: handle error properly
+            nvm_write(dst, src, len as u32);
 
-            debug_assert_eq!(&self.0[from..], &slice[..]);
+            assert_eq!(&self.0[from..(from+len)], &slice[..]);
         };
         return true;
     }
