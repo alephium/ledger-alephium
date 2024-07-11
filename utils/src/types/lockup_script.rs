@@ -225,8 +225,7 @@ mod tests {
         while length < bytes.len() {
             let remain = bytes.len() - length;
             let size = random_usize(0, remain);
-            let mut buffer =
-                Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
             length += size;
 
             let result = decoder.decode(&mut buffer).unwrap();

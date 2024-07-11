@@ -5,6 +5,7 @@ use crate::error_code::ErrorCode;
 
 pub const NVM_DATA_SIZE: usize = 2048;
 
+#[allow(clippy::upper_case_acronyms)]
 #[repr(align(64))]
 pub struct NVM<const N: usize>(pub [u8; N]);
 
@@ -24,9 +25,9 @@ impl<const N: usize> NVM<N> {
             let src = slice.as_ptr() as *mut u8 as *mut _;
             nvm_write(dst, src, len as u32);
 
-            assert_eq!(&self.0[from..(from+len)], &slice[..]);
+            assert_eq!(&self.0[from..(from + len)], slice);
         };
-        return true;
+        true
     }
 }
 
@@ -147,7 +148,7 @@ impl<'a, const N: usize> Writable for NVMBuffer<'a, N> {
     fn write(&mut self, bytes: &[u8]) {
         match self.data.write_from(self.index, bytes) {
             Ok(()) => self.index += bytes.len(),
-            Err(_) => self.index = N + 1
+            Err(_) => self.index = N + 1,
         }
     }
 }

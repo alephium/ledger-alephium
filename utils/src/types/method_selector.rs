@@ -42,7 +42,10 @@ pub mod tests {
             }
 
             let mut buffer = Buffer::new(&bytes[(bytes.len() - step)..], &mut temp_data).unwrap();
-            assert_eq!(decoder.decode(&mut buffer), Ok(Some(&MethodSelector(number))));
+            assert_eq!(
+                decoder.decode(&mut buffer),
+                Ok(Some(&MethodSelector(number)))
+            );
         }
     }
 }

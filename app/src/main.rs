@@ -18,9 +18,9 @@ mod blind_signing;
 mod debug;
 mod error_code;
 mod nvm_buffer;
+mod public_key;
 mod sign_tx_context;
 mod tx_reviewer;
-mod public_key;
 
 use debug::print::{println, println_slice};
 use ledger_device_sdk::io;

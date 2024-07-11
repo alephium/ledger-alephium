@@ -26,7 +26,7 @@ impl Blake2bHasher {
             cx_hash_update(
                 &mut self.0 as *mut cx_blake2b_s as *mut cx_hash_t,
                 input.as_ptr(),
-                input.len() as usize,
+                input.len(),
             )
         };
         if rc == CX_OK {

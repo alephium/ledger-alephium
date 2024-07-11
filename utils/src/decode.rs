@@ -83,10 +83,7 @@ impl<T: Default> Default for PartialDecoder<T> {
 }
 
 impl<T: RawDecoder> PartialDecoder<T> {
-    pub fn step<'a, W: Writable>(
-        &mut self,
-        buffer: &mut Buffer<'a, W>,
-    ) -> DecodeResult<bool> {
+    pub fn step<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<bool> {
         if buffer.is_empty() {
             return Ok(false);
         }

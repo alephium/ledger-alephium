@@ -1,8 +1,8 @@
 // auto-generated, do not edit
 use super::*;
-use crate::types::method_selector::MethodSelector;
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
+use crate::types::method_selector::MethodSelector;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Instr {
     CallLocal(Byte),
@@ -199,7 +199,7 @@ pub enum Instr {
     CreateMapEntry(Byte, Byte),
     MethodSelector(MethodSelector),
     CallExternalBySelector(MethodSelector),
-    Unknown
+    Unknown,
 }
 impl Reset for Instr {
     fn reset(&mut self) {
@@ -408,7 +408,7 @@ impl Instr {
             210 => Some(Self::CreateMapEntry(Byte::default(), Byte::default())),
             211 => Some(Self::MethodSelector(MethodSelector::default())),
             212 => Some(Self::CallExternalBySelector(MethodSelector::default())),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -452,7 +452,7 @@ impl RawDecoder for Instr {
                     return Err(DecodeError::InvalidData);
                 }
                 *self = result.unwrap();
-            },
+            }
             _ => (),
         };
         match self {
@@ -471,7 +471,13 @@ impl RawDecoder for Instr {
             Self::LoadMutField(v0) => v0.decode(buffer, stage),
             Self::StoreMutField(v0) => v0.decode(buffer, stage),
             Self::LoadImmField(v0) => v0.decode(buffer, stage),
-            Self::CreateMapEntry(v0, v1) => if stage.step < v0.step_size() { v0.decode(buffer, stage) } else { v1.decode(buffer, stage) },
+            Self::CreateMapEntry(v0, v1) => {
+                if stage.step < v0.step_size() {
+                    v0.decode(buffer, stage)
+                } else {
+                    v1.decode(buffer, stage)
+                }
+            }
             Self::MethodSelector(v0) => v0.decode(buffer, stage),
             Self::CallExternalBySelector(v0) => v0.decode(buffer, stage),
             Self::Unknown => Err(DecodeError::InternalError),

@@ -5,7 +5,7 @@ use ledger_device_sdk::ui::gadgets::MessageScroller;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::blind_signing::is_blind_signing_enabled;
-use crate::nvm_buffer::{NVMData, NVMBuffer, NVM, NVM_DATA_SIZE};
+use crate::nvm_buffer::{NVMBuffer, NVMData, NVM, NVM_DATA_SIZE};
 use crate::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
@@ -67,15 +67,19 @@ impl SignTxContext {
         Ok(signature)
     }
 
-    fn _decode_tx<'a>(
+    fn _decode_tx(
         &mut self,
-        buffer: &mut Buffer<'a, NVMBuffer<'static, NVM_DATA_SIZE>>,
+        buffer: &mut Buffer<'_, NVMBuffer<'static, NVM_DATA_SIZE>>,
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {
             match self.tx_decoder.step(buffer) {
                 Ok(true) => {
-                    tx_reviewer.review_tx_details(&self.tx_decoder.inner, &self.path, &self.temp_data)?;
+                    tx_reviewer.review_tx_details(
+                        &self.tx_decoder.inner,
+                        &self.path,
+                        &self.temp_data,
+                    )?;
                     self.temp_data.reset();
                     if self.tx_decoder.inner.is_complete() {
                         self.current_step = DecodeStep::Complete;
@@ -117,7 +121,8 @@ impl SignTxContext {
                     }
                     self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
-                    if tx_data[2] == 0x01 { // if this tx calls contract
+                    if tx_data[2] == 0x01 {
+                        // if this tx calls contract
                         check_blind_signing()?;
                     }
                     self.decode_tx(tx_data, tx_reviewer)

@@ -166,8 +166,8 @@ mod tests {
             (((size >> 24) & 0xff) as u8) + 0x80,
             ((size >> 16) & 0xff) as u8,
             ((size >> 8) & 0xff) as u8,
-            (size & 0xff) as u8
-        ]
+            (size & 0xff) as u8,
+        ];
     }
 
     #[test]
