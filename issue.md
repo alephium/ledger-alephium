@@ -2,7 +2,7 @@ After upgrading from ledger rust sdk `1.4.1` to `1.11.1`, we encountered display
 
 To reproduce:
 
-1. `make release`
+1. `make build-debug`
 2. `make run-speculos-nanosplus`
 3. `cd js/docker && docker compose up`
 4. `cd js && npm install && npm run test -- test/speculos.test.ts`

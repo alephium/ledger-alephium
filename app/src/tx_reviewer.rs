@@ -2,6 +2,7 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     nvm_buffer::{NVMData, NVM},
+    debug::print::println,
 };
 use core::str::from_utf8;
 use ledger_device_sdk::ui::{
@@ -434,6 +435,8 @@ fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
 }
 
 fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
+    println(&review_message);
+
     let review_messages = [review_message];
     let review = MultiFieldReview::new(
         fields,
