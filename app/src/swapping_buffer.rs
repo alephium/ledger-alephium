@@ -1,3 +1,4 @@
+// This code is inspired by code from zondax: https://github.com/Zondax/ledger-rust/blob/main/bolos/src/swapping_buffer.rs
 use utils::buffer::Writable;
 
 use crate::{
