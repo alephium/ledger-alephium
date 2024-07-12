@@ -4,10 +4,10 @@ use crate::{
     nvm_buffer::{NVMData, NVM},
 };
 use core::str::from_utf8;
-use ledger_device_sdk::ui::{
+use ledger_device_sdk::{testing::debug_print, ui::{
     bitmaps::{CHECKMARK, CROSS, EYE},
     gadgets::{Field, MultiFieldReview},
-};
+}};
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
     types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, I32, U256},
@@ -235,9 +235,19 @@ impl TxReviewer {
         current_index: usize,
         temp_data: &[u8],
     ) -> Result<OutputIndexes, ErrorCode> {
+        debug_print("============== prepare output\n");
         let review_message_from_index = self.index;
+        let prefix = b"Review Output #";
+        match bytes_to_string(prefix) {
+            Err(_) => debug_print("error\n"),
+            Ok(str) => {
+                debug_print("prefix\n");
+                debug_print(str);
+                debug_print("\n");
+            }
+        }
         let review_message_to_index =
-            self.write_index_with_prefix(current_index, b"Review Output #")?;
+            self.write_index_with_prefix(current_index, prefix)?;
 
         let alph_amount_from_index = self.index;
         let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
@@ -347,12 +357,14 @@ impl TxReviewer {
         current_index: usize,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
+        debug_print("========== review output 0000 =========\n");
         let OutputIndexes {
             review_message,
             alph_amount,
             address,
             token,
         } = self.prepare_output(output, current_index, temp_data)?;
+        debug_print("========== review output 1111 =========\n");
         let review_message = self.get_str_from_range(review_message)?;
         let alph_amount = self.get_str_from_range(alph_amount)?;
         let address = self.get_str_from_range(address)?;
