@@ -1,5 +1,7 @@
+use crate::decode::{DecodeError, DecodeResult};
+
 pub trait Writable {
-    fn write(&mut self, bytes: &[u8]);
+    fn write(&mut self, bytes: &[u8]) -> bool;
 }
 
 pub struct Buffer<'a, W> {
@@ -48,7 +50,12 @@ impl<'a, W> Buffer<'a, W> {
 }
 
 impl<'a, W: Writable> Buffer<'a, W> {
-    pub fn write_bytes_to_temp_data(&self, bytes: &[u8]) {
-        unsafe { self.temp_data.as_mut().unwrap().write(bytes) };
+    pub fn write_bytes_to_temp_data(&self, bytes: &[u8]) -> DecodeResult<()> {
+        let is_ok = unsafe { self.temp_data.as_mut().unwrap().write(bytes) };
+        if is_ok {
+            Ok(())
+        } else {
+            Err(DecodeError::Overflow)
+        }
     }
 }

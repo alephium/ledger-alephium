@@ -5,6 +5,7 @@ pub enum DecodeError {
     InvalidSize,
     InvalidData,
     InternalError,
+    Overflow,
 }
 
 pub type DecodeResult<T> = Result<T, DecodeError>;

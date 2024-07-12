@@ -5,7 +5,8 @@ use ledger_device_sdk::ui::gadgets::MessageScroller;
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::blind_signing::is_blind_signing_enabled;
-use crate::nvm_buffer::{NVMBuffer, NVMData, NVM, NVM_DATA_SIZE};
+use crate::nvm::{NVMData, NVM, NVM_DATA_SIZE};
+use crate::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
@@ -27,7 +28,7 @@ pub struct SignTxContext {
     tx_decoder: PartialDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
-    temp_data: NVMBuffer<'static, NVM_DATA_SIZE>,
+    temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
 }
 
 impl SignTxContext {
@@ -37,7 +38,7 @@ impl SignTxContext {
             tx_decoder: PartialDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
-            temp_data: unsafe { NVMBuffer::new(&mut DATA) },
+            temp_data: unsafe { SwappingBuffer::new(&mut DATA) },
         }
     }
 
@@ -69,7 +70,7 @@ impl SignTxContext {
 
     fn _decode_tx(
         &mut self,
-        buffer: &mut Buffer<'_, NVMBuffer<'static, NVM_DATA_SIZE>>,
+        buffer: &mut Buffer<'_, SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>>,
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {

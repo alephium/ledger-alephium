@@ -41,10 +41,11 @@ impl TempData {
 }
 
 impl Writable for TempData {
-    fn write(&mut self, bytes: &[u8]) {
+    fn write(&mut self, bytes: &[u8]) -> bool {
         for byte in bytes {
             self.write_byte(*byte)
         }
+        true
     }
 }
 

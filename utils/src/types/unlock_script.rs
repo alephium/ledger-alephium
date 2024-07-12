@@ -54,7 +54,7 @@ impl RawDecoder for P2SH {
                 let result = self.0.decode(buffer, stage);
                 let to_index = buffer.get_index();
                 let bytes = buffer.get_range(from_index, to_index);
-                buffer.write_bytes_to_temp_data(bytes);
+                buffer.write_bytes_to_temp_data(bytes)?;
                 result
             }
             _ => self.1.decode(buffer, stage),

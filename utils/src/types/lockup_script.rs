@@ -30,7 +30,7 @@ impl RawDecoder for P2MPKH {
         let result = match stage.step {
             0 => {
                 if stage.index == 0 {
-                    buffer.write_bytes_to_temp_data(&[1u8]); // write prefix
+                    buffer.write_bytes_to_temp_data(&[1u8])?; // write prefix
                 }
                 self.size.decode(buffer, stage)
             }
@@ -57,7 +57,7 @@ impl RawDecoder for P2MPKH {
             Err(err) => Err(err),
             Ok(value) => {
                 let to_index = buffer.get_index();
-                buffer.write_bytes_to_temp_data(&buffer.get_range(from_index, to_index));
+                buffer.write_bytes_to_temp_data(&buffer.get_range(from_index, to_index))?;
                 Ok(value)
             }
         }

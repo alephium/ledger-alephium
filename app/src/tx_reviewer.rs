@@ -1,8 +1,9 @@
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
-    nvm_buffer::{NVMBuffer, NVMData, NVM, NVM_DATA_SIZE},
+    nvm::{NVMData, NVM, NVM_DATA_SIZE},
     public_key::{derive_pub_key_by_path, hash_of_public_key},
+    swapping_buffer::{SwappingBuffer, RAM_SIZE},
 };
 use core::str::from_utf8;
 use ledger_device_sdk::ui::{
@@ -18,55 +19,39 @@ use utils::{
 static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 pub struct TxReviewer {
-    data: &'static mut NVMData<NVM<NVM_DATA_SIZE>>,
-    index: usize,
+    buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     previous_input: Option<InputInfo>,
 }
 
 impl TxReviewer {
     pub fn new() -> Self {
-        unsafe {
-            Self {
-                data: &mut DATA,
-                index: 0,
-                previous_input: None,
-            }
+        Self {
+            buffer: unsafe { SwappingBuffer::new(&mut DATA) },
+            previous_input: None,
         }
     }
 
     #[inline]
     fn reset(&mut self) {
-        self.index = 0;
+        self.buffer.reset();
         self.previous_input = None;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 33];
         let amount_str = u256.to_alph(&mut amount_output).unwrap();
-        self.write_str(amount_str)
+        self.buffer.write(amount_str)
     }
 
     fn write_token_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 78]; // u256 max
         let amount_str = u256.to_str(&mut amount_output).unwrap();
-        self.write_str(amount_str)
-    }
-
-    fn write_str(&mut self, str: &[u8]) -> Result<usize, ErrorCode> {
-        let size = get_memory_size(str.len());
-        self.data.write_from(self.index, str)?;
-        let to_index = self.index + str.len();
-        self.index += size;
-        Ok(to_index)
+        self.buffer.write(amount_str)
     }
 
     fn write_token_id(&mut self, token_id: &Byte32) -> Result<usize, ErrorCode> {
         let hex_str: [u8; 64] = utils::to_hex(&token_id.0).unwrap();
-        self.write_str(&hex_str)
-    }
-
-    fn read_from_range(&self, from_index: usize, to_index: usize) -> &[u8] {
-        &self.data.get_ref().0[from_index..to_index]
+        self.buffer.write(&hex_str)
     }
 
     fn update_with_carry(
@@ -79,13 +64,13 @@ impl TxReviewer {
         let mut from_index = from;
         let mut new_carry = carry;
         while from_index < to {
-            let stored = self.read_from_range(from_index, from_index + 64);
+            let stored = self.buffer.read(from_index, from_index + 64);
             for index in 0..64 {
                 new_carry += (stored[index] as usize) << 8;
                 bytes[index] = (new_carry % 58) as u8;
                 new_carry /= 58;
             }
-            self.data.write_from(from_index, &bytes)?;
+            self.buffer.write_from(from_index, &bytes)?;
             bytes = [0; 64];
             from_index += 64;
         }
@@ -93,31 +78,30 @@ impl TxReviewer {
     }
 
     fn finalize_multi_sig(&mut self, from: usize, to: usize) -> Result<(), ErrorCode> {
-        assert!(to - from > 64);
         let mut temp0 = [0u8; 64];
         let mut temp1 = [0u8; 64];
         let mut begin = from;
         let mut end = to;
         while begin < end {
             if (end - begin) <= 64 {
-                let stored = self.read_from_range(begin, end);
+                let stored = self.buffer.read(begin, end);
                 let length = end - begin;
                 for i in 0..length {
                     temp0[length - i - 1] = ALPHABET[stored[i] as usize];
                 }
-                self.data.write_from(begin, &temp0[..length])?;
+                self.buffer.update(begin, &temp0[..length]);
                 return Ok(());
             }
 
-            let left = self.read_from_range(begin, begin + 64);
-            let right = self.read_from_range(end - 64, end);
+            let left = self.buffer.read(begin, begin + 64);
+            let right = self.buffer.read(end - 64, end);
             for i in 0..64 {
                 let index = 64 - i - 1;
                 temp0[index] = ALPHABET[left[i] as usize];
                 temp1[index] = ALPHABET[right[i] as usize];
             }
-            self.data.write_from(begin, &temp1)?;
-            self.data.write_from(end - 64, &temp0)?;
+            self.buffer.update(begin, &temp1);
+            self.buffer.update(end - 64, &temp0);
             end -= 64;
             begin += 64;
         }
@@ -126,7 +110,7 @@ impl TxReviewer {
 
     // This function only for multi-sig address, which has no leading zeros
     pub fn write_multi_sig(&mut self, input: &[u8]) -> Result<usize, ErrorCode> {
-        let from_index = self.index;
+        let from_index = self.buffer.get_index();
         let mut output_length = 0;
         let mut output_index = 0;
         let mut output = [0u8; 64];
@@ -142,7 +126,7 @@ impl TxReviewer {
             }
             while carry > 0 {
                 if (output_index - output_length) == output.len() {
-                    self.data.write_from(from_index + output_length, &output)?;
+                    self.buffer.write_from(from_index + output_length, &output)?;
                     output = [0u8; 64];
                     output_length += 64;
                 }
@@ -152,15 +136,13 @@ impl TxReviewer {
             }
         }
 
-        self.data.write_from(
+        self.buffer.write_from(
             from_index + output_length,
             &output[..(output_index - output_length)],
         )?;
-        self.finalize_multi_sig(from_index, from_index + output_index)?;
-
-        let result = from_index + output_index;
-        self.index += get_memory_size(output_index);
-        Ok(result)
+        let to_index = from_index + output_index;
+        self.finalize_multi_sig(from_index, to_index)?;
+        Ok(to_index)
     }
 
     fn write_index_with_prefix(&mut self, index: usize, prefix: &[u8]) -> Result<usize, ErrorCode> {
@@ -172,13 +154,13 @@ impl TxReviewer {
             return Err(ErrorCode::Overflow);
         }
         let total_size = prefix.len() + num_str_bytes.unwrap().len();
-        self.write_str(&output[..total_size])
+        self.buffer.write(&output[..total_size])
     }
 
     pub fn write_address(&mut self, prefix: u8, hash: &[u8; 32]) -> Result<usize, ErrorCode> {
         let mut output = [0u8; 46];
         let str_bytes = to_base58_address(prefix, hash, &mut output)?;
-        self.write_str(str_bytes)
+        self.buffer.write(str_bytes)
     }
 
     fn prepare_output(
@@ -187,14 +169,13 @@ impl TxReviewer {
         current_index: usize,
         temp_data: &[u8],
     ) -> Result<OutputIndexes, ErrorCode> {
-        assert!(self.index == 0);
-        let review_message_from_index = self.index;
+        let review_message_from_index = self.buffer.get_index();
         let review_message_to_index = self.write_index_with_prefix(current_index, b"Output #")?;
 
-        let alph_amount_from_index = self.index;
+        let alph_amount_from_index = self.buffer.get_index();
         let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
 
-        let address_from_index = self.index;
+        let address_from_index = self.buffer.get_index();
         let address_to_index = match &output.lockup_script {
             LockupScript::P2PKH(hash) | LockupScript::P2SH(hash) => {
                 self.write_address(output.lockup_script.get_type(), &hash.0)?
@@ -215,15 +196,15 @@ impl TxReviewer {
 
         // Asset output has at most one token
         let token = output.tokens.get_current_item().unwrap();
-        let token_id_from_index = self.index;
-        let token_id_to_address = self.write_token_id(&token.id)?;
+        let token_id_from_index = self.buffer.get_index();
+        let token_id_to_index = self.write_token_id(&token.id)?;
 
-        let token_amount_from_index = self.index;
+        let token_amount_from_index = self.buffer.get_index();
         let token_amount_to_index = self.write_token_amount(&token.amount)?;
 
         Ok(OutputIndexes {
             token: Some(TokenIndexes {
-                token_id: (token_id_from_index, token_id_to_address),
+                token_id: (token_id_from_index, token_id_to_index),
                 token_amount: (token_amount_from_index, token_amount_to_index),
             }),
             ..output_indexes
@@ -231,7 +212,7 @@ impl TxReviewer {
     }
 
     fn get_str_from_range(&self, range: (usize, usize)) -> Result<&str, ErrorCode> {
-        let bytes = self.read_from_range(range.0, range.1);
+        let bytes = self.buffer.read(range.0, range.1);
         bytes_to_string(bytes)
     }
 
@@ -264,7 +245,7 @@ impl TxReviewer {
     }
 
     pub fn review_gas_price(&mut self, gas_price: &U256) -> Result<(), ErrorCode> {
-        let from_index = self.index;
+        let from_index = self.buffer.get_index();
         let to_index = self.write_alph_amount(gas_price)?;
         let value = self.get_str_from_range((from_index, to_index))?;
         let fields = [Field {
@@ -283,7 +264,7 @@ impl TxReviewer {
                 let previous_input_length = previous_input.length as usize;
                 assert!(current_input_index > previous_input_index);
                 let inputs_count = current_input_index - previous_input_index;
-                let review_message_from_index = self.index;
+                let review_message_from_index = self.buffer.get_index();
                 let review_message_to_index = if inputs_count == 1 {
                     self.write_index_with_prefix(previous_input_index, b"Input #")?
                 } else {
@@ -306,7 +287,7 @@ impl TxReviewer {
                         return Err(ErrorCode::Overflow);
                     }
                     index += input_to_index.unwrap().len();
-                    self.write_str(&bytes[..index])?
+                    self.buffer.write(&bytes[..index])?
                 };
                 let address = self.get_str_from_range((0, previous_input_length))?;
                 let review_message =
@@ -326,9 +307,7 @@ impl TxReviewer {
     #[inline]
     fn is_input_address_same_as_previous(&self, address: &[u8]) -> bool {
         match &self.previous_input {
-            Some(previous_input) => {
-                self.read_from_range(0, previous_input.length as usize) == address
-            }
+            Some(previous_input) => self.buffer.read(0, previous_input.length as usize) == address,
             None => false,
         }
     }
@@ -339,7 +318,7 @@ impl TxReviewer {
         address_bytes: &mut [u8],
         path: &[u32],
     ) -> Result<bool, ErrorCode> {
-        let previous_address = self.read_from_range(0, previous_address_length);
+        let previous_address = self.buffer.read(0, previous_address_length);
         let device_public_key =
             derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
         let public_key_hash = hash_of_public_key(device_public_key.as_ref());
@@ -349,7 +328,7 @@ impl TxReviewer {
 
     #[inline]
     fn update_previous_input(&mut self, input_index: usize, address: &[u8]) {
-        let _ = self.write_str(address);
+        let _ = self.buffer.write(address);
         self.previous_input = Some(InputInfo {
             input_index: input_index as u16,
             length: address.len() as u16,
@@ -485,7 +464,7 @@ impl TxReviewer {
         &mut self,
         unsigned_tx: &UnsignedTx,
         path: &[u32],
-        temp_data: &NVMBuffer<'static, NVM_DATA_SIZE>,
+        temp_data: &SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {
             UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
@@ -498,7 +477,7 @@ impl TxReviewer {
                         inputs.current_index as usize,
                         inputs.size(),
                         path,
-                        temp_data.read()?,
+                        temp_data.read_all(),
                     )
                 } else {
                     Ok(())
@@ -509,7 +488,7 @@ impl TxReviewer {
                     self.review_output(
                         current_output,
                         outputs.current_index as usize,
-                        temp_data.read()?,
+                        temp_data.read_all(),
                     )
                 } else {
                     Ok(())
@@ -545,16 +524,6 @@ pub struct OutputIndexes {
 pub struct TokenIndexes {
     pub token_id: (usize, usize),
     pub token_amount: (usize, usize),
-}
-
-// https://developers.ledger.com/docs/device-app/architecture/memory/persistent-storage#flash-memory-endurance
-fn get_memory_size(num: usize) -> usize {
-    let remainder = num % 64;
-    if remainder == 0 {
-        num
-    } else {
-        num + (64 - remainder)
-    }
 }
 
 #[inline]

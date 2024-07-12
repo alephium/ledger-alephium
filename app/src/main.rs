@@ -17,9 +17,10 @@ mod blake2b_hasher;
 mod blind_signing;
 mod debug;
 mod error_code;
-mod nvm_buffer;
+mod nvm;
 mod public_key;
 mod sign_tx_context;
+mod swapping_buffer;
 mod tx_reviewer;
 
 use debug::print::{println, println_slice};

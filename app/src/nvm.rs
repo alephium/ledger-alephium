@@ -1,5 +1,4 @@
 use ledger_secure_sdk_sys::nvm_write;
-use utils::buffer::Writable;
 
 use crate::error_code::ErrorCode;
 
@@ -108,44 +107,6 @@ impl<const N: usize> NVMData<NVM<N>> {
             Ok(())
         } else {
             Err(ErrorCode::Overflow)
-        }
-    }
-}
-
-pub struct NVMBuffer<'a, const N: usize> {
-    data: &'a mut NVMData<NVM<N>>,
-    pub index: usize,
-}
-
-impl<'a, const N: usize> NVMBuffer<'a, N> {
-    pub fn new(data: &'a mut NVMData<NVM<N>>) -> Self {
-        Self { data, index: 0 }
-    }
-
-    pub fn read(&self) -> Result<&[u8], ErrorCode> {
-        if self.is_overflow() {
-            Err(ErrorCode::Overflow)
-        } else {
-            Ok(&self.data.get_ref().0[..self.index])
-        }
-    }
-
-    #[inline]
-    pub fn reset(&mut self) {
-        self.index = 0;
-    }
-
-    #[inline]
-    fn is_overflow(&self) -> bool {
-        self.index > N
-    }
-}
-
-impl<'a, const N: usize> Writable for NVMBuffer<'a, N> {
-    fn write(&mut self, bytes: &[u8]) {
-        match self.data.write_from(self.index, bytes) {
-            Ok(()) => self.index += bytes.len(),
-            Err(_) => self.index = N + 1,
         }
     }
 }
