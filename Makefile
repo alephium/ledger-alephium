@@ -40,7 +40,7 @@ debug:
 	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 
 _run-speculos:
-	docker run --rm -it -v $(shell pwd):/app --publish 5001:5001 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
+	docker run --rm -it -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
 		-v '/tmp/.X11-unix:/tmp/.X11-unix' --privileged ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:3.27.0 \
 		speculos -m $(device) /app/app/target/$(path)/release/app
 
@@ -61,10 +61,12 @@ clean:
 
 set-github-action:
 	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
-	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:3.27.0
-	make build-debug
+	docker pull ghcr.io/ledgerhq/speculos:0.9.5
+	make release
 	cd js/docker && docker compose up -d && cd ../..
-	make run-speculos
+	docker run -d --rm -v $(shell pwd):/speculos/app \
+		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
+		ghcr.io/ledgerhq/speculos:0.9.5 --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
 
 .PHONY: release clean
 

@@ -16,4 +16,4 @@ jobs:
         with:
           node-version: 16
       - run: make set-github-action
-      - run: cd js && npm ci && npm test
+      - run: cd js && npm ci && npm test -- --forceExit

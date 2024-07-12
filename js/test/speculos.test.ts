@@ -119,12 +119,12 @@ describe('sdk', () => {
       if (index >= 7) return
       if (index >= 3) { // outputs and signature
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(6)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(2)
+          await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
       }
@@ -143,7 +143,7 @@ describe('sdk', () => {
     expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
   it('should transfer alph to multisig address', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
@@ -170,17 +170,17 @@ describe('sdk', () => {
       if (index >= 7) return
       if (index == 3 || index == 4) { // multi-sig outputs
         setTimeout(async () => {
-          await clickAndApprove(10)
+          await clickAndApprove(11)
           approve(index + 1)
         }, 1000)
       } else if (index > 4) { // change output and signature
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(6)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(2)
+          await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
       }
@@ -199,7 +199,7 @@ describe('sdk', () => {
     expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
   it('should transfer token to multisig address', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
@@ -230,27 +230,27 @@ describe('sdk', () => {
       if (index > 7) return
       if (index <= 2) {
         setTimeout(async () => {
-          await clickAndApprove(2)
+          await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
       } else if (index === 3) { // multi-sig token output
         setTimeout(async () => {
-          await clickAndApprove(16)
+          await clickAndApprove(17)
           approve(index + 1)
         }, 1000)
       } else if (index === 4) { // multi-sig alph output
         setTimeout(async () => {
-          await clickAndApprove(10)
+          await clickAndApprove(11)
           approve(index + 1)
         }, 1000)
       } else if (index === 5) { // token change output
         setTimeout(async () => {
-          await clickAndApprove(11)
+          await clickAndApprove(12)
           approve(index + 1)
         }, 1000)
       } else if (index >= 6) { // alph change output and signature
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(6)
           approve(index + 1)
         }, 1000)
       }
@@ -275,7 +275,7 @@ describe('sdk', () => {
     expect(token.amount).toEqual('1111111111111111111111111')
 
     await app.close()
-  }, 90000)
+  }, 120000)
 
   it('should transfer from multiple inputs', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
@@ -299,12 +299,12 @@ describe('sdk', () => {
       if (index >= 6) return
       if (index >= 3) { // outputs and signature
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(6)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(2)
+          await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
       }
@@ -323,7 +323,7 @@ describe('sdk', () => {
     expect(balance < (ONE_ALPH * 1n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
   it('should transfer from different input addresses', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
@@ -378,17 +378,17 @@ describe('sdk', () => {
       if (index > 6) return
       if (index === 3 || index === 4) { // inputs
         setTimeout(async () => {
-          await clickAndApprove(4)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else if (index >= 5) { // outputs and tx id
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(6)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(2)
+          await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
       }
@@ -407,5 +407,5 @@ describe('sdk', () => {
     expect(balance).toEqual(ONE_ALPH * 3n)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 })
