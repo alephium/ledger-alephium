@@ -40,7 +40,7 @@ extern "C" {
     // access, as if it were a RAM access.
     // To force the compiler out of this assumption, we define
     // it as a function instead, but it is _not_ a function at all
-    fn _nvram_data();
+    fn _nvm_data_start();
 }
 
 /// The following is a means to correctly access data stored in NVM
@@ -70,7 +70,7 @@ impl<T> NVMData<T> {
     /// because a static mutable will be assumed to be located in
     /// RAM, and be accessed through the static base (r9)
     #[cfg(not(target_os = "nanos"))]
-    pub fn get_mut(&mut self) -> &mut T {
+    fn get_addr(&self) -> *mut T {
         use core::arch::asm;
         unsafe {
             // Compute offset in .nvm_data by taking the reference to
@@ -79,26 +79,23 @@ impl<T> NVMData<T> {
             let static_base: u32;
             asm!( "mov {}, r9", out(reg) static_base);
             let offset = (addr - static_base) as isize;
-            let data_addr = (_nvram_data as *const u8).offset(offset);
-            let pic_addr =
-                ledger_secure_sdk_sys::pic(data_addr as *mut core::ffi::c_void) as *mut T;
+            let data_addr = (_nvm_data_start as *const u8).offset(offset);
+            ledger_secure_sdk_sys::pic(data_addr as *mut core::ffi::c_void) as *mut T
+        }
+    }
+
+    #[cfg(not(target_os = "nanos"))]
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe {
+            let pic_addr = self.get_addr();
             &mut *pic_addr.cast()
         }
     }
 
     #[cfg(not(target_os = "nanos"))]
     pub fn get_ref(&self) -> &T {
-        use core::arch::asm;
         unsafe {
-            // Compute offset in .nvm_data by taking the reference to
-            // self.data and subtracting r9
-            let addr = &self.data as *const T as u32;
-            let static_base: u32;
-            asm!( "mov {}, r9", out(reg) static_base);
-            let offset = (addr - static_base) as isize;
-            let data_addr = (_nvram_data as *const u8).offset(offset);
-            let pic_addr =
-                ledger_secure_sdk_sys::pic(data_addr as *mut core::ffi::c_void) as *const T;
+            let pic_addr = self.get_addr();
             &*pic_addr.cast()
         }
     }
