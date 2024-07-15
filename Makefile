@@ -62,7 +62,7 @@ clean:
 set-github-action:
 	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 	docker pull ghcr.io/ledgerhq/speculos:0.9.5
-	make release
+	make build-debug
 	cd js/docker && docker compose up -d && cd ../..
 	docker run -d --rm -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \

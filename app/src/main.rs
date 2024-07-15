@@ -209,13 +209,11 @@ fn handle_apdu(
             if !deserialize_path(raw_path, &mut path) {
                 return Err(ErrorCode::BadLen.into());
             }
-            println_slice::<40>(raw_path);
 
             let p1 = apdu_header.p1;
             let p2 = apdu_header.p2;
             let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
 
-            println_slice::<130>(pk.as_ref());
             comm.append(pk.as_ref());
             comm.append(hd_index.to_be_bytes().as_slice());
         }
