@@ -2,7 +2,7 @@ use ledger_device_sdk::ui::{layout::{self, Draw, StringPlace}, bagls, gadgets, s
 use ledger_device_sdk::io;
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 
-use crate::{blind_signing::{is_blind_signing_enabled, update_blind_signing}, Ins};
+use crate::{settings::{is_blind_signing_enabled, update_blind_signing}, Ins};
 
 const UI_PAGE_NUM: u8 = 4;
 

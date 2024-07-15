@@ -32,3 +32,9 @@ icon = "alph_14x14.gif"
 
 [package.metadata.ledger.nanosplus]
 icon = "alph_14x14.gif"
+
+[package.metadata.ledger.stax]
+icon = "alph_14x14.gif"
+
+[package.metadata.ledger.flex]
+icon = "alph_14x14.gif"

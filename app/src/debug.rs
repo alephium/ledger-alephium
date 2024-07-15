@@ -1,3 +1,4 @@
+#[allow(unused)]
 #[cfg(feature = "debug")]
 pub mod print {
 
@@ -14,6 +15,7 @@ pub mod print {
         println(m);
     }
 
+    #[allow(unused)]
     pub fn println_array<const N: usize, const M: usize>(tab: &[u8; N]) {
         let hex: [u8; M] = utils::to_hex_fixed::<N, M>(tab).unwrap();
         let m = core::str::from_utf8(&hex).unwrap();
@@ -21,6 +23,7 @@ pub mod print {
     }
 }
 
+#[allow(unused)]
 #[cfg(feature = "device")]
 pub mod print {
     pub fn println(_s: &str) {}

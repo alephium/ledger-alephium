@@ -3,3 +3,7 @@ app.json
 app/app*.json
 nanox.hex
 nanox.json
+stax.hex
+stax.json
+flex.hex
+flex.json

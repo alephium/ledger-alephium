@@ -1,10 +1,13 @@
 use ledger_device_sdk::ecc::Secp256k1;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
-use ledger_device_sdk::ui::gadgets::MessageScroller;
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+use ledger_device_sdk::ui::gadgets::MessageValidator;
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+use ledger_device_sdk::nbgl::{NbglGenericReview, NbglPageContent, InfoLongPress, TuneIndex};
 use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
 
-use crate::blind_signing::is_blind_signing_enabled;
+use crate::settings::{is_blind_signing_enabled, update_blind_signing};
 use crate::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::tx_reviewer::TxReviewer;
@@ -142,11 +145,31 @@ impl SignTxContext {
     }
 }
 
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
 fn check_blind_signing() -> Result<(), ErrorCode> {
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let scroller = MessageScroller::new("Blind signing must be enabled");
-    scroller.event_loop();
-    Err(ErrorCode::BlindSigningDisabled)
+    let approved = MessageValidator::new(&["Blind signing must", "be enabled"], &["Approve"], &["Reject"]).ask();
+    if approved {
+        update_blind_signing();
+        Ok(())
+    } else {
+        Err(ErrorCode::BlindSigningDisabled)
+    }
+}
+
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+fn check_blind_signing() -> Result<(), ErrorCode> {
+    if is_blind_signing_enabled() {
+        return Ok(());
+    }
+    let info = InfoLongPress::new("Blind signing must be enabled", None, "Approve", TuneIndex::TapCasual);
+    let approved = NbglGenericReview::new().add_content(NbglPageContent::InfoLongPress(info)).show("Reject", "Approved", "Rejected");
+    if approved {
+        update_blind_signing();
+        Ok(())
+    } else {
+        Err(ErrorCode::BlindSigningDisabled)
+    }
 }

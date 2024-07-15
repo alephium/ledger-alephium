@@ -6,9 +6,15 @@ use crate::{
     swapping_buffer::{SwappingBuffer, RAM_SIZE},
 };
 use core::str::from_utf8;
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use ledger_device_sdk::ui::{
     bitmaps::{CHECKMARK, CROSS, EYE},
     gadgets::{Field, MultiFieldReview},
+};
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+use ledger_device_sdk::nbgl::{
+    Field, NbglGenericReview, NbglPageContent, TagValueList, TagValueConfirm,
+    CenteredInfo, CenteredInfoStyle, TuneIndex
 };
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
@@ -532,20 +538,38 @@ fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
 }
 
 fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
-    let review_messages = ["Review ", review_message];
-    let review = MultiFieldReview::new(
-        fields,
-        &review_messages,
-        Some(&EYE),
-        "Approve",
-        Some(&CHECKMARK),
-        "Reject",
-        Some(&CROSS),
-    );
-    if review.show() {
-        Ok(())
-    } else {
-        Err(ErrorCode::UserCancelled)
+    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+    {
+        let review_messages = ["Review ", review_message];
+        let review = MultiFieldReview::new(
+            fields,
+            &review_messages,
+            Some(&EYE),
+            "Approve",
+            Some(&CHECKMARK),
+            "Reject",
+            Some(&CROSS),
+        );
+        if review.show() {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    {
+        let info = CenteredInfo::new("Review", review_message, "", None, false, CenteredInfoStyle::LargeCaseInfo, 0);
+        let values = TagValueList::new(fields, 0, false, false);
+        let approved = NbglGenericReview::new()
+            .add_content(NbglPageContent::CenteredInfo(info))
+            .add_content(NbglPageContent::TagValueConfirm(TagValueConfirm::new(&values, TuneIndex::TapCasual, "Approve", "Reject")))
+            .show("Reject", "Approved", "Rejected");
+        if approved {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
     }
 }
 

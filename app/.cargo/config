@@ -12,5 +12,5 @@ target = "thumbv6m-none-eabi"
 stackcheck = "stack-sizes --release --bin app --target=thumbv6m-none-eabi"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]
 build-std-features = ["compiler-builtins-mem"]

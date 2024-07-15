@@ -2,6 +2,8 @@ release:
 	@make _release device=nanos
 	@make _release device=nanox
 	@make _release device=nanosplus
+	@make _release device=stax
+	@make _release device=flex
 
 _release:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
@@ -14,16 +16,19 @@ _release:
 			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
-build-debug:
+debug:
+	@make _debug device=nanos
+	@make _debug device=nanox
+	@make _debug device=nanosplus
+	@make _debug device=stax
+	@make _debug device=flex
+
+_debug:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
 		bash -c " \
 			cd app && \
-			echo 'Building nanos app' && \
-			cargo ledger build nanos -- --no-default-features --features debug && \
-			echo 'Building nanosplus app' && \
-			cargo ledger build nanosplus -- --no-default-features --features debug && \
-			echo 'Building nanox app' && \
-			cargo ledger build nanox -- --no-default-features --features debug \
+			echo 'Building $(device)  app' && \
+			cargo ledger build $(device) -- --no-default-features --features debug \
 		"
 
 check:
@@ -35,9 +40,6 @@ check:
 			echo 'Cargo clippy' && \
 			cargo clippy -Z build-std=core -Z build-std-features=compiler-builtins-mem --target=nanos \
 		"
-
-debug:
-	@docker run --rm -it -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 
 _run-speculos:
 	docker run --rm -it -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
@@ -56,13 +58,19 @@ run-speculos-nanosplus:
 run-speculos-nanox:
 	@make _run-speculos device=nanox path=nanox
 
+run-speculos-stax:
+	@make _run-speculos device=stax path=stax
+
+run-speculos-flex:
+	@make _run-speculos device=flex path=flex
+
 clean:
 	cd app && cargo clean
 
 set-github-action:
 	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
 	docker pull ghcr.io/ledgerhq/speculos:0.9.5
-	make build-debug
+	make debug
 	cd js/docker && docker compose up -d && cd ../..
 	docker run -d --rm -v $(shell pwd):/speculos/app \
 		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
