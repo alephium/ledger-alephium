@@ -1,21 +1,19 @@
 #![no_std]
 #![no_main]
 
-use blind_signing::is_blind_signing_enabled;
-use blind_signing::update_blind_signing;
 use debug::print::println_array;
+use display::MainPages;
 use error_code::ErrorCode;
-use ledger_device_sdk::ui::layout;
-use ledger_device_sdk::ui::layout::Draw;
-use ledger_device_sdk::ui::layout::StringPlace;
-use ledger_secure_sdk_sys::buttons::ButtonEvent;
 use public_key::derive_pub_key;
 use sign_tx_context::SignTxContext;
 use tx_reviewer::TxReviewer;
 use utils::{self, deserialize_path};
+
 mod blake2b_hasher;
 mod blind_signing;
 mod debug;
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+mod display;
 mod error_code;
 mod nvm;
 mod public_key;
@@ -25,141 +23,39 @@ mod tx_reviewer;
 
 use debug::print::{println, println_slice};
 use ledger_device_sdk::io;
-use ledger_device_sdk::ui::bagls;
-use ledger_device_sdk::ui::gadgets;
-use ledger_device_sdk::ui::screen_util;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
-
-fn show_ui_common(draw: fn() -> ()) {
-    gadgets::clear_screen();
-
-    bagls::LEFT_ARROW.display();
-    bagls::RIGHT_ARROW.display();
-
-    draw();
-
-    screen_util::screen_update();
-}
-
-fn show_ui_welcome() {
-    show_ui_common(|| {
-        let mut lines = [
-            bagls::Label::from_const("Alephium"),
-            bagls::Label::from_const("ready"),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
-    });
-}
-
-fn show_ui_blind_signing() {
-    show_ui_common(|| {
-        let mut lines = [
-            bagls::Label::from_const("Blind Signing"),
-            bagls::Label::from_const(if is_blind_signing_enabled() {
-                "enabled"
-            } else {
-                "disabled"
-            }),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
-    });
-}
-
-fn show_ui_version() {
-    show_ui_common(|| {
-        const VERSION: &str = env!("CARGO_PKG_VERSION");
-        let mut lines = [
-            bagls::Label::from_const("Version"),
-            bagls::Label::from_const(VERSION),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
-    });
-}
-
-fn show_ui_quit() {
-    show_ui_common(|| {
-        let mut lines = [bagls::Label::from_const("Quit")];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
-    });
-}
-
-fn show_ui(index: u8) {
-    match index {
-        0 => show_ui_welcome(),
-        1 => show_ui_version(),
-        2 => show_ui_blind_signing(),
-        3 => show_ui_quit(),
-        _ => panic!("Invalid ui index"),
-    }
-}
 
 #[no_mangle]
 extern "C" fn sample_main() {
     let mut comm = io::Comm::new();
-    let mut ui_index = 0;
-    let ui_page_num = 4;
+    let mut main_pages = MainPages::new();
 
     let mut sign_tx_context: SignTxContext = SignTxContext::new();
     let mut tx_reviewer: TxReviewer = TxReviewer::new();
-    // Draw some 'welcome' screen
-    show_ui(ui_index);
 
     loop {
         // Wait for either a specific button push to exit the app
         // or an APDU command
-        match comm.next_event() {
-            io::Event::Button(ButtonEvent::LeftButtonPress) => {
-                bagls::LEFT_S_ARROW.instant_display();
-            }
-            io::Event::Button(ButtonEvent::RightButtonPress) => {
-                bagls::RIGHT_S_ARROW.instant_display();
-            }
-            io::Event::Button(ButtonEvent::RightButtonRelease) => {
-                ui_index = (ui_index + 1) % ui_page_num;
-                show_ui(ui_index);
-            }
-            io::Event::Button(ButtonEvent::LeftButtonRelease) => {
-                ui_index = (ui_index + ui_page_num - 1) % ui_page_num;
-                show_ui(ui_index);
-            }
-            io::Event::Button(ButtonEvent::BothButtonsRelease) => {
-                if ui_index == 2 {
-                    update_blind_signing();
-                    show_ui_blind_signing();
-                }
-                if ui_index == 3 {
-                    ledger_device_sdk::exit_app(0);
-                }
-            }
+        match main_pages.show(&mut comm) {
             io::Event::Command(ins) => {
                 println("=== Before event");
-                println_array::<1, 2>(&[ui_index]);
+                println_array::<1, 2>(&[main_pages.ui_index]);
                 match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
-                    Ok(ui_changed) => {
-                        comm.reply_ok();
-                        if ui_changed {
-                            ui_index = 0;
-                            show_ui(ui_index);
-                        }
-                    }
+                    Ok(()) => comm.reply_ok(),
                     Err(sw) => comm.reply(sw),
                 }
                 println("=== After event");
-                println_array::<1, 2>(&[ui_index]);
-                show_ui(ui_index);
+                println_array::<1, 2>(&[main_pages.ui_index]);
+                main_pages.show_ui(main_pages.ui_index);
             }
-            _ => (),
+            _ => ()
         }
     }
 }
 
 #[repr(u8)]
-enum Ins {
+pub enum Ins {
     GetVersion,
     GetPubKey,
     SignTx,
@@ -177,14 +73,12 @@ impl TryFrom<io::ApduHeader> for Ins {
     }
 }
 
-use ledger_device_sdk::io::Reply;
-
 fn handle_apdu(
     comm: &mut io::Comm,
     ins: Ins,
     sign_tx_context: &mut SignTxContext,
     tx_reviewer: &mut TxReviewer,
-) -> Result<bool, Reply> {
+) -> Result<(), io::Reply> {
     if comm.rx == 0 {
         return Err(ErrorCode::BadLen.into());
     }
@@ -221,13 +115,13 @@ fn handle_apdu(
             let data = comm.get_data()?;
             match sign_tx_context.handle_data(apdu_header, data, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
-                    return Ok(false);
+                    return Ok(());
                 }
                 Ok(()) => {
                     let result = match sign_tx_context.review_tx_id_and_sign() {
                         Ok((signature_buf, length, _)) => {
                             comm.append(&signature_buf[..length as usize]);
-                            Ok(true)
+                            Ok(())
                         }
                         Err(code) => Err(code.into()),
                     };
@@ -241,5 +135,5 @@ fn handle_apdu(
             }
         }
     }
-    Ok(false)
+    Ok(())
 }
