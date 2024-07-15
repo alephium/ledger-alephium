@@ -1,7 +1,7 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
 import fetch from 'node-fetch'
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Address, KeyType, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
@@ -325,11 +325,23 @@ describe('sdk', () => {
     await app.close()
   }, 120000)
 
+  function getAccount(groupIndex: number): { account: PrivateKeyWallet, unlockScript: string } {
+    const useDefaultKeyType = Math.random() >= 0.5
+    if (useDefaultKeyType) {
+      const account = PrivateKeyWallet.Random(groupIndex)
+      return { account, unlockScript: '00' + account.publicKey }
+    }
+
+    const account = PrivateKeyWallet.Random(groupIndex, nodeProvider, 'bip340-schnorr')
+    const unlockScript = '02' + `0101000000000458144020${account.publicKey}8685` + '00'
+    return { account, unlockScript }
+  }
+
   it('should transfer from different input addresses', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
-    const newAccount = PrivateKeyWallet.Random(testAccount.group)
+    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(testAccount.group)
     for (let i = 0; i < 2; i += 1) {
       await transferToAddress(testAccount.address, ONE_ALPH)
       await transferToAddress(newAccount.address, ONE_ALPH)
@@ -341,7 +353,6 @@ describe('sdk', () => {
     expect(utxos1.utxos.length).toEqual(2)
 
     const useSameAsPrevious = Math.random() >= 0.5
-    const unlockScript0 = '00' + newAccount.publicKey
     const inputs0: node.AssetInput[] = utxos0.utxos.map((utxo, index) => {
       const unlockScript = index > 0 && useSameAsPrevious ? '03' : unlockScript0
       return { outputRef: utxo.ref, unlockScript }
