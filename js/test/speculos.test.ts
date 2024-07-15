@@ -116,8 +116,8 @@ describe('sdk', () => {
     })
 
     function approve(index: number) {
-      if (index >= 7) return
-      if (index >= 3) { // outputs and signature
+      if (index >= 6) return
+      if (index >= 2) { // outputs and signature
         setTimeout(async () => {
           await clickAndApprove(6)
           approve(index + 1)
@@ -167,13 +167,13 @@ describe('sdk', () => {
     })
 
     function approve(index: number) {
-      if (index >= 7) return
-      if (index == 3 || index == 4) { // multi-sig outputs
+      if (index >= 6) return
+      if (index == 2 || index == 3) { // multi-sig outputs
         setTimeout(async () => {
           await clickAndApprove(11)
           approve(index + 1)
         }, 1000)
-      } else if (index > 4) { // change output and signature
+      } else if (index > 3) { // change output and signature
         setTimeout(async () => {
           await clickAndApprove(6)
           approve(index + 1)
@@ -227,28 +227,28 @@ describe('sdk', () => {
     })
 
     function approve(index: number) {
-      if (index > 7) return
-      if (index <= 2) {
+      if (index > 6) return
+      if (index <= 1) {
         setTimeout(async () => {
           await clickAndApprove(3)
           approve(index + 1)
         }, 1000)
-      } else if (index === 3) { // multi-sig token output
+      } else if (index === 2) { // multi-sig token output
         setTimeout(async () => {
           await clickAndApprove(17)
           approve(index + 1)
         }, 1000)
-      } else if (index === 4) { // multi-sig alph output
+      } else if (index === 3) { // multi-sig alph output
         setTimeout(async () => {
           await clickAndApprove(11)
           approve(index + 1)
         }, 1000)
-      } else if (index === 5) { // token change output
+      } else if (index === 4) { // token change output
         setTimeout(async () => {
           await clickAndApprove(12)
           approve(index + 1)
         }, 1000)
-      } else if (index >= 6) { // alph change output and signature
+      } else if (index >= 5) { // alph change output and signature
         setTimeout(async () => {
           await clickAndApprove(6)
           approve(index + 1)
@@ -296,8 +296,8 @@ describe('sdk', () => {
     })
 
     function approve(index: number) {
-      if (index >= 6) return
-      if (index >= 3) { // outputs and signature
+      if (index >= 5) return
+      if (index >= 2) { // outputs and signature
         setTimeout(async () => {
           await clickAndApprove(6)
           approve(index + 1)
@@ -386,13 +386,13 @@ describe('sdk', () => {
     })
 
     function approve(index: number) {
-      if (index > 6) return
-      if (index === 3 || index === 4) { // inputs
+      if (index > 5) return
+      if (index === 2 || index === 3) { // inputs
         setTimeout(async () => {
           await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
-      } else if (index >= 5) { // outputs and tx id
+      } else if (index >= 4) { // outputs and tx id
         setTimeout(async () => {
           await clickAndApprove(6)
           approve(index + 1)

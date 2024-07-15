@@ -36,7 +36,6 @@ impl U256 {
     const _1000_NANO_ALPH: u64 =
         (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
 
-    #[cfg(test)]
     pub fn from_encoded_bytes(bytes: &[u8]) -> Self {
         let mut bs = [0u8; 33];
         bs[..bytes.len()].copy_from_slice(bytes);
@@ -45,6 +44,62 @@ impl U256 {
 
     pub fn is_zero(&self) -> bool {
         self.0.get_length() == 1 && self.0.bytes.iter().all(|v| *v == 0)
+    }
+
+    pub fn to_u128(&self) -> Option<u128> {
+        let length = self.0.get_length();
+        if self.0.is_fixed_size() {
+            Some(Self::decode_fixed_size(&self.0.bytes[..length]) as u128)
+        } else if length <= 16 {
+            let mut bytes = [0u8; 16];
+            let tail = &self.0.bytes[1..length];
+            bytes[(16-tail.len())..].copy_from_slice(tail);
+            Some(u128::from_be_bytes(bytes))
+        } else {
+            None
+        }
+    }
+
+    pub fn multiply(&self, num: u32) -> Option<U256> {
+        self.to_u128().map(|value| U256::encode_u128(value * num as u128))
+    }
+
+    fn encode_fixed_bytes(n: u32) -> U256 {
+        if n < 0x40 {
+            U256::from_encoded_bytes(&[n as u8])
+        } else if n < (0x40 << 8) {
+            U256::from_encoded_bytes(&[((n >> 8) + 0x40) as u8, n as u8])
+        } else if n < (0x40 << 24) {
+            U256::from_encoded_bytes(&[
+                ((n >> 24) + 0x40) as u8,
+                (n >> 16) as u8,
+                (n >> 8) as u8,
+                n as u8,
+            ])
+        } else {
+            panic!()
+        }
+    }
+
+    fn encode_u128(value: u128) -> U256 {
+        if value < (0x40 << 24) {
+            U256::encode_fixed_bytes(value as u32)
+        } else {
+            let bytes = value.to_be_bytes();
+            let mut index: usize = 0;
+            for (i, &byte) in bytes.iter().enumerate() {
+                if byte != 0 {
+                    index = i;
+                    break;
+                }
+            }
+            let length = bytes.len() - index;
+            let header: u8 = ((length - 4) as u8) | 0xc0;
+            let mut bs = [0u8; 33];
+            bs[0] = header;
+            bs[1..(length+1)].copy_from_slice(&bytes[index..]);
+            Self(BigInt { bytes: bs })
+        }
     }
 
     fn decode_fixed_size(bytes: &[u8]) -> u32 {
@@ -342,50 +397,26 @@ pub mod tests {
         }
     }
 
-    const MAX_OF_4_BYTES_ENCODED: u128 = 1073741823;
-    fn encode_fixed_bytes(n: u32) -> U256 {
-        if n < 0x40 {
-            U256::from_encoded_bytes(&[n as u8])
-        } else if n < (0x40 << 8) {
-            U256::from_encoded_bytes(&[((n >> 8) + 0x40) as u8, n as u8])
-        } else if n < (0x40 << 24) {
-            U256::from_encoded_bytes(&[
-                ((n >> 24) + 0x40) as u8,
-                (n >> 16) as u8,
-                (n >> 8) as u8,
-                n as u8,
-            ])
-        } else {
-            panic!()
-        }
-    }
-
-    fn encode_u128(value: u128) -> U256 {
-        if value <= MAX_OF_4_BYTES_ENCODED {
-            encode_fixed_bytes(value as u32)
-        } else {
-            let mut bytes: Vec<u8> = value
-                .to_be_bytes()
-                .iter()
-                .cloned()
-                .skip_while(|&b| b == 0)
-                .collect();
-            let header: u8 = ((bytes.len() - 4) as u8) | 0xc0;
-            bytes.insert(0, header);
-            U256::from_encoded_bytes(&bytes)
-        }
-    }
-
     #[test]
     fn test_is_less_than_1000_nano_alph() {
-        let u2560 = encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
-        let u2561 = encode_u128((U256::_1000_NANO_ALPH) as u128);
-        let u2562 = encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
+        let u2560 = U256::encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
+        let u2561 = U256::encode_u128((U256::_1000_NANO_ALPH) as u128);
+        let u2562 = U256::encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
 
         assert!(u2560.is_less_than_1000_nano());
         assert!(!u2561.is_less_than_1000_nano());
         assert!(!u2562.is_less_than_1000_nano());
-        assert!(!encode_u128(u128::MAX).is_less_than_1000_nano())
+        assert!(!U256::encode_u128(u128::MAX).is_less_than_1000_nano())
+    }
+
+    #[test]
+    fn test_multiply() {
+        let min_gas_price = u128::pow(10, 11);
+        let gas_amount = random_usize(1, 5000000) as u32;
+        let fee = min_gas_price * (gas_amount as u128);
+        let u256 = U256::encode_u128(min_gas_price).multiply(gas_amount).unwrap();
+        assert!(u256.to_u128().unwrap() == fee);
+        assert!(U256::encode_u128(u128::MAX).multiply(2).is_none());
     }
 
     #[test]
@@ -424,7 +455,7 @@ pub mod tests {
             (alph("1.9999999"), "1.999999"),
         ];
         for (number, str) in cases {
-            let u256 = encode_u128(number);
+            let u256 = U256::encode_u128(number);
             let mut output = [0u8; 33];
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());

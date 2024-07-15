@@ -18,7 +18,7 @@ use ledger_device_sdk::nbgl::{
 };
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
-    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
+    types::{unsigned_tx::TxFee, AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
 };
 
 #[link_section = ".nvm_data"]
@@ -236,29 +236,19 @@ impl TxReviewer {
         review(&fields, "Network ")
     }
 
-    pub fn review_gas_amount(gas_amount: &I32) -> Result<(), ErrorCode> {
-        let mut output = [0; 11];
-        let num_str_bytes = gas_amount.to_str(&mut output);
-        if num_str_bytes.is_none() {
+    pub fn review_tx_fee(&mut self, tx_fee: &TxFee) -> Result<(), ErrorCode> {
+        let from_index = self.buffer.get_index();
+        let fee = tx_fee.get();
+        if fee.is_none() {
             return Err(ErrorCode::Overflow);
         }
-        let value = bytes_to_string(num_str_bytes.unwrap())?;
-        let fields = [Field {
-            name: "Gas Amount",
-            value,
-        }];
-        review(&fields, "Gas Amount ")
-    }
-
-    pub fn review_gas_price(&mut self, gas_price: &U256) -> Result<(), ErrorCode> {
-        let from_index = self.buffer.get_index();
-        let to_index = self.write_alph_amount(gas_price)?;
+        let to_index = self.write_alph_amount(fee.as_ref().unwrap())?;
         let value = self.get_str_from_range((from_index, to_index))?;
         let fields = [Field {
-            name: "Gas Price",
+            name: "Fees",
             value,
         }];
-        review(&fields, "Gas Price ")?;
+        review(&fields, "Fees ")?;
         self.reset();
         Ok(())
     }
@@ -474,8 +464,7 @@ impl TxReviewer {
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {
             UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
-            UnsignedTx::GasAmount(amount) => Self::review_gas_amount(amount),
-            UnsignedTx::GasPrice(amount) => self.review_gas_price(amount),
+            UnsignedTx::TxFee(tx_fee) => self.review_tx_fee(&tx_fee.inner),
             UnsignedTx::Inputs(inputs) => {
                 if let Some(current_input) = inputs.get_current_item() {
                     self.review_input(
