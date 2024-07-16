@@ -5,7 +5,7 @@ use ledger_device_sdk::io::ApduHeader;
 use ledger_device_sdk::ui::gadgets::MessageValidator;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{NbglGenericReview, NbglPageContent, InfoLongPress, TuneIndex};
-use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
+use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
 use crate::settings::{is_blind_signing_enabled, update_blind_signing};
 use crate::nvm::{NVMData, NVM, NVM_DATA_SIZE};
@@ -28,7 +28,7 @@ enum DecodeStep {
 
 pub struct SignTxContext {
     pub path: [u32; 5],
-    tx_decoder: PartialDecoder<UnsignedTx>,
+    tx_decoder: StreamingDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
     temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
@@ -38,7 +38,7 @@ impl SignTxContext {
     pub fn new() -> Self {
         SignTxContext {
             path: [0; 5],
-            tx_decoder: PartialDecoder::default(),
+            tx_decoder: StreamingDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
             temp_data: unsafe { SwappingBuffer::new(&mut DATA) },

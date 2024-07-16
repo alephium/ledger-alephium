@@ -6,7 +6,7 @@ use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
-    current_item: PartialDecoder<T>,
+    current_item: StreamingDecoder<T>,
     total_size: U16,
     pub current_index: i16,
 }
@@ -30,7 +30,7 @@ impl<T: PartialEq> PartialEq for AVector<T> {
 impl<T: Default + RawDecoder> AVector<T> {
     pub fn from_item(value: T) -> Self {
         AVector {
-            current_item: PartialDecoder {
+            current_item: StreamingDecoder {
                 inner: value,
                 stage: DecodeStage::default(),
             },

@@ -6,8 +6,8 @@ use crate::decode::*;
 pub enum UnsignedTx {
     Version(Byte),
     NetworkId(Byte),
-    ScriptOpt(PartialDecoder<Option<Script>>),
-    TxFee(PartialDecoder<TxFee>),
+    ScriptOpt(StreamingDecoder<Option<Script>>),
+    TxFee(StreamingDecoder<TxFee>),
     Inputs(AVector<TxInput>),
     FixedOutputs(AVector<AssetOutput>),
 }
@@ -30,8 +30,8 @@ impl UnsignedTx {
     pub fn next_step(&mut self) {
         match self {
             Self::Version(_) => *self = Self::NetworkId(Byte::default()),
-            Self::NetworkId(_) => *self = Self::ScriptOpt(PartialDecoder::default()),
-            Self::ScriptOpt(_) => *self = Self::TxFee(PartialDecoder::default()),
+            Self::NetworkId(_) => *self = Self::ScriptOpt(StreamingDecoder::default()),
+            Self::ScriptOpt(_) => *self = Self::TxFee(StreamingDecoder::default()),
             Self::TxFee(_) => *self = Self::Inputs(AVector::default()),
             Self::Inputs(inputs) => {
                 if inputs.is_complete() {
@@ -133,7 +133,7 @@ mod tests {
 
     fn decode<'a, W: Writable>(
         buffer: &mut Buffer<'a, W>,
-        decoder: &mut PartialDecoder<UnsignedTx>,
+        decoder: &mut StreamingDecoder<UnsignedTx>,
         hasher: &mut Blake2b256,
     ) -> DecodeResult<bool> {
         let from_index = buffer.get_index();

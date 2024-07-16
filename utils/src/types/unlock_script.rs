@@ -65,8 +65,8 @@ impl RawDecoder for P2SH {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum UnlockScript {
     P2PKH(PublicKey),
-    P2MPKH(PartialDecoder<AVector<PublicKeyWithIndex>>),
-    P2SH(PartialDecoder<P2SH>),
+    P2MPKH(StreamingDecoder<AVector<PublicKeyWithIndex>>),
+    P2SH(StreamingDecoder<P2SH>),
     SameAsPrevious,
     Unknown,
 }
@@ -87,8 +87,8 @@ impl UnlockScript {
     fn from_type(tpe: u8) -> Option<Self> {
         match tpe {
             0 => Some(UnlockScript::P2PKH(PublicKey::default())),
-            1 => Some(UnlockScript::P2MPKH(PartialDecoder::default())),
-            2 => Some(UnlockScript::P2SH(PartialDecoder::default())),
+            1 => Some(UnlockScript::P2MPKH(StreamingDecoder::default())),
+            2 => Some(UnlockScript::P2SH(StreamingDecoder::default())),
             3 => Some(UnlockScript::SameAsPrevious),
             _ => None,
         }

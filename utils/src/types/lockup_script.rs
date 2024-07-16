@@ -67,7 +67,7 @@ impl RawDecoder for P2MPKH {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum LockupScript {
     P2PKH(Hash),
-    P2MPKH(PartialDecoder<P2MPKH>),
+    P2MPKH(StreamingDecoder<P2MPKH>),
     P2SH(Hash),
     P2C(Hash),
     Unknown,
@@ -89,7 +89,7 @@ impl LockupScript {
     fn from_type(tpe: u8) -> Option<Self> {
         match tpe {
             0 => Some(LockupScript::P2PKH(Hash::default())),
-            1 => Some(LockupScript::P2MPKH(PartialDecoder::default())),
+            1 => Some(LockupScript::P2MPKH(StreamingDecoder::default())),
             2 => Some(LockupScript::P2SH(Hash::default())),
             3 => Some(LockupScript::P2C(Hash::default())),
             _ => None,

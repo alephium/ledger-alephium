@@ -496,10 +496,10 @@ impl TxReviewer {
         let hex: [u8; 64] = utils::to_hex(&tx_id[..]).unwrap();
         let hex_str = bytes_to_string(&hex)?;
         let fields = [Field {
-            name: "Tx ID",
+            name: "Transaction ID",
             value: hex_str,
         }];
-        let result = review(&fields, "Tx ID");
+        let result = review(&fields, "Transaction ID");
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         { return result }
 

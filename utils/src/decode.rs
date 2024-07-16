@@ -54,19 +54,19 @@ pub trait Reset {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-pub struct PartialDecoder<T> {
+pub struct StreamingDecoder<T> {
     pub inner: T,
     pub stage: DecodeStage,
 }
 
-impl<T> PartialDecoder<T> {
+impl<T> StreamingDecoder<T> {
     pub fn reset_stage(&mut self) {
         self.stage.index = 0;
         self.stage.step = 0;
     }
 }
 
-impl<T: Reset> PartialDecoder<T> {
+impl<T: Reset> StreamingDecoder<T> {
     pub fn reset(&mut self) {
         self.inner.reset();
         self.stage.index = 0;
@@ -74,16 +74,16 @@ impl<T: Reset> PartialDecoder<T> {
     }
 }
 
-impl<T: Default> Default for PartialDecoder<T> {
+impl<T: Default> Default for StreamingDecoder<T> {
     fn default() -> Self {
-        PartialDecoder {
+        StreamingDecoder {
             inner: T::default(),
             stage: DecodeStage::default(),
         }
     }
 }
 
-impl<T: RawDecoder> PartialDecoder<T> {
+impl<T: RawDecoder> StreamingDecoder<T> {
     pub fn step<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<bool> {
         if buffer.is_empty() {
             return Ok(false);
@@ -125,7 +125,7 @@ impl<T: RawDecoder> PartialDecoder<T> {
     }
 }
 
-impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
+impl<T: RawDecoder> Decoder<T> for StreamingDecoder<T> {
     fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>> {
         loop {
             match self.step(buffer) {
@@ -194,6 +194,6 @@ impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
     }
 }
 
-pub fn new_decoder<T: Default + RawDecoder>() -> PartialDecoder<T> {
-    PartialDecoder::<T>::default()
+pub fn new_decoder<T: Default + RawDecoder>() -> StreamingDecoder<T> {
+    StreamingDecoder::<T>::default()
 }
