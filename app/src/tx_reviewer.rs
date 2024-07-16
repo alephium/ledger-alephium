@@ -12,10 +12,9 @@ use ledger_device_sdk::ui::{
     gadgets::{Field, MultiFieldReview},
 };
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{
-    Field, NbglGenericReview, NbglPageContent, TagValueList, TagValueConfirm,
-    CenteredInfo, CenteredInfoStyle, TuneIndex
-};
+use ledger_device_sdk::nbgl::{Field, TagValueList};
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status};
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
     types::{unsigned_tx::TxFee, AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
@@ -500,7 +499,17 @@ impl TxReviewer {
             name: "Tx ID",
             value: hex_str,
         }];
-        review(&fields, "Tx ID")
+        let result = review(&fields, "Tx ID");
+        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+        { return result }
+
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            if result.is_ok() {
+                nbgl_sync_review_status();
+            }
+            result
+        }
     }
 }
 
@@ -548,12 +557,8 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        let info = CenteredInfo::new("Review", review_message, "", None, false, CenteredInfoStyle::LargeCaseInfo, 0);
         let values = TagValueList::new(fields, 0, false, false);
-        let approved = NbglGenericReview::new()
-            .add_content(NbglPageContent::CenteredInfo(info))
-            .add_content(NbglPageContent::TagValueConfirm(TagValueConfirm::new(&values, TuneIndex::TapCasual, "Approve", "Reject")))
-            .show("Reject", "Approved", "Rejected");
+        let approved = nbgl_review_fields("Review", review_message, &values);
         if approved {
             Ok(())
         } else {

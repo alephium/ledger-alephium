@@ -19,6 +19,8 @@ mod debug;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 mod display;
 mod error_code;
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+mod nbgl;
 mod nvm;
 mod public_key;
 mod sign_tx_context;
