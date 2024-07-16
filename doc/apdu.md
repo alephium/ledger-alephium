@@ -97,42 +97,34 @@ This command returns the public key corresponding to the secret key found at the
 
 This command will return a signature of the passed transaction
 
-#### Command #1
-
 | Field | Type     | Content                     | Expected          |
 |-------|----------|-----------------------------|-------------------|
 | CLA   | byte (1) | Application Identifier      | 0x80              |
 | INS   | byte (1) | Instruction ID              | 0x02              |
-| P1    | byte (1) | Payload desc                | 0                 |
+| P1    | byte (1) | Payload desc                | 0x00: first transaction data block <br> 0x01: subsequent transaction data block |
 | P2    | byte (1) | ignored                     |                   |
 | L     | byte (1) | Bytes in payload            | (depends)         |
-| Path[0] | byte (4) | Derivation Path Data      | 0x80000A55        |
+
+Input data (first transaction data block):
+
+| Field   | Type     | Content                   | Expected          |
+|---------|----------|---------------------------|-------------------|
+| Path[0] | byte (4) | Derivation Path Data      | ?                 |
 | Path[1] | byte (4) | Derivation Path Data      | ?                 |
 | Path[2] | byte (4) | Derivation Path Data      | ?                 |
 | Path[3] | byte (4) | Derivation Path Data      | ?                 |
 | Path[4] | byte (4) | Derivation Path Data      | ?                 |
 | Payload | byte (?) | Transaction payload       | ?                 |
 
-#### Response
+Input data (subsequent transaction data block):
 
-| Field    | Type      | Content     | Note                                  |
-|----------|-----------|-------------|---------------------------------------|
-| SW1-SW2  | byte (2)  | Return code | see list of return codes              |
-
-#### Command #2
-
-| Field | Type     | Content                     | Expected          |
-|-------|----------|-----------------------------|-------------------|
-| CLA   | byte (1) | Application Identifier      | 0x80              |
-| INS   | byte (1) | Instruction ID              | 0x02              |
-| P1    | byte (1) | Payload desc                | 1                 |
-| P2    | byte (1) | ignored                     |                   |
-| L     | byte (1) | Bytes in payload            | (depends)         |
+| Field   | Type     | Content                   | Expected          |
+|---------|----------|---------------------------|-------------------|
 | Payload | byte (?) | Transaction payload       | ?                 |
 
 #### Response
 
 | Field    | Type      | Content     | Note                                  |
 |----------|-----------|-------------|---------------------------------------|
-| SIG      | byte (?)  | Signature   |  DER-encoded signature                |
+| SIG      | byte (?)  | Signature   | DER-encoded signature                |
 | SW1-SW2  | byte (2)  | Return code | see list of return codes              |
