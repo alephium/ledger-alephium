@@ -1,107 +1,138 @@
-# Alephium application: Technical Specifications
+# APDU protocol description
 
-## About
+This document aims to provide a description of the APDU protocol supported by the app, explaining what each instruction does, the expected parameters and return values
 
-This application describes the APDU messages interface to communicate with the Alephium application.
+## General Structure
 
-The application covers the following functionalities:
+The general structure of a reqeuest and response is as followed:
 
-* Retrieve an address and public key given a BIP 32 path and group number
-* Sign a transaction given a BIP 32 path
+### Request / Command
 
-## APDUs
+| Field   | Type     | Content                | Note                   |
+|:--------|:---------|:-----------------------|------------------------|
+| CLA     | byte (1) | Application Identifier | 0x80                   |
+| INS     | byte (1) | Instruction ID         |                        |
+| P1      | byte (1) | Parameter 1            |                        |
+| P2      | byte (1) | Parameter 2            |                        |
+| L       | byte (1) | Bytes in payload       |                        |
+| PAYLOAD | byte (L) | Payload                |                        |
 
-### GET PUBLIC KEY
+### Response
 
-#### Description
+| Field   | Type     | Content     | Note                     |
+| ------- | -------- | ----------- | ------------------------ |
+| ANSWER  | byte (?) | Answer      | depends on the command   |
+| SW1-SW2 | byte (2) | Return code | see list of return codes |
 
-This command returns the public key and Alephium address for the given BIP 32 path.
+#### Return codes
 
-#### Coding
+| Return code | Description               |
+| ----------- | --------------------------|
+| 0x9000      | Success                   |
+| 0x6E00      | Bad CLA                   |
+| 0x6E01      | Bad Ins                   |
+| 0x6E02      | Bad P1/P2                 |
+| 0x6E04      | User Cancelled            |
+| 0xE000      | Failed to decode tx       |
+| 0xE001      | Failed to sign tx         |
+| 0xE002      | Stack overflow            |
+| 0xE003      | Failed to decode path     |
+| 0xE004      | Blind signing is disabled |
+| 0xE005      | Failed to derive pub key  |
+| 0xEF00      | Internal error            |
 
-*Command*
-|  CLA  |  INS |       P1      |       P2                  |
-|-------|------|---------------|---------------------------|
-|  80   |  01  |     0 or 4    |  Any value between [0-3]  |
+## Commands definitions
 
-Alephium is a sharded blockchain. Currently, there are 4 groups in Alephium.
-Users can choose any group's address. We use `P1` to represent the group
-number(currently 4) and `P2` to represent the target group of the user
-address.
+### GetVersion
 
-If both `P1` and `P2` are 0, it means that no target group has been
-specified. If `P2` is specified, the value of `P2` must be less than `P1`.
+This command will return the app version
 
-*Input Data*
-| Length | Description |
-|--------|-------------|
-| `4`    | First derivation index (big endian) |
-| `4`    | Second derivation index (big endian) |
-| `4`    | Third derivation index (big endian) |
-| `4`    | Fourth derivation index (big endian) |
-| `4`    | Fifth derivation index (big endian) |
+#### Command
 
-*Output Data*
-| Length  | Description |
-|---------|-------------|
-| `65`    | Public key |
-| `4`     | Derivation index (big endian) |
+| Field | Type     | Content                | Expected |
+|-------|----------|------------------------|----------|
+| CLA   | byte (1) | Application Identifier | 0x80     |
+| INS   | byte (1) | Instruction ID         | 0x00     |
+| P1    | byte (1) | Parameter 1            | ignored  |
+| P2    | byte (1) | Parameter 2            | ignored  |
+| L     | byte (1) | Bytes in payload       | 0        |
 
-If the user specifies a target group(`P2`), the fifth derivation index will
-serve as the starting index. It will increment by 1 with each iteration until
-an address satisfying the target group is found. The final derivation index
-will be returned along with the public key.
+#### Response
 
-If the user does not specify a target group, the original derivation index is returned.
+| Field     | Type     | Content          | Note                            |
+| --------- | -------- | ---------------- | ------------------------------- |
+| MAJOR     | byte (1) | Version Major    |                                 |
+| MINOR     | byte (1) | Version Minor    |                                 |
+| PATCH     | byte (1) | Version Patch    |                                 |
+| SW1-SW2   | byte (2) | Return code      | see list of return codes        |
 
-### SIGN UNSIGNED TX
+### GetPubKey
 
-#### Description
+This command returns the public key corresponding to the secret key found at the given path
 
-This command returns the signature for the given BIP 32 path and unsigned tx.
+#### Command
 
-#### Coding
+| Field   | Type     | Content                   | Expected        |
+|---------|----------|---------------------------|-----------------|
+| CLA     | byte (1) | Application Identifier    | 0x8A            |
+| INS     | byte (1) | Instruction ID            | 0x01            |
+| P1      | byte (1) | Parameter 1               | 0 or 4          |
+| P2      | byte (1) | Parameter 2               | Any value between [0-3]         |
+| L       | byte (1) | Bytes in payload          | 0x14            |
+| Path[0] | byte (4) | Derivation Path Data      | 0x80000A55      |
+| Path[1] | byte (4) | Derivation Path Data      | ?               |
+| Path[2] | byte (4) | Derivation Path Data      | ?               |
+| Path[3] | byte (4) | Derivation Path Data      | ?               |
+| Path[4] | byte (4) | Derivation Path Data      | ?               |
 
-*Command*
-|  CLA  |  INS |         P1            |     P2     |
-|-------|------|-----------------------|------------|
-|  80   |  02  |   0: first chunk      |  Not used  |
-|       |      |   1: following chunk  |            |
+#### Response
 
-*Input Data*
+| Field      | Type      | Content           | Note                     |
+| ---------- | --------- | ----------------- | ------------------------ |
+| PKEY       | byte (65) | Public key bytes  |                          |
+| HD INDEX   | byte (4)  | Derivation index  |                          |
+| SW1-SW2    | byte (2)  | Return code       | see list of return codes |
 
-If P1 == first chunk
+### SignTx
 
-| Length     | Description |
-|------------|-------------|
-| `20`       | Derivation indexes |
-| `variable` | Transaction payload |
+This command will return a signature of the passed transaction
 
-If P2 == following chunk
+#### Command #1
 
-| Length     | Description |
-|------------|-------------|
-| `variable` | Transaction payload |
+| Field | Type     | Content                     | Expected          |
+|-------|----------|-----------------------------|-------------------|
+| CLA   | byte (1) | Application Identifier      | 0x80              |
+| INS   | byte (1) | Instruction ID              | 0x02              |
+| P1    | byte (1) | Payload desc                | 0                 |
+| P2    | byte (1) | ignored                     |                   |
+| L     | byte (1) | Bytes in payload            | (depends)         |
+| Path[0] | byte (4) | Derivation Path Data      | 0x80000A55        |
+| Path[1] | byte (4) | Derivation Path Data      | ?                 |
+| Path[2] | byte (4) | Derivation Path Data      | ?                 |
+| Path[3] | byte (4) | Derivation Path Data      | ?                 |
+| Path[4] | byte (4) | Derivation Path Data      | ?                 |
+| Payload | byte (?) | Transaction payload       | ?                 |
 
-*Output Data*
-| Length     | Description |
-|------------|-------------|
-| `variable` | DER-encoded signature  |
+#### Response
 
-## Status Words
+| Field    | Type      | Content     | Note                                  |
+|----------|-----------|-------------|---------------------------------------|
+| SW1-SW2  | byte (2)  | Return code | see list of return codes              |
 
-The following standard status words are returned for all APDUs.
+#### Command #2
 
-| SW     | SW name                  | Description |
-|--------|--------------------------|-------------|
-| 0x9000 | `Ok`                     | Success |
-| 0x6E00 | `BadCla`                 | Invalid `CLA` |
-| 0x6E01 | `BadIns`                 | Invalid `INS` |
-| 0x6E02 | `BadP1P2`                | Invalid `P1` or `P2` |
-| 0x6E04 | `UserCancelled`          | Rejected by user |
-| 0xE000 | `TxDecodeFail`           | Failed to decode tx |
-| 0xE001 | `TxSignFail`             | Failed to sign tx |
-| 0xE002 | `Overflow`               | Stack overflow |
-| 0xE003 | `DerivePathDecodeFail`   | Failed to decode derive path |
-| 0xE004 | `BlindSigningNotEnabled` | Blind signing is not enabled |
-| 0xEF00 | `InternalError`          | Internal error |
+| Field | Type     | Content                     | Expected          |
+|-------|----------|-----------------------------|-------------------|
+| CLA   | byte (1) | Application Identifier      | 0x80              |
+| INS   | byte (1) | Instruction ID              | 0x02              |
+| P1    | byte (1) | Payload desc                | 1                 |
+| P2    | byte (1) | ignored                     |                   |
+| L     | byte (1) | Bytes in payload            | (depends)         |
+| Payload | byte (?) | Transaction payload       | ?                 |
+
+#### Response
+
+| Field    | Type      | Content     | Note                                  |
+|----------|-----------|-------------|---------------------------------------|
+| SIG      | byte (?)  | Signature   |  DER-encoded signature                |
+| SW1-SW2  | byte (2)  | Return code | see list of return codes              |
