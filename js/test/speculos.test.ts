@@ -419,4 +419,49 @@ describe('sdk', () => {
 
     await app.close()
   }, 120000)
+
+  it('should test contract deployment', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+    const buildTxResult = await nodeProvider.contracts.postContractsUnsignedTxDeployContract({
+      fromPublicKey: testAccount.publicKey,
+      bytecode: '00010c010000000002d38d0b3636020000'
+    })
+
+    function approve(index: number) {
+      if (index > 3) return
+      if (index === 2 || index === 3) {
+        setTimeout(async () => {
+          await clickAndApprove(6)
+          approve(index + 1)
+        }, 1000)
+      } else {
+        setTimeout(async () => {
+          await clickAndApprove(3)
+          approve(index + 1)
+        }, 1000)
+      }
+    }
+
+    setTimeout(async () => await clickAndApprove(3))
+    await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
+
+    async function enableBlindSigning() {
+      await clickAndApprove(2)
+    }
+
+    await sleep(1000)
+    await enableBlindSigning()
+    approve(0)
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+
+    await app.close()
+  }, 120000)
 })
