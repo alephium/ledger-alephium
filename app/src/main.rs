@@ -13,19 +13,18 @@ use sign_tx_context::SignTxContext;
 use tx_reviewer::TxReviewer;
 use utils::{self, deserialize_path};
 
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+mod display;
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+mod nbgl;
 mod blake2b_hasher;
 mod settings;
 mod debug;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-mod display;
 mod error_code;
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-mod nbgl;
-mod nvm;
 mod public_key;
 mod sign_tx_context;
-mod swapping_buffer;
 mod tx_reviewer;
+mod ledger_sdk_stub;
 
 use debug::print::{println, println_slice};
 use ledger_device_sdk::io;

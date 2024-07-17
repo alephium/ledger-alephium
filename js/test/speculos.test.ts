@@ -118,12 +118,12 @@ describe('sdk', () => {
       if (index >= 6) return
       if (index >= 2) { // outputs and signature
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       }
@@ -169,17 +169,17 @@ describe('sdk', () => {
       if (index >= 6) return
       if (index == 2 || index == 3) { // multi-sig outputs
         setTimeout(async () => {
-          await clickAndApprove(11)
+          await clickAndApprove(10)
           approve(index + 1)
         }, 1000)
       } else if (index > 3) { // change output and signature
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       }
@@ -229,27 +229,27 @@ describe('sdk', () => {
       if (index > 6) return
       if (index <= 1) {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       } else if (index === 2) { // multi-sig token output
         setTimeout(async () => {
-          await clickAndApprove(17)
+          await clickAndApprove(16)
           approve(index + 1)
         }, 1000)
       } else if (index === 3) { // multi-sig alph output
         setTimeout(async () => {
-          await clickAndApprove(11)
+          await clickAndApprove(10)
           approve(index + 1)
         }, 1000)
       } else if (index === 4) { // token change output
         setTimeout(async () => {
-          await clickAndApprove(12)
+          await clickAndApprove(11)
           approve(index + 1)
         }, 1000)
       } else if (index >= 5) { // alph change output and signature
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       }
@@ -298,12 +298,12 @@ describe('sdk', () => {
       if (index >= 5) return
       if (index >= 2) { // outputs and signature
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       }
@@ -388,17 +388,17 @@ describe('sdk', () => {
       if (index > 5) return
       if (index === 2 || index === 3) { // inputs
         setTimeout(async () => {
-          await clickAndApprove(5)
+          await clickAndApprove(4)
           approve(index + 1)
         }, 1000)
       } else if (index >= 4) { // outputs and tx id
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       }
@@ -433,12 +433,12 @@ describe('sdk', () => {
       if (index > 3) return
       if (index === 2 || index === 3) {
         setTimeout(async () => {
-          await clickAndApprove(6)
+          await clickAndApprove(5)
           approve(index + 1)
         }, 1000)
       } else {
         setTimeout(async () => {
-          await clickAndApprove(3)
+          await clickAndApprove(2)
           approve(index + 1)
         }, 1000)
       }

@@ -1,16 +1,15 @@
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
-    nvm::{NVMData, NVM, NVM_DATA_SIZE},
+    ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE},
     public_key::{derive_pub_key_by_path, hash_of_public_key},
-    swapping_buffer::{SwappingBuffer, RAM_SIZE},
+    ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE},
 };
 use core::str::from_utf8;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::{
-    bitmaps::{CHECKMARK, CROSS, EYE},
-    gadgets::{Field, MultiFieldReview},
-};
+use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{Field, TagValueList};
 #[cfg(any(target_os = "stax", target_os = "flex"))]

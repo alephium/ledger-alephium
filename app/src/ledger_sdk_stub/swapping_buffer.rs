@@ -3,7 +3,7 @@ use utils::buffer::Writable;
 
 use crate::{
     error_code::ErrorCode,
-    nvm::{NVMData, NVM},
+    ledger_sdk_stub::nvm::{NVMData, NVM},
 };
 
 pub const RAM_SIZE: usize = 512;
