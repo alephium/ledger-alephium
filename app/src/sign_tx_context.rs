@@ -1,13 +1,9 @@
 use ledger_device_sdk::ecc::Secp256k1;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::gadgets::MessageValidator;
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{NbglGenericReview, NbglPageContent, InfoLongPress, TuneIndex};
 use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
-use crate::settings::{is_blind_signing_enabled, update_blind_signing};
+use crate::settings::is_blind_signing_enabled;
 use crate::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::tx_reviewer::TxReviewer;
@@ -147,29 +143,23 @@ impl SignTxContext {
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 fn check_blind_signing() -> Result<(), ErrorCode> {
+    use ledger_device_sdk::ui::gadgets::MessageScroller;
+
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let approved = MessageValidator::new(&["Blind signing must", "be enabled"], &["Approve"], &["Reject"]).ask();
-    if approved {
-        update_blind_signing();
-        Ok(())
-    } else {
-        Err(ErrorCode::BlindSigningDisabled)
-    }
+    let scroller = MessageScroller::new("Blind signing must be enabled");
+    scroller.event_loop();
+    Err(ErrorCode::BlindSigningDisabled)
 }
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 fn check_blind_signing() -> Result<(), ErrorCode> {
+    use crate::nbgl::nbgl_review_info;
+
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let info = InfoLongPress::new("Blind signing must be enabled", None, "Approve", TuneIndex::TapCasual);
-    let approved = NbglGenericReview::new().add_content(NbglPageContent::InfoLongPress(info)).show("Reject", "Approved", "Rejected");
-    if approved {
-        update_blind_signing();
-        Ok(())
-    } else {
-        Err(ErrorCode::BlindSigningDisabled)
-    }
+    nbgl_review_info("Blind signing must be enabled in Settings");
+    Err(ErrorCode::BlindSigningDisabled)
 }

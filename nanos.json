@@ -1,6 +1,6 @@
 {
   "binary": "nanos.hex",
-  "dataSize": 6720,
+  "dataSize": 6656,
   "derivationPath": {
     "curves": [
       "secp256k1"
