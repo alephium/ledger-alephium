@@ -38,7 +38,7 @@ impl RawDecoder for P2MPKH {
                 let total_length = (self.size.inner as usize) * Byte32::ENCODED_LENGTH;
                 let mut index = stage.index;
                 while !buffer.is_empty() && (index as usize) < total_length {
-                    let _ = buffer.next_byte().unwrap();
+                    let _ = buffer.consume_byte().unwrap();
                     index += 1;
                 }
                 if (index as usize) == total_length {
@@ -122,7 +122,7 @@ impl RawDecoder for LockupScript {
         }
         match self {
             LockupScript::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
+                let tpe = buffer.consume_byte().unwrap();
                 let result = LockupScript::from_type(tpe);
                 if result.is_none() {
                     return Err(DecodeError::InvalidData);
@@ -163,7 +163,7 @@ mod tests {
             let mut temp_data = TempData::new();
 
             {
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let mut decoder = new_decoder::<LockupScript>();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&lockup_script));
@@ -176,7 +176,7 @@ mod tests {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
                 let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();
@@ -210,7 +210,7 @@ mod tests {
         let bytes = hex_to_bytes("0103a3cd757be03c7dac8d48bf79e2a7d6e735e018a9c054b99138c7b29738c437ecef51c98556924afa1cd1a8026c3d2d33ee1d491e1fe77c73a75a2d0129f061951dd2aa371711d1faea1c96d395f08eb94de1f388993e8be3f4609dc327ab513a02").unwrap();
         {
             let mut temp_data = TempData::new();
-            let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data);
             let mut decoder = new_decoder::<LockupScript>();
             let result = decoder.decode(&mut buffer).unwrap();
             assert!(result.is_some());
@@ -225,7 +225,7 @@ mod tests {
         while length < bytes.len() {
             let remain = bytes.len() - length;
             let size = random_usize(0, remain);
-            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
             length += size;
 
             let result = decoder.decode(&mut buffer).unwrap();

@@ -51,7 +51,7 @@ impl RawDecoder for BigInt {
             return Ok(DecodeStage { ..*stage });
         }
         let from_index = if stage.index == 0 {
-            self.bytes[0] = buffer.next_byte().unwrap();
+            self.bytes[0] = buffer.consume_byte().unwrap();
             1
         } else {
             stage.index
@@ -59,7 +59,7 @@ impl RawDecoder for BigInt {
         let length = self.get_length();
         let mut idx = 0;
         while !buffer.is_empty() && idx < (length - (from_index as usize)) {
-            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
+            self.bytes[(from_index as usize) + idx] = buffer.consume_byte().unwrap();
             idx += 1;
         }
         let new_index = (from_index as usize) + idx;

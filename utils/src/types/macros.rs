@@ -37,7 +37,7 @@ macro_rules! fixed_size_bytes {
                 let remain = $struct_name::ENCODED_LENGTH - (stage.index as usize);
                 let mut idx: usize = 0;
                 while !buffer.is_empty() && idx < remain {
-                    self.0[(stage.index as usize) + idx] = buffer.next_byte().unwrap();
+                    self.0[(stage.index as usize) + idx] = buffer.consume_byte().unwrap();
                     idx += 1;
                 }
                 let new_index = (stage.index as usize) + idx;
@@ -84,7 +84,7 @@ macro_rules! fixed_size_integer {
                 let remain = Self::ENCODED_LENGTH - (stage.index as usize);
                 let mut idx: usize = 0;
                 while !buffer.is_empty() && idx < remain {
-                    let byte = buffer.next_byte().unwrap();
+                    let byte = buffer.consume_byte().unwrap();
                     self.0 |= ((byte & 0xff) as $tpe) << ((remain - 1 - idx) * 8);
                     idx += 1;
                 }

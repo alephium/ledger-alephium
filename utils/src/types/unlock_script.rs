@@ -110,7 +110,7 @@ impl RawDecoder for UnlockScript {
         }
         match self {
             UnlockScript::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
+                let tpe = buffer.consume_byte().unwrap();
                 let result = UnlockScript::from_type(tpe);
                 if result.is_none() {
                     return Err(DecodeError::InvalidData);
@@ -155,7 +155,7 @@ mod tests {
             ));
 
             {
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let mut decoder = new_decoder::<UnlockScript>();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&unlock_script));
@@ -168,7 +168,7 @@ mod tests {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
                 let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();
@@ -194,7 +194,7 @@ mod tests {
         while length < bytes.len() {
             let remain = bytes.len() - length;
             let size = random_usize(0, remain);
-            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
             length += size;
 
             let result = decoder.decode(&mut buffer).unwrap();

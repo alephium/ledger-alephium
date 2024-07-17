@@ -363,7 +363,7 @@ pub mod tests {
 
             {
                 let mut decoder = new_decoder::<U256>();
-                let mut buffer = Buffer::new(bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(bytes, &mut temp_data);
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert!(result.is_some());
                 let result = result.unwrap();
@@ -379,7 +379,7 @@ pub mod tests {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
                 let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

@@ -24,7 +24,7 @@ impl RawDecoder for Byte {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        self.0 = buffer.next_byte().unwrap();
+        self.0 = buffer.consume_byte().unwrap();
         Ok(DecodeStage::COMPLETE)
     }
 }

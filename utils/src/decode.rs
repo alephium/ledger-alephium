@@ -159,7 +159,7 @@ impl<T: Default + RawDecoder> RawDecoder for Option<T> {
         }
 
         if self.is_none() {
-            let byte = buffer.next_byte().unwrap();
+            let byte = buffer.consume_byte().unwrap();
             if byte == 0 {
                 return Ok(DecodeStage::COMPLETE);
             } else if byte == 1 {

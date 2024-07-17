@@ -24,7 +24,7 @@ impl RawDecoder for Bool {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        let byte = buffer.next_byte().unwrap();
+        let byte = buffer.consume_byte().unwrap();
         self.0 = if byte == 1 { true } else { false };
         Ok(DecodeStage::COMPLETE)
     }

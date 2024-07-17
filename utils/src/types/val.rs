@@ -59,7 +59,7 @@ impl RawDecoder for Val {
         }
         match self {
             Val::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
+                let tpe = buffer.consume_byte().unwrap();
                 let result = Val::from_type(tpe);
                 if result.is_none() {
                     return Err(DecodeError::InvalidData);

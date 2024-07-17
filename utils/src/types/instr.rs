@@ -446,7 +446,7 @@ impl RawDecoder for Instr {
         }
         match self {
             Self::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
+                let tpe = buffer.consume_byte().unwrap();
                 let result = Self::from_type(tpe);
                 if result.is_none() {
                     return Err(DecodeError::InvalidData);

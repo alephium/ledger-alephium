@@ -280,7 +280,7 @@ mod tests {
                 let remain = encoded_tx.len() - length;
                 let size = min(random_usize(0, frame_size), remain);
                 let mut buffer =
-                    Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let mut continue_decode = true;

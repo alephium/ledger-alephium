@@ -132,7 +132,7 @@ impl I32 {
     ) -> usize {
         let mut index = from_index;
         while !buffer.is_empty() && index < length {
-            let byte = buffer.next_byte().unwrap() as u32;
+            let byte = buffer.consume_byte().unwrap() as u32;
             self.inner |= ((byte & 0xff) as i32) << ((length - index - 1) * 8);
             index += 1;
         }
@@ -160,7 +160,7 @@ impl RawDecoder for I32 {
             return Ok(DecodeStage { ..*stage });
         }
         if stage.index == 0 {
-            self.first_byte = buffer.next_byte().unwrap();
+            self.first_byte = buffer.consume_byte().unwrap();
         }
         let length = self.get_length();
         if length > 5 {
@@ -249,7 +249,7 @@ pub mod tests {
 
             {
                 let mut decoder = new_decoder::<I32>();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&I32::from(item.1)));
                 assert!(decoder.stage.is_complete())
@@ -262,7 +262,7 @@ pub mod tests {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
                 let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

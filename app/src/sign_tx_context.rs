@@ -100,7 +100,7 @@ impl SignTxContext {
         if data.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
-        let mut buffer = Buffer::new(data, &mut self.temp_data).unwrap();
+        let mut buffer = Buffer::new(data, &mut self.temp_data);
         let result = self._decode_tx(&mut buffer, tx_reviewer);
         self.hasher.update(data)?;
         result

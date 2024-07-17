@@ -71,7 +71,7 @@ mod tests {
 
             {
                 let mut decoder = new_decoder::<Token>();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 assert_eq!(decoder.decode(&mut buffer), Ok(Some(&token)));
             }
 
@@ -82,7 +82,7 @@ mod tests {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
                 let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

@@ -5,29 +5,25 @@ pub trait Writable {
 }
 
 pub struct Buffer<'a, W> {
-    index: u8,
+    index: usize,
     data: &'a [u8],
     temp_data: *mut W,
 }
 
 impl<'a, W> Buffer<'a, W> {
-    pub fn new(data: &'a [u8], temp_data: *mut W) -> Option<Buffer<'a, W>> {
-        if data.len() > (u8::MAX as usize) {
-            return None;
-        }
-        Some(Buffer {
+    pub fn new(data: &'a [u8], temp_data: *mut W) -> Buffer<'a, W> {
+        Buffer {
             index: 0,
             data,
             temp_data,
-        })
+        }
     }
 
-    pub fn next_byte(&mut self) -> Option<u8> {
-        let idx = self.index as usize;
-        if idx >= self.data.len() {
+    pub fn consume_byte(&mut self) -> Option<u8> {
+        if self.index >= self.data.len() {
             return None;
         }
-        let byte = self.data[idx];
+        let byte = self.data[self.index];
         self.index += 1;
         Some(byte)
     }
@@ -40,12 +36,13 @@ impl<'a, W> Buffer<'a, W> {
         self.len() == 0
     }
 
-    pub fn get_index(&self) -> u8 {
+    pub fn get_index(&self) -> usize {
         self.index
     }
 
-    pub fn get_range(&self, from_index: u8, to_index: u8) -> &[u8] {
-        &self.data[(from_index as usize)..(to_index as usize)]
+    pub fn get_range(&self, from_index: usize, to_index: usize) -> &[u8] {
+        assert!(from_index <= to_index && to_index <= self.data.len());
+        &self.data[from_index..to_index]
     }
 }
 

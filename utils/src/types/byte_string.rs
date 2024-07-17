@@ -70,7 +70,7 @@ impl RawDecoder for ByteString {
         }
 
         while (self.current_index as usize) < self.size() && !buffer.is_empty() {
-            let _ = buffer.next_byte().unwrap();
+            let _ = buffer.consume_byte().unwrap();
             self.current_index += 1;
         }
 
@@ -95,7 +95,7 @@ mod tests {
         let mut temp_data = TempData::new();
         let bytes = vec![0u8];
         let mut decoder = new_decoder::<ByteString>();
-        let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+        let mut buffer = Buffer::new(&bytes, &mut temp_data);
 
         let result = decoder.decode(&mut buffer).unwrap().unwrap();
         assert_eq!(result.size(), 0);
@@ -107,7 +107,7 @@ mod tests {
         let mut temp_data = TempData::new();
         let bytes = vec![4u8, 0, 1, 2, 3];
         let mut decoder = new_decoder::<ByteString>();
-        let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+        let mut buffer = Buffer::new(&bytes, &mut temp_data);
 
         let result = decoder.decode(&mut buffer).unwrap().unwrap();
         assert_eq!(result.size(), 4);

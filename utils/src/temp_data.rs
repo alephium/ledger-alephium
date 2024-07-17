@@ -29,7 +29,7 @@ impl TempData {
     #[inline]
     pub fn write_byte(&mut self, byte: u8) {
         if self.size == TempData::MAX_SIZE {
-            return;
+            panic!();
         }
         self.data[self.size] = byte;
         self.size += 1;
