@@ -5,8 +5,8 @@ authors = ["alephium devs"]
 edition = "2021"
 
 [dependencies]
-ledger_device_sdk = "1.11.1"
-ledger_secure_sdk_sys = "1.4.2"
+ledger_device_sdk = "=1.11.1"
+ledger_secure_sdk_sys = "=1.4.2"
 utils= { path = "../utils" }
 
 [features]
