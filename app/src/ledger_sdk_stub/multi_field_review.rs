@@ -1,5 +1,5 @@
 use ledger_device_sdk::ui::{
-    bitmaps::{Glyph, CHECKMARK, CROSS, EYE},
+    bitmaps::Glyph,
     gadgets::{clear_screen, get_event, Field, Page, PageStyle},
     screen_util::screen_update,
 };
@@ -18,15 +18,23 @@ pub struct MultiFieldReview<'a> {
 }
 
 impl<'a> MultiFieldReview<'a> {
-    pub fn new(fields: &'a [Field<'a>], messages: &'a [&'a str]) -> Self {
+    pub fn new(
+        fields: &'a [Field<'a>],
+        review_message: &'a [&'a str],
+        review_glyph: Option<&'a Glyph<'a>>,
+        validation_message: &'a str,
+        validation_glyph: Option<&'a Glyph<'a>>,
+        cancel_message: &'a str,
+        cancel_glyph: Option<&'a Glyph<'a>>,
+    ) -> Self {
         MultiFieldReview {
             fields,
-            review_message: messages,
-            review_glyph: Some(&EYE),
-            validation_message: "Approve",
-            validation_glyph: Some(&CHECKMARK),
-            cancel_message: "Reject",
-            cancel_glyph: Some(&CROSS),
+            review_message,
+            review_glyph,
+            validation_message,
+            validation_glyph,
+            cancel_message,
+            cancel_glyph,
         }
     }
 

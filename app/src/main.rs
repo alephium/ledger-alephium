@@ -189,11 +189,19 @@ fn sign_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCo
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
         use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::gadgets::Field;
+        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
 
         let review_messages = ["Review ", "Hash "];
         let fields = [Field{ name: "Hash", value: hex_str }];
-        let review = MultiFieldReview::new(&fields, &review_messages);
+        let review = MultiFieldReview::new(
+            &fields,
+           &review_messages,
+           Some(&EYE),
+           "Approve",
+           Some(&CHECKMARK),
+           "Reject",
+           Some(&CROSS),
+        );
         if review.show() {
             sign_hash(path, message)
         } else {

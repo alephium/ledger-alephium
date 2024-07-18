@@ -6,7 +6,7 @@ use crate::{
 };
 use core::str::from_utf8;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::gadgets::Field;
+use ledger_device_sdk::ui::{bitmaps::{EYE, CHECKMARK, CROSS, WARNING}, gadgets::Field};
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
@@ -23,21 +23,21 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
-    previous_input: Option<InputInfo>,
+    has_external_inputs: bool,
 }
 
 impl TxReviewer {
     pub fn new() -> Self {
         Self {
             buffer: unsafe { SwappingBuffer::new(&mut DATA) },
-            previous_input: None,
+            has_external_inputs: false,
         }
     }
 
     #[inline]
     fn reset(&mut self) {
         self.buffer.reset();
-        self.previous_input = None;
+        self.has_external_inputs = false;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -182,7 +182,8 @@ impl TxReviewer {
             _ => panic!(), // dead branch
         };
 
-        if self.is_same_as_device_address(address_from_index, address_to_index, device_address) {
+        let address = self.buffer.read(address_from_index, address_to_index);
+        if device_address.eq(address) {
             return Ok(None);
         }
 
@@ -241,137 +242,33 @@ impl TxReviewer {
         Ok(())
     }
 
-    fn review_inputs(&mut self, current_input_index: usize) -> Result<(), ErrorCode> {
-        match &self.previous_input {
-            Some(previous_input) => {
-                let previous_input_index = previous_input.input_index as usize;
-                let previous_input_length = previous_input.length as usize;
-                assert!(current_input_index > previous_input_index);
-                let inputs_count = current_input_index - previous_input_index;
-                let review_message_from_index = self.buffer.get_index();
-                let review_message_to_index = if inputs_count == 1 {
-                    self.write_index_with_prefix(previous_input_index, b"Input #")?
-                } else {
-                    let prefix = b"Inputs #";
-                    let mut bytes = [0u8; 18];
-                    bytes[..prefix.len()].copy_from_slice(prefix);
-                    let mut index = prefix.len();
-                    let input_from_index =
-                        I32::unsafe_from(previous_input_index).to_str(&mut bytes[index..]);
-                    if input_from_index.is_none() {
-                        return Err(ErrorCode::Overflow);
-                    }
-                    index += input_from_index.unwrap().len();
-
-                    bytes[index..(index + 4)].copy_from_slice(b" - #");
-                    index += 4;
-                    let input_to_index =
-                        I32::unsafe_from(current_input_index - 1).to_str(&mut bytes[index..]);
-                    if input_to_index.is_none() {
-                        return Err(ErrorCode::Overflow);
-                    }
-                    index += input_to_index.unwrap().len();
-                    self.buffer.write(&bytes[..index])?
-                };
-                let address = self.get_str_from_range((0, previous_input_length))?;
-                let review_message =
-                    self.get_str_from_range((review_message_from_index, review_message_to_index))?;
-                let fields = [Field {
-                    name: "Address",
-                    value: address,
-                }];
-                review(&fields, review_message)?;
-                self.reset();
-                Ok(())
-            }
-            None => Ok(()),
-        }
-    }
-
-    #[inline]
-    fn is_input_address_same_as_previous(&self, address: &[u8]) -> bool {
-        match &self.previous_input {
-            Some(previous_input) => self.buffer.read(0, previous_input.length as usize) == address,
-            None => false,
-        }
-    }
-
-    fn is_same_as_device_address(&self, from_index: usize, to_index: usize, device_address: &DeviceAddress) -> bool {
-        let address = self.buffer.read(from_index, to_index);
-        device_address.eq(address)
-    }
-
-    #[inline]
-    fn update_previous_input(&mut self, input_index: usize, address: &[u8]) {
-        let _ = self.buffer.write(address);
-        self.previous_input = Some(InputInfo {
-            input_index: input_index as u16,
-            length: address.len() as u16,
-        });
-    }
-
     pub fn review_input(
         &mut self,
         input: &TxInput,
         current_index: usize,
         input_size: usize,
-        device_address: &DeviceAddress,
-        temp_data: &[u8],
+        device_address: &DeviceAddress
     ) -> Result<(), ErrorCode> {
         assert!(current_index < input_size);
-        let mut address_bytes = [0u8; 46];
-        let mut address_length = 0;
-        let is_same_as_previous = match &input.unlock_script {
+        match &input.unlock_script {
             UnlockScript::P2PKH(public_key) => {
+                let mut address_bytes = [0u8; 46];
                 let public_key_hash = Blake2bHasher::hash(&public_key.0)?;
                 let address = to_base58_address(0u8, &public_key_hash, &mut address_bytes)?;
-                address_length = address.len();
-                self.is_input_address_same_as_previous(address)
+                if !self.has_external_inputs {
+                    self.has_external_inputs = !device_address.eq(address)
+                }
             }
-            UnlockScript::P2MPKH(_) => {
-                let multisig_address = b"Multisig Address";
-                address_bytes.copy_from_slice(multisig_address);
-                address_length = multisig_address.len();
-                false
-            }
-            UnlockScript::P2SH(_) => {
-                let script_hash = Blake2bHasher::hash(temp_data)?;
-                let address = to_base58_address(2u8, &script_hash, &mut address_bytes)?;
-                address_length = address.len();
-                self.is_input_address_same_as_previous(address)
-            }
-            UnlockScript::SameAsPrevious => true,
+            UnlockScript::P2MPKH(_) => self.has_external_inputs = true,
+            UnlockScript::P2SH(_) => self.has_external_inputs = true,
+            UnlockScript::SameAsPrevious => (),
             _ => panic!(),
         };
 
-        let is_current_input_the_last_one = current_index == input_size - 1;
-        if is_same_as_previous && !is_current_input_the_last_one {
-            return Ok(());
+        if (current_index == input_size - 1) && self.has_external_inputs {
+            warning_external_inputs()?;
         }
-
-        if is_same_as_previous && is_current_input_the_last_one {
-            assert!(self.previous_input.is_some());
-            let previous_input = self.previous_input.as_ref().unwrap();
-            if previous_input.input_index == 0 && self.is_same_as_device_address(0, previous_input.length as usize, device_address) {
-                // No need to display inputs if all inputs come from the device address
-                self.reset();
-                return Ok(());
-            }
-            return self.review_inputs(input_size);
-        }
-
-        self.review_inputs(current_index)?;
-        self.update_previous_input(current_index, &address_bytes[..address_length]);
-        if input_size == 1 && self.is_same_as_device_address(0, address_length, device_address) {
-            self.reset();
-            return Ok(());
-        }
-
-        if is_current_input_the_last_one {
-            self.review_inputs(input_size)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     pub fn review_output(
@@ -449,7 +346,6 @@ impl TxReviewer {
                         inputs.current_index as usize,
                         inputs.size(),
                         device_address,
-                        temp_data.read_all(),
                     )
                 } else {
                     Ok(())
@@ -492,11 +388,6 @@ impl TxReviewer {
     }
 }
 
-pub struct InputInfo {
-    pub length: u16,
-    pub input_index: u16,
-}
-
 pub struct OutputIndexes {
     pub review_message: (usize, usize),
     pub alph_amount: (usize, usize),
@@ -518,7 +409,15 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
         let review_messages = ["Review ", review_message];
-        let review = MultiFieldReview::new(fields, &review_messages);
+        let review = MultiFieldReview::new(
+            fields,
+           &review_messages,
+           Some(&EYE),
+           "Approve",
+           Some(&CHECKMARK),
+           "Reject",
+           Some(&CROSS),
+        );
         if review.show() {
             Ok(())
         } else {
@@ -535,6 +434,33 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
         } else {
             Err(ErrorCode::UserCancelled)
         }
+    }
+}
+
+fn warning_external_inputs() -> Result<(), ErrorCode> {
+    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+    {
+        let review_messages = ["There are ", "external inputs"];
+        let review = MultiFieldReview::new(
+            &[],
+           &review_messages,
+           Some(&WARNING),
+           "Continue",
+           Some(&CHECKMARK),
+           "Reject",
+           Some(&CROSS),
+        );
+        if review.show() {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    {
+        // TODO: support stax & flex
+        Ok(())
     }
 }
 
