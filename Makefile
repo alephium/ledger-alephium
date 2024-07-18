@@ -16,21 +16,6 @@ _release:
 			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
-debug:
-	@make _debug device=nanos
-	@make _debug device=nanox
-	@make _debug device=nanosplus
-	@make _debug device=stax
-	@make _debug device=flex
-
-_debug:
-	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
-		bash -c " \
-			cd app && \
-			echo 'Building $(device)  app' && \
-			cargo ledger build $(device) -- --no-default-features --features debug \
-		"
-
 check:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
 		bash -c " \
@@ -69,12 +54,16 @@ clean:
 
 set-github-action:
 	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0
-	docker pull ghcr.io/ledgerhq/speculos:0.9.5
-	make debug
-	cd js/docker && docker compose up -d && cd ../..
-	docker run -d --rm -v $(shell pwd):/speculos/app \
-		--publish 41000:41000 -p 25000:5000 -p 9999:9999 \
-		ghcr.io/ledgerhq/speculos:0.9.5 --model nanos --display headless --vnc-port 41000 app/app/target/nanos/release/app
+	docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:3.27.0
+	cd js/docker && docker compose up -d && cd .. && npm ci && cd ..
+
+run-github-ci:
+	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:3.27.0 \
+		bash -c "cd app && cargo ledger build $(path) -- --no-default-features --features debug"
+	docker run -d --name speculos --rm -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 \
+		ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:3.27.0 \
+		speculos -m $(device) /app/app/target/$(path)/release/app --display headless
+	cd js && sleep 3 && MODEL=$(device) npm run test && docker stop speculos && cd ..
 
 .PHONY: release clean
 
