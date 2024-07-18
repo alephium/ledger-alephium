@@ -24,6 +24,7 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     has_external_inputs: bool,
+    next_output_index: u16,
 }
 
 impl TxReviewer {
@@ -31,13 +32,20 @@ impl TxReviewer {
         Self {
             buffer: unsafe { SwappingBuffer::new(&mut DATA) },
             has_external_inputs: false,
+            next_output_index: 1, // display output from index 1, similar to BTC
         }
     }
 
     #[inline]
-    fn reset(&mut self) {
+    fn reset_buffer(&mut self) {
         self.buffer.reset();
+    }
+
+    #[inline]
+    pub fn reset(&mut self) {
+        self.reset_buffer();
         self.has_external_inputs = false;
+        self.next_output_index = 1;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -169,7 +177,6 @@ impl TxReviewer {
     fn prepare_output(
         &mut self,
         output: &AssetOutput,
-        current_index: usize,
         device_address: &DeviceAddress,
         temp_data: &[u8],
     ) -> Result<Option<OutputIndexes>, ErrorCode> {
@@ -188,7 +195,8 @@ impl TxReviewer {
         }
 
         let review_message_from_index = self.buffer.get_index();
-        let review_message_to_index = self.write_index_with_prefix(current_index, b"Output #")?;
+        let review_message_to_index = self.write_index_with_prefix(self.next_output_index as usize, b"Output #")?;
+        self.next_output_index += 1;
 
         let alph_amount_from_index = self.buffer.get_index();
         let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
@@ -238,7 +246,7 @@ impl TxReviewer {
             value,
         }];
         review(&fields, "Fees ")?;
-        self.reset();
+        self.reset_buffer();
         Ok(())
     }
 
@@ -274,13 +282,11 @@ impl TxReviewer {
     pub fn review_output(
         &mut self,
         output: &AssetOutput,
-        current_index: usize,
         device_address: &DeviceAddress,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
-        let output_indexes_opt = self.prepare_output(output, current_index, device_address, temp_data)?;
+        let output_indexes_opt = self.prepare_output(output, device_address, temp_data)?;
         if output_indexes_opt.is_none() {
-            self.reset();
             return Ok(());
         }
         let OutputIndexes {
@@ -302,9 +308,7 @@ impl TxReviewer {
         };
         if token.is_none() {
             let fields = [address_field, alph_amount_field];
-            review(&fields, review_message)?;
-            self.reset();
-            return Ok(());
+            return review(&fields, review_message)
         }
 
         let TokenIndexes {
@@ -325,9 +329,7 @@ impl TxReviewer {
                 value: token_amount,
             },
         ];
-        review(&fields, review_message)?;
-        self.reset();
-        Ok(())
+        review(&fields, review_message)
     }
 
     pub fn review_tx_details(
@@ -353,12 +355,13 @@ impl TxReviewer {
             }
             UnsignedTx::FixedOutputs(outputs) => {
                 if let Some(current_output) = outputs.get_current_item() {
-                    self.review_output(
+                    let result = self.review_output(
                         current_output,
-                        outputs.current_index as usize,
                         device_address,
                         temp_data.read_all(),
-                    )
+                    );
+                    self.reset_buffer();
+                    result
                 } else {
                     Ok(())
                 }

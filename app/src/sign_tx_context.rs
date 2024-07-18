@@ -119,6 +119,7 @@ impl SignTxContext {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
+                tx_reviewer.reset();
                 if apdu_header.p1 == 0 && data.len() >= 23 {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::HDPathDecodingFailed);
