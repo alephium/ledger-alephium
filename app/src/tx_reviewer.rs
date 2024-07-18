@@ -1,9 +1,8 @@
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
-    ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE},
+    ledger_sdk_stub::{nvm::{NVMData, NVM, NVM_DATA_SIZE}, swapping_buffer::{SwappingBuffer, RAM_SIZE}},
     public_key::{derive_pub_key_by_path, hash_of_public_key},
-    ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE},
 };
 use core::str::from_utf8;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -171,14 +170,9 @@ impl TxReviewer {
         &mut self,
         output: &AssetOutput,
         current_index: usize,
+        device_address: &DeviceAddress,
         temp_data: &[u8],
-    ) -> Result<OutputIndexes, ErrorCode> {
-        let review_message_from_index = self.buffer.get_index();
-        let review_message_to_index = self.write_index_with_prefix(current_index, b"Output #")?;
-
-        let alph_amount_from_index = self.buffer.get_index();
-        let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
-
+    ) -> Result<Option<OutputIndexes>, ErrorCode> {
         let address_from_index = self.buffer.get_index();
         let address_to_index = match &output.lockup_script {
             LockupScript::P2PKH(hash) | LockupScript::P2SH(hash) => {
@@ -188,6 +182,16 @@ impl TxReviewer {
             _ => panic!(), // dead branch
         };
 
+        if self.is_same_as_device_address(address_from_index, address_to_index, device_address) {
+            return Ok(None);
+        }
+
+        let review_message_from_index = self.buffer.get_index();
+        let review_message_to_index = self.write_index_with_prefix(current_index, b"Output #")?;
+
+        let alph_amount_from_index = self.buffer.get_index();
+        let alph_amount_to_index = self.write_alph_amount(&output.amount)?;
+
         let output_indexes = OutputIndexes {
             review_message: (review_message_from_index, review_message_to_index),
             alph_amount: (alph_amount_from_index, alph_amount_to_index),
@@ -195,7 +199,7 @@ impl TxReviewer {
             token: None,
         };
         if output.tokens.is_empty() {
-            return Ok(output_indexes);
+            return Ok(Some(output_indexes));
         }
 
         // Asset output has at most one token
@@ -206,13 +210,13 @@ impl TxReviewer {
         let token_amount_from_index = self.buffer.get_index();
         let token_amount_to_index = self.write_token_amount(&token.amount)?;
 
-        Ok(OutputIndexes {
+        Ok(Some(OutputIndexes {
             token: Some(TokenIndexes {
                 token_id: (token_id_from_index, token_id_to_index),
                 token_amount: (token_amount_from_index, token_amount_to_index),
             }),
             ..output_indexes
-        })
+        }))
     }
 
     fn get_str_from_range(&self, range: (usize, usize)) -> Result<&str, ErrorCode> {
@@ -292,18 +296,9 @@ impl TxReviewer {
         }
     }
 
-    fn is_same_as_device_address(
-        &self,
-        previous_address_length: usize,
-        address_bytes: &mut [u8],
-        path: &[u32],
-    ) -> Result<bool, ErrorCode> {
-        let previous_address = self.buffer.read(0, previous_address_length);
-        let device_public_key =
-            derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
-        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
-        let device_address = to_base58_address(0u8, &public_key_hash, address_bytes)?;
-        Ok(previous_address == device_address)
+    fn is_same_as_device_address(&self, from_index: usize, to_index: usize, device_address: &DeviceAddress) -> bool {
+        let address = self.buffer.read(from_index, to_index);
+        device_address.eq(address)
     }
 
     #[inline]
@@ -320,7 +315,7 @@ impl TxReviewer {
         input: &TxInput,
         current_index: usize,
         input_size: usize,
-        path: &[u32],
+        device_address: &DeviceAddress,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
         assert!(current_index < input_size);
@@ -334,7 +329,7 @@ impl TxReviewer {
                 self.is_input_address_same_as_previous(address)
             }
             UnlockScript::P2MPKH(_) => {
-                let multisig_address = b"multi-sig-address";
+                let multisig_address = b"Multisig Address";
                 address_bytes.copy_from_slice(multisig_address);
                 address_length = multisig_address.len();
                 false
@@ -357,13 +352,7 @@ impl TxReviewer {
         if is_same_as_previous && is_current_input_the_last_one {
             assert!(self.previous_input.is_some());
             let previous_input = self.previous_input.as_ref().unwrap();
-            if previous_input.input_index == 0
-                && self.is_same_as_device_address(
-                    previous_input.length as usize,
-                    &mut address_bytes,
-                    path,
-                )?
-            {
+            if previous_input.input_index == 0 && self.is_same_as_device_address(0, previous_input.length as usize, device_address) {
                 // No need to display inputs if all inputs come from the device address
                 self.reset();
                 return Ok(());
@@ -373,9 +362,7 @@ impl TxReviewer {
 
         self.review_inputs(current_index)?;
         self.update_previous_input(current_index, &address_bytes[..address_length]);
-        if input_size == 1
-            && self.is_same_as_device_address(address_length, &mut address_bytes, path)?
-        {
+        if input_size == 1 && self.is_same_as_device_address(0, address_length, device_address) {
             self.reset();
             return Ok(());
         }
@@ -391,14 +378,20 @@ impl TxReviewer {
         &mut self,
         output: &AssetOutput,
         current_index: usize,
+        device_address: &DeviceAddress,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
+        let output_indexes_opt = self.prepare_output(output, current_index, device_address, temp_data)?;
+        if output_indexes_opt.is_none() {
+            self.reset();
+            return Ok(());
+        }
         let OutputIndexes {
             review_message,
             alph_amount,
             address,
             token,
-        } = self.prepare_output(output, current_index, temp_data)?;
+        } = output_indexes_opt.unwrap();
         let review_message = self.get_str_from_range(review_message)?;
         let alph_amount = self.get_str_from_range(alph_amount)?;
         let address = self.get_str_from_range(address)?;
@@ -443,7 +436,7 @@ impl TxReviewer {
     pub fn review_tx_details(
         &mut self,
         unsigned_tx: &UnsignedTx,
-        path: &[u32],
+        device_address: &DeviceAddress,
         temp_data: &SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {
@@ -455,7 +448,7 @@ impl TxReviewer {
                         current_input,
                         inputs.current_index as usize,
                         inputs.size(),
-                        path,
+                        device_address,
                         temp_data.read_all(),
                     )
                 } else {
@@ -467,6 +460,7 @@ impl TxReviewer {
                     self.review_output(
                         current_output,
                         outputs.current_index as usize,
+                        device_address,
                         temp_data.read_all(),
                     )
                 } else {
@@ -545,7 +539,7 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
 }
 
 #[inline]
-fn to_base58_address<'a>(
+pub fn to_base58_address<'a>(
     prefix: u8,
     hash: &[u8; 32],
     output: &'a mut [u8],
@@ -554,5 +548,26 @@ fn to_base58_address<'a>(
         Ok(str_bytes)
     } else {
         Err(ErrorCode::Overflow)
+    }
+}
+
+pub struct DeviceAddress {
+    bytes: [u8; 46],
+    length: usize
+}
+
+impl DeviceAddress {
+    pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
+        let mut bytes = [0u8; 46];
+        let device_public_key =
+            derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
+        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
+        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
+        let length = device_address.len();
+        Ok(Self { bytes, length })
+    }
+
+    pub fn eq(&self, addr: &[u8]) -> bool {
+        &self.bytes[..self.length] == addr
     }
 }

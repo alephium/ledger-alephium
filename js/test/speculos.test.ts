@@ -83,9 +83,7 @@ function getInputClickSize() {
 
 async function click(inputSize: number, outputs: OutputType[]) {
   await sleep(1000);
-  for (let index = 0; index < 2; index += 1) { // network id and fees
-    await clickAndApprove(2)
-  }
+  await clickAndApprove(2) // fees
 
   for (let index = 0; index < inputSize; index += 1){
     await clickAndApprove(getInputClickSize())
@@ -299,7 +297,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, Array(3).fill(OutputType.Base))
+    approveTx(0, Array(2).fill(OutputType.Base))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -335,7 +333,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, [OutputType.Multisig, OutputType.Multisig, OutputType.Base]);
+    approveTx(0, Array(2).fill(OutputType.Multisig));
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -375,7 +373,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, [OutputType.MultisigAndToken, OutputType.Multisig, OutputType.Token, OutputType.Base])
+    approveTx(0, [OutputType.MultisigAndToken, OutputType.Multisig])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -414,7 +412,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, Array(2).fill(OutputType.Base))
+    approveTx(0, [OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -489,7 +487,7 @@ describe('sdk', () => {
       unsignedTx: binToHex(txBytes)
     })
 
-    approveTx(2, [OutputType.Base])
+    approveTx(2, [])
     const signature1 = await app.signUnsignedTx(path, Buffer.from(txBytes))
     expect(transactionVerifySignature(signResult0.txId, testAccount.publicKey, signature1)).toBe(true)
 
@@ -518,7 +516,7 @@ describe('sdk', () => {
     await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
 
     await enableBlindSigning()
-    approveTx(0, [OutputType.Base])
+    approveTx(0, [])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
       unsignedTx: buildTxResult.unsignedTx,

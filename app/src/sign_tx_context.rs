@@ -6,6 +6,7 @@ use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::U
 use crate::settings::is_blind_signing_enabled;
 use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
+use crate::tx_reviewer::DeviceAddress;
 use crate::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
@@ -28,6 +29,7 @@ pub struct SignTxContext {
     current_step: DecodeStep,
     hasher: Blake2bHasher,
     temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
+    device_address: Option<DeviceAddress>,
 }
 
 impl SignTxContext {
@@ -38,6 +40,7 @@ impl SignTxContext {
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
             temp_data: unsafe { SwappingBuffer::new(&mut DATA) },
+            device_address: None,
         }
     }
 
@@ -47,6 +50,7 @@ impl SignTxContext {
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
         self.temp_data.reset();
+        self.device_address = None;
     }
 
     pub fn is_complete(&self) -> bool {
@@ -77,7 +81,7 @@ impl SignTxContext {
                 Ok(true) => {
                     tx_reviewer.review_tx_details(
                         &self.tx_decoder.inner,
-                        &self.path,
+                        &self.device_address.as_ref().unwrap(),
                         &self.temp_data,
                     )?;
                     self.temp_data.reset();
@@ -119,6 +123,7 @@ impl SignTxContext {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::HDPathDecodingFailed);
                     }
+                    self.device_address = Some(DeviceAddress::from_path(&self.path)?);
                     self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
                     if tx_data[2] == 0x01 {
