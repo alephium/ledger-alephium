@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+use core::str::from_utf8;
+
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use display::MainPages;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
@@ -27,7 +29,7 @@ mod tx_reviewer;
 mod ledger_sdk_stub;
 
 use debug::print::{println, println_slice};
-use ledger_device_sdk::io;
+use ledger_device_sdk::{ecc::{Secp256k1, SeedDerive}, io};
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 
@@ -83,6 +85,7 @@ extern "C" fn sample_main() {
 pub enum Ins {
     GetVersion,
     GetPubKey,
+    SignHash,
     SignTx,
 }
 
@@ -92,7 +95,8 @@ impl TryFrom<io::ApduHeader> for Ins {
         match header.ins {
             0 => Ok(Ins::GetVersion),
             1 => Ok(Ins::GetPubKey),
-            2 => Ok(Ins::SignTx),
+            2 => Ok(Ins::SignHash),
+            3 => Ok(Ins::SignTx),
             _ => Err(ErrorCode::BadIns),
         }
     }
@@ -136,6 +140,21 @@ fn handle_apdu(
             comm.append(pk.as_ref());
             comm.append(hd_index.to_be_bytes().as_slice());
         }
+        Ins::SignHash => {
+            let data = comm.get_data()?;
+            if data.len() != 4 * 5 + 32 {
+                return Err(ErrorCode::BadLen.into());
+            }
+            // This check can be removed, but we keep it for double checking
+            if !deserialize_path(&data[..20], &mut path) {
+                return Err(ErrorCode::BadLen.into());
+            }
+
+            match sign_ui(&path, &data[20..]) {
+                Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),
+                Err(code) => return Err(code.into()),
+            }
+        }
         Ins::SignTx => {
             let data = comm.get_data()?;
             match sign_tx_context.handle_data(apdu_header, data, tx_reviewer) {
@@ -161,4 +180,46 @@ fn handle_apdu(
         }
     }
     Ok(())
+}
+
+fn sign_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
+    let hex: [u8; 64] = utils::to_hex(message).map_err(|_| ErrorCode::BadLen)?;
+    let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InternalError)?;
+
+    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+    {
+        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
+        use ledger_device_sdk::ui::gadgets::Field;
+
+        let review_messages = ["Review ", "Hash "];
+        let fields = [Field{ name: "Hash", value: hex_str }];
+        let review = MultiFieldReview::new(&fields, &review_messages);
+        if review.show() {
+            sign_hash(path, message)
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    {
+        use ledger_device_sdk::nbgl::{Field, TagValueList};
+        use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
+
+        let fields = [Field{ name: "Hash", value: hex_str }];
+        let values = TagValueList::new(&fields, 0, false, false);
+        let approved = nbgl_review_fields("Review", "Hash", &values);
+        if approved {
+            nbgl_sync_review_status(ReviewType::Hash);
+            sign_hash(path, message)
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+}
+
+fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
+    Secp256k1::derive_from_path(path)
+        .deterministic_sign(message)
+        .map_err(|_| ErrorCode::TxSigningFailed)
 }

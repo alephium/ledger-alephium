@@ -9,7 +9,8 @@ export const CLA = 0x80
 export enum INS {
   GET_VERSION = 0x00,
   GET_PUBLIC_KEY = 0x01,
-  SIGN_TX = 0x02
+  SIGN_HASH = 0x02,
+  SIGN_TX = 0x03
 }
 
 export const GROUP_NUM = 4
@@ -51,6 +52,19 @@ export default class AlephiumApp {
     const hdIndex = response.slice(65, 69).readUInt32BE(0)
 
     return [{ publicKey: publicKey, address: address, group: group, keyType: keyType ?? 'default' }, hdIndex] as const
+  }
+
+  async signHash(path: string, hash: Buffer): Promise<string> {
+    if (hash.length !== HASH_LEN) {
+      throw new Error('Invalid hash length')
+    }
+
+    const data = Buffer.concat([serde.serializePath(path), hash])
+    console.log(`data ${data.length}`)
+    const response = await this.transport.send(CLA, INS.SIGN_HASH, 0x00, 0x00, data, [StatusCodes.OK])
+    console.log(`response ${response.length} - ${response.toString('hex')}`)
+
+    return decodeSignature(response)
   }
 
   async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {

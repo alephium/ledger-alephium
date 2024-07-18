@@ -4,6 +4,7 @@ import fetch from 'node-fetch'
 import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
+import blake from 'blakejs'
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -72,6 +73,24 @@ describe('sdk', () => {
     }
     await app.close()
   })
+
+  it('should sign hash', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+
+    const [account] = await app.getAccount(path)
+    console.log(account)
+
+    const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))
+    setTimeout(async () => {
+      await clickAndApprove(5)
+    }, 1000)
+    const signature = await app.signHash(path, hash)
+    console.log(signature)
+    await app.close()
+
+    expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
+  }, 10000)
 
   async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
     const balance0 = await getALPHBalance(address)

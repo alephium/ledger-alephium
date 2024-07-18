@@ -7,13 +7,13 @@ use crate::{
 };
 use core::str::from_utf8;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
+use ledger_device_sdk::ui::gadgets::Field;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{Field, TagValueList};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status};
+use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
     types::{unsigned_tx::TxFee, AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
@@ -514,7 +514,7 @@ impl TxReviewer {
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
             if result.is_ok() {
-                nbgl_sync_review_status();
+                nbgl_sync_review_status(ReviewType::Transaction);
             }
             result
         }
@@ -547,15 +547,7 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
         let review_messages = ["Review ", review_message];
-        let review = MultiFieldReview::new(
-            fields,
-            &review_messages,
-            Some(&EYE),
-            "Approve",
-            Some(&CHECKMARK),
-            "Reject",
-            Some(&CROSS),
-        );
+        let review = MultiFieldReview::new(fields, &review_messages);
         if review.show() {
             Ok(())
         } else {

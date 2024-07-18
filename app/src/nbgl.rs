@@ -7,6 +7,11 @@ use core::ffi::c_char;
 use ledger_device_sdk::nbgl::*;
 use ledger_secure_sdk_sys::*;
 
+pub enum ReviewType {
+    Transaction,
+    Hash,
+}
+
 pub fn nbgl_review_fields(title: &str, subtitle: &str, fields: &TagValueList) -> bool {
     unsafe {
         let title = CString::new(title).unwrap();
@@ -28,9 +33,13 @@ pub fn nbgl_review_fields(title: &str, subtitle: &str, fields: &TagValueList) ->
     }
 }
 
-pub fn nbgl_sync_review_status() {
+pub fn nbgl_sync_review_status(tpe: ReviewType) {
     unsafe {
-        let _ = ux_sync_reviewStatus(STATUS_TYPE_TRANSACTION_SIGNED);
+        let status_type = match tpe {
+            ReviewType::Transaction => STATUS_TYPE_TRANSACTION_SIGNED,
+            ReviewType::Hash => STATUS_TYPE_OPERATION_SIGNED, // there is no `STATUS_TYPE_HASH` in ledger sdk
+        };
+        let _ = ux_sync_reviewStatus(status_type);
     }
 }
 

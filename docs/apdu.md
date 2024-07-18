@@ -79,7 +79,7 @@ This command returns the public key corresponding to the secret key found at the
 | P1      | byte (1) | Parameter 1               | 0 or 4          |
 | P2      | byte (1) | Parameter 2               | Any value between [0-3]         |
 | L       | byte (1) | Bytes in payload          | 0x14            |
-| Path[0] | byte (4) | Derivation Path Data      | 0x80000A55      |
+| Path[0] | byte (4) | Derivation Path Data      | ?               |
 | Path[1] | byte (4) | Derivation Path Data      | ?               |
 | Path[2] | byte (4) | Derivation Path Data      | ?               |
 | Path[3] | byte (4) | Derivation Path Data      | ?               |
@@ -93,14 +93,41 @@ This command returns the public key corresponding to the secret key found at the
 | HD INDEX   | byte (4)  | Derivation index  |                          |
 | SW1-SW2    | byte (2)  | Return code       | see list of return codes |
 
+### SignHash
+
+This command returns a signature of the passed hash
+
+#### Command
+
+| Field   | Type     | Content                   | Expected        |
+|---------|----------|---------------------------|-----------------|
+| CLA     | byte (1) | Application Identifier    | 0x8A            |
+| INS     | byte (1) | Instruction ID            | 0x02            |
+| P1      | byte (1) | Parameter 1               | ignored         |
+| P2      | byte (1) | Parameter 2               | ignored         |
+| L       | byte (1) | Bytes in payload          | 0x34            |
+| Path[0] | byte (4) | Derivation Path Data      | ?               |
+| Path[1] | byte (4) | Derivation Path Data      | ?               |
+| Path[2] | byte (4) | Derivation Path Data      | ?               |
+| Path[3] | byte (4) | Derivation Path Data      | ?               |
+| Path[4] | byte (4) | Derivation Path Data      | ?               |
+| Hash    | byte (32)| Hash                      | ?               |
+
+#### Response
+
+| Field    | Type      | Content     | Note                                  |
+|----------|-----------|-------------|---------------------------------------|
+| SIG      | byte (?)  | Signature   | DER-encoded signature                 |
+| SW1-SW2  | byte (2)  | Return code | see list of return codes              |
+
 ### SignTx
 
-This command will return a signature of the passed transaction
+This command returns a signature of the passed transaction
 
 | Field | Type     | Content                     | Expected          |
 |-------|----------|-----------------------------|-------------------|
 | CLA   | byte (1) | Application Identifier      | 0x80              |
-| INS   | byte (1) | Instruction ID              | 0x02              |
+| INS   | byte (1) | Instruction ID              | 0x03              |
 | P1    | byte (1) | Payload desc                | 0x00: first transaction data block <br> 0x01: subsequent transaction data block |
 | P2    | byte (1) | ignored                     |                   |
 | L     | byte (1) | Bytes in payload            | (depends)         |
@@ -126,5 +153,5 @@ Input data (subsequent transaction data block):
 
 | Field    | Type      | Content     | Note                                  |
 |----------|-----------|-------------|---------------------------------------|
-| SIG      | byte (?)  | Signature   | DER-encoded signature                |
+| SIG      | byte (?)  | Signature   | DER-encoded signature                 |
 | SW1-SW2  | byte (2)  | Return code | see list of return codes              |
