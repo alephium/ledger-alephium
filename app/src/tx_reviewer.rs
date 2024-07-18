@@ -220,29 +220,6 @@ impl TxReviewer {
         bytes_to_string(bytes)
     }
 
-    pub fn review_network(id: u8) -> Result<(), ErrorCode> {
-        let mut bytes = [0u8; 7];
-        let network_id = match id {
-            0 => "mainnet",
-            1 => "testnet",
-            2 | 3 | 4 => "devnet",
-            _ => {
-                let prefix = b"ID: ";
-                bytes[..prefix.len()].copy_from_slice(prefix);
-                let result = I32::unsafe_from(id as usize).to_str(&mut bytes[prefix.len()..]);
-                assert!(result.is_some());
-                let length = prefix.len() + result.unwrap().len();
-                bytes_to_string(&bytes[..length])?
-            }
-        };
-
-        let fields = [Field {
-            name: "Network",
-            value: network_id,
-        }];
-        review(&fields, "Network ")
-    }
-
     pub fn review_tx_fee(&mut self, tx_fee: &TxFee) -> Result<(), ErrorCode> {
         let from_index = self.buffer.get_index();
         let fee = tx_fee.get();
@@ -470,7 +447,7 @@ impl TxReviewer {
         temp_data: &SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {
-            UnsignedTx::NetworkId(byte) => Self::review_network(byte.0),
+            UnsignedTx::NetworkId(_) => Ok(()),
             UnsignedTx::TxFee(tx_fee) => self.review_tx_fee(&tx_fee.inner),
             UnsignedTx::Inputs(inputs) => {
                 if let Some(current_input) = inputs.get_current_item() {
