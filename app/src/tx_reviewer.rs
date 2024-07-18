@@ -21,6 +21,8 @@ use utils::{
 #[link_section = ".nvm_data"]
 static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
+const FIRST_OUTPUT_INDEX: u16 = 1;
+
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     has_external_inputs: bool,
@@ -33,7 +35,7 @@ impl TxReviewer {
         Self {
             buffer: unsafe { SwappingBuffer::new(&mut DATA) },
             has_external_inputs: false,
-            next_output_index: 1, // display output from index 1, similar to BTC
+            next_output_index: FIRST_OUTPUT_INDEX, // display output from index 1, similar to BTC
             tx_fee: None,
         }
     }
@@ -47,7 +49,7 @@ impl TxReviewer {
     pub fn reset(&mut self) {
         self.reset_buffer();
         self.has_external_inputs = false;
-        self.next_output_index = 1;
+        self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
     }
 
@@ -367,19 +369,63 @@ impl TxReviewer {
         }
     }
 
+    fn review_self_transfer(&self, fee_field: &Field) -> Result<(), ErrorCode> {
+        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+        {
+            let fields = &[Field{ name: fee_field.name, value: fee_field.value }];
+            let review = MultiFieldReview::new(
+                fields,
+               &["Confirm self-transfer"],
+               Some(&EYE),
+               "Sign transaction",
+               Some(&CHECKMARK),
+               "Reject",
+               Some(&CROSS),
+            );
+            if review.show() {
+                Ok(())
+            } else {
+                Err(ErrorCode::UserCancelled)
+            }
+        }
+
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            let fields = &[
+                Field{ name: "Amount", value: "Self-transfer" }, // same as app-bitcoin
+                Field{ name: fee_field.name, value: fee_field.value }
+            ];
+            let result = review(fields, "Fees");
+            if result.is_ok() {
+                if NbglStreamingReview::new().finish("Click to sign") {
+                    Ok(())
+                } else {
+                    Err(ErrorCode::UserCancelled)
+                }
+            } else {
+                result
+            }
+        }
+    }
+
     pub fn review_tx_fee(&self) -> Result<(), ErrorCode> {
         assert!(self.tx_fee.is_some());
         let mut amount_output = [0u8; 33];
         let amount_str = self.tx_fee.as_ref().unwrap().to_alph(&mut amount_output).unwrap();
         let value = bytes_to_string(amount_str)?;
-        let fields = [Field {
+        let fee_field = Field {
             name: "Fees",
             value,
-        }];
+        };
+        if self.next_output_index == FIRST_OUTPUT_INDEX {
+            return self.review_self_transfer(&fee_field);
+        }
+
+        let fields = &[fee_field];
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
             let review = MultiFieldReview::new(
-                &fields,
+                fields,
                &[],
                None,
                "Sign transaction",
@@ -396,7 +442,7 @@ impl TxReviewer {
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
-            let result = review(&fields, "Fees");
+            let result = review(fields, "Fees");
             if result.is_ok() {
                 nbgl_sync_review_status(ReviewType::Transaction);
             }
