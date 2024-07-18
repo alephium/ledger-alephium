@@ -39,23 +39,25 @@ impl<'a> MultiFieldReview<'a> {
     }
 
     pub fn show(&self) -> bool {
-        let first_page = match self.review_message.len() {
-            0 => Page::new(PageStyle::PictureNormal, ["", ""], self.review_glyph),
-            1 => Page::new(
+        let first_page_opt = match self.review_message.len() {
+            0 => None,
+            1 => Some(Page::new(
                 PageStyle::PictureBold,
                 [self.review_message[0], ""],
                 self.review_glyph,
-            ),
-            _ => Page::new(
+            )),
+            _ => Some(Page::new(
                 PageStyle::PictureNormal,
                 [self.review_message[0], self.review_message[1]],
                 self.review_glyph,
-            ),
+            )),
         };
 
-        clear_screen();
-        first_page.place_and_wait();
-        screen_update();
+        if let Some(first_page) = first_page_opt {
+            clear_screen();
+            first_page.place_and_wait();
+            screen_update();
+        }
 
         let validation_page = Page::new(
             PageStyle::PictureBold,

@@ -3,6 +3,7 @@ use crate::decode::*;
 use crate::types::compact_integer::*;
 
 #[cfg_attr(test, derive(Debug))]
+#[derive(Clone)]
 pub struct BigInt {
     pub bytes: [u8; 33],
 }

@@ -5,7 +5,7 @@ use crate::types::compact_integer::*;
 use super::{reset, BigInt};
 
 #[cfg_attr(test, derive(Debug))]
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone)]
 pub struct U256(pub BigInt);
 
 impl Reset for U256 {

@@ -62,9 +62,8 @@ impl SignTxContext {
         self.hasher.finalize()
     }
 
-    pub fn review_tx_id_and_sign(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
+    pub fn sign_tx(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
-        TxReviewer::review_tx_id(&tx_id)?;
         let signature = Secp256k1::derive_from_path(&self.path)
             .deterministic_sign(&tx_id)
             .map_err(|_| ErrorCode::TxSigningFailed)?;

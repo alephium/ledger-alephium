@@ -15,7 +15,7 @@ use ledger_device_sdk::nbgl::{Field, TagValueList};
 use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
-    types::{unsigned_tx::TxFee, AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
+    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
 };
 
 #[link_section = ".nvm_data"]
@@ -25,6 +25,7 @@ pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     has_external_inputs: bool,
     next_output_index: u16,
+    tx_fee: Option<U256>,
 }
 
 impl TxReviewer {
@@ -33,6 +34,7 @@ impl TxReviewer {
             buffer: unsafe { SwappingBuffer::new(&mut DATA) },
             has_external_inputs: false,
             next_output_index: 1, // display output from index 1, similar to BTC
+            tx_fee: None,
         }
     }
 
@@ -46,6 +48,7 @@ impl TxReviewer {
         self.reset_buffer();
         self.has_external_inputs = false;
         self.next_output_index = 1;
+        self.tx_fee = None;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -233,23 +236,6 @@ impl TxReviewer {
         bytes_to_string(bytes)
     }
 
-    pub fn review_tx_fee(&mut self, tx_fee: &TxFee) -> Result<(), ErrorCode> {
-        let from_index = self.buffer.get_index();
-        let fee = tx_fee.get();
-        if fee.is_none() {
-            return Err(ErrorCode::Overflow);
-        }
-        let to_index = self.write_alph_amount(fee.as_ref().unwrap())?;
-        let value = self.get_str_from_range((from_index, to_index))?;
-        let fields = [Field {
-            name: "Fees",
-            value,
-        }];
-        review(&fields, "Fees ")?;
-        self.reset_buffer();
-        Ok(())
-    }
-
     pub fn review_input(
         &mut self,
         input: &TxInput,
@@ -340,7 +326,14 @@ impl TxReviewer {
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {
             UnsignedTx::NetworkId(_) => Ok(()),
-            UnsignedTx::TxFee(tx_fee) => self.review_tx_fee(&tx_fee.inner),
+            UnsignedTx::TxFee(tx_fee) => {
+                let fee = tx_fee.inner.get();
+                if fee.is_none() {
+                    return Err(ErrorCode::Overflow);
+                }
+                self.tx_fee = Some(fee.as_ref().unwrap().clone());
+                Ok(())
+            },
             UnsignedTx::Inputs(inputs) => {
                 if let Some(current_input) = inputs.get_current_item() {
                     self.review_input(
@@ -361,7 +354,11 @@ impl TxReviewer {
                         temp_data.read_all(),
                     );
                     self.reset_buffer();
-                    result
+                    if result.is_ok() && (outputs.current_index as usize == outputs.size() - 1) {
+                        self.review_tx_fee()
+                    } else {
+                        result
+                    }
                 } else {
                     Ok(())
                 }
@@ -370,19 +367,36 @@ impl TxReviewer {
         }
     }
 
-    pub fn review_tx_id(tx_id: &[u8; 32]) -> Result<(), ErrorCode> {
-        let hex: [u8; 64] = utils::to_hex(&tx_id[..]).unwrap();
-        let hex_str = bytes_to_string(&hex)?;
+    pub fn review_tx_fee(&self) -> Result<(), ErrorCode> {
+        assert!(self.tx_fee.is_some());
+        let mut amount_output = [0u8; 33];
+        let amount_str = self.tx_fee.as_ref().unwrap().to_alph(&mut amount_output).unwrap();
+        let value = bytes_to_string(amount_str)?;
         let fields = [Field {
-            name: "Transaction ID",
-            value: hex_str,
+            name: "Fees",
+            value,
         }];
-        let result = review(&fields, "Transaction ID");
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-        { return result }
+        {
+            let review = MultiFieldReview::new(
+                &fields,
+               &[],
+               None,
+               "Sign transaction",
+               Some(&CHECKMARK),
+               "Reject",
+               Some(&CROSS),
+            );
+            if review.show() {
+                Ok(())
+            } else {
+                Err(ErrorCode::UserCancelled)
+            }
+        }
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
+            let result = review(&fields, "Fees");
             if result.is_ok() {
                 nbgl_sync_review_status(ReviewType::Transaction);
             }
@@ -416,7 +430,7 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
             fields,
            &review_messages,
            Some(&EYE),
-           "Approve",
+           "Continue",
            Some(&CHECKMARK),
            "Reject",
            Some(&CROSS),
@@ -445,7 +459,7 @@ fn warning_external_inputs() -> Result<(), ErrorCode> {
     {
         let review_messages = ["There are ", "external inputs"];
         let review = MultiFieldReview::new(
-            &[],
+           &[],
            &review_messages,
            Some(&WARNING),
            "Continue",
