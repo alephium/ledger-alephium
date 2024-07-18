@@ -5,6 +5,7 @@ use crate::{
     public_key::{derive_pub_key_by_path, hash_of_public_key},
 };
 use core::str::from_utf8;
+use ledger_device_sdk::ecc::ECPublicKey;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use ledger_device_sdk::ui::{bitmaps::{EYE, CHECKMARK, CROSS, WARNING}, gadgets::Field};
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -554,6 +555,18 @@ impl DeviceAddress {
         let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
         let length = device_address.len();
         Ok(Self { bytes, length })
+    }
+
+    pub fn from_pub_key(pub_key: &ECPublicKey<65, 'W'>) -> Result<Self, ErrorCode> {
+        let mut bytes = [0u8; 46];
+        let public_key_hash = hash_of_public_key(pub_key.as_ref());
+        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
+        let length = device_address.len();
+        Ok(Self { bytes, length })
+    }
+
+    pub fn get_address_str(&self) -> Result<&str, ErrorCode> {
+        bytes_to_string(&self.bytes[..self.length])
     }
 
     pub fn eq(&self, addr: &[u8]) -> bool {

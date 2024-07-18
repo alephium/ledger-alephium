@@ -34,7 +34,7 @@ export default class AlephiumApp {
   }
 
   // TODO: make address display optional
-  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType): Promise<readonly [Account, number]> {
+  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType, display = false): Promise<readonly [Account, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
@@ -45,7 +45,8 @@ export default class AlephiumApp {
 
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
-    const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, serde.serializePath(startPath))
+    const payload = Buffer.concat([serde.serializePath(startPath), Buffer.from([display ? 1 : 0])]);
+    const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, payload)
     const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
     const address = addressFromPublicKey(publicKey)
     const group = groupOfAddress(address)

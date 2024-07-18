@@ -12,7 +12,7 @@ use public_key::derive_pub_key;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use settings::SETTINGS_DATA;
 use sign_tx_context::SignTxContext;
-use tx_reviewer::TxReviewer;
+use tx_reviewer::{DeviceAddress, TxReviewer};
 use utils::{self, deserialize_path};
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -29,7 +29,7 @@ mod tx_reviewer;
 mod ledger_sdk_stub;
 
 use debug::print::{println, println_slice};
-use ledger_device_sdk::{ecc::{Secp256k1, SeedDerive}, io};
+use ledger_device_sdk::{ecc::{ECPublicKey, Secp256k1, SeedDerive}, io};
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 
@@ -126,16 +126,25 @@ fn handle_apdu(
             comm.append([version_major, version_minor, version_patch].as_slice());
         }
         Ins::GetPubKey => {
-            let raw_path = comm.get_data()?;
-            println("raw path");
-            println_slice::<40>(raw_path);
+            let data = comm.get_data()?;
+            if data.len() != 21 {
+                return Err(ErrorCode::BadLen.into());
+            }
+            let raw_path = &data[..20];
             if !deserialize_path(raw_path, &mut path) {
                 return Err(ErrorCode::BadLen.into());
             }
 
+            println("raw path");
+            println_slice::<40>(raw_path);
             let p1 = apdu_header.p1;
             let p2 = apdu_header.p2;
             let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
+
+            let need_to_display = data[20] != 0;
+            if need_to_display {
+                review_address(&pk)?;
+            }
 
             comm.append(pk.as_ref());
             comm.append(hd_index.to_be_bytes().as_slice());
@@ -230,4 +239,46 @@ fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), Error
     Secp256k1::derive_from_path(path)
         .deterministic_sign(message)
         .map_err(|_| ErrorCode::TxSigningFailed)
+}
+
+fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
+    let address = DeviceAddress::from_pub_key(pub_key)?;
+    let address_str = address.get_address_str()?;
+
+    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+    {
+        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
+        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
+
+        let review_messages = ["Review ", "Address "];
+        let fields = [Field{ name: "Address", value: address_str }];
+        let review = MultiFieldReview::new(
+            &fields,
+           &review_messages,
+           Some(&EYE),
+           "Confirm address",
+           Some(&CHECKMARK),
+           "Reject",
+           Some(&CROSS),
+        );
+        if review.show() {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    {
+        use ledger_device_sdk::nbgl::NbglAddressReview;
+
+        let result = NbglAddressReview::new()
+            .verify_str("Confirm address")
+            .show(address_str);
+        if result {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
+    }
 }
