@@ -449,9 +449,10 @@ impl RawDecoder for Instr {
                 let tpe = buffer.consume_byte().unwrap();
                 let result = Self::from_type(tpe);
                 if result.is_none() {
-                    return Err(DecodeError::InvalidData);
+                    *self = Instr::Unknown;
+                } else {
+                    *self = result.unwrap();
                 }
-                *self = result.unwrap();
             }
             _ => (),
         };
@@ -480,7 +481,7 @@ impl RawDecoder for Instr {
             }
             Self::MethodSelector(v0) => v0.decode(buffer, stage),
             Self::CallExternalBySelector(v0) => v0.decode(buffer, stage),
-            Self::Unknown => Err(DecodeError::InternalError),
+            Self::Unknown => Ok(DecodeStage::COMPLETE), // skip unknown instr
             _ => Ok(DecodeStage::COMPLETE),
         }
     }
