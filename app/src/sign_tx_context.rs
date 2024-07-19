@@ -147,9 +147,8 @@ fn check_blind_signing() -> Result<(), ErrorCode> {
     use ledger_device_sdk::{
         buttons::{ButtonEvent, ButtonsState},
         ui::{
-            bagls,
-            gadgets::{clear_screen, get_event},
-            layout::{self, StringPlace},
+            bitmaps::CROSSMARK,
+            gadgets::{clear_screen, get_event, Page, PageStyle},
             screen_util::screen_update,
         },
     };
@@ -157,12 +156,13 @@ fn check_blind_signing() -> Result<(), ErrorCode> {
     if is_blind_signing_enabled() {
         return Ok(());
     }
+    let page = Page::new(
+        PageStyle::PictureNormal,
+        ["Blind signing", "must be enabled"],
+        Some(&CROSSMARK),
+    );
     clear_screen();
-    let lines = [
-        bagls::Label::from_const("Blind signing"),
-        bagls::Label::from_const("must be enabled"),
-    ];
-    lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    page.place();
     screen_update();
     let mut buttons = ButtonsState::new();
 
