@@ -65,35 +65,17 @@ function getOutputClickSize(outputType: OutputType) {
   }
 }
 
-function getTxIdClickSize() {
-  const model = process.env.MODEL
-  switch (model) {
-    case 'nanos': return 5
-    case 'nanosp':
-    case 'nanox': return 3
-    case 'stax':
-    case 'flex': return 2
-    default: throw new Error(`Unknown model ${model}`)
-  }
-}
-
-function getInputClickSize() {
-  return process.env.MODEL === 'nanos' ? 4 : 2
-}
-
-async function click(inputSize: number, outputs: OutputType[]) {
+async function click(outputs: OutputType[], hasExternalInputs: boolean) {
   await sleep(1000);
-  await clickAndApprove(2) // fees
-
-  for (let index = 0; index < inputSize; index += 1){
-    await clickAndApprove(getInputClickSize())
+  if (hasExternalInputs) {
+    await clickAndApprove(1)
   }
 
   for (let index = 0; index < outputs.length; index += 1) {
     await clickAndApprove(getOutputClickSize(outputs[index]))
   }
 
-  await clickAndApprove(getTxIdClickSize()) // tx id
+  await clickAndApprove(1) // fees
 }
 
 interface Position {
@@ -101,7 +83,7 @@ interface Position {
   y: number
 }
 
-const STAX_CONTINUE_POSITION = { x: 200, y: 280 }
+const STAX_CONTINUE_POSITION = { x: 342, y: 606 }
 const STAX_APPROVE_POSITION = { x: 200, y: 515 }
 const STAX_REJECT_POSITION = { x: 36, y: 606 }
 const STAX_SETTINGS_POSITION = { x: 342, y: 55 }
@@ -130,28 +112,38 @@ async function _touch(times: number) {
   await touchPosition(approvePos)
 }
 
-async function touch(inputSize: number, outputs: OutputType[]) {
+async function touch(outputs: OutputType[], hasExternalInputs: boolean) {
   await sleep(1000);
-  for (let index = 0; index < 2; index += 1) { // network id and fees
-    await _touch(2)
-  }
-
-  for (let index = 0; index < inputSize; index += 1){
-    await _touch(getInputClickSize())
+  if (hasExternalInputs) {
+    if (process.env.MODEL === 'stax') {
+      await touchPosition(STAX_APPROVE_POSITION)
+    } else {
+      await touchPosition(FLEX_APPROVE_POSITION)
+    }
   }
 
   for (let index = 0; index < outputs.length; index += 1) {
     await _touch(getOutputClickSize(outputs[index]))
   }
 
-  await _touch(getTxIdClickSize()) // tx id
+  await _touch(2) // fees
 }
 
-async function approveTx(inputSize: number, outputs: OutputType[]) {
+async function approveTx(outputs: OutputType[], hasExternalInputs: boolean = false) {
+  const isSelfTransfer = outputs.length === 0 && !hasExternalInputs
+  if (isSelfTransfer) {
+    if (isStaxOrFlex()) {
+      await _touch(2)
+    } else {
+      await clickAndApprove(2)
+    }
+    return
+  }
+
   if (isStaxOrFlex()) {
-    await touch(inputSize, outputs)
+    await touch(outputs, hasExternalInputs)
   } else {
-    await click(inputSize, outputs)
+    await click(outputs, hasExternalInputs)
   }
 }
 
@@ -163,6 +155,17 @@ async function approveHash() {
     await clickAndApprove(5)
   } else {
     await clickAndApprove(3)
+  }
+}
+
+async function approveAddress() {
+  if (isStaxOrFlex()) {
+    return await _touch(2)
+  }
+  if (process.env.MODEL === 'nanos') {
+    await clickAndApprove(4)
+  } else {
+    await clickAndApprove(2)
   }
 }
 
@@ -209,6 +212,20 @@ describe('sdk', () => {
     path = `m/44'/1234'/0'/0/` + pathIndex
   })
 
+  async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
+    const balance0 = await getALPHBalance(address)
+    const fromAccount = await getSigner()
+    const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)
+    await waitForTxConfirmation(transferResult.txId, 1, 1000)
+    const balance1 = await getALPHBalance(address)
+    expect(balance1 - balance0).toEqual(amount)
+  }
+
+  async function getALPHBalance(address: Address) {
+    const balances = await nodeProvider.addresses.getAddressesAddressBalance(address)
+    return BigInt(balances.balance)
+  }
+
   it('should get version', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
@@ -225,6 +242,16 @@ describe('sdk', () => {
     console.log(account)
     await app.close()
   })
+
+  it('should get public key and confirm address', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    approveAddress()
+    const [account, hdIndex] = await app.getAccount(path, undefined, undefined, true)
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  }, 30000)
 
   it('should get public key for group', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
@@ -263,21 +290,38 @@ describe('sdk', () => {
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
   }, 10000)
 
-  async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
-    const balance0 = await getALPHBalance(address)
-    const fromAccount = await getSigner()
-    const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)
-    await waitForTxConfirmation(transferResult.txId, 1, 1000)
-    const balance1 = await getALPHBalance(address)
-    expect(balance1 - balance0).toEqual(amount)
-  }
+  it('shoudl transfer alph to one address', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
 
-  async function getALPHBalance(address: Address) {
-    const balances = await nodeProvider.addresses.getAddressesAddressBalance(address)
-    return BigInt(balances.balance)
-  }
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
 
-  it('should transfer alph to p2pkh address', async () => {
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer alph to multiple addresses', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -291,13 +335,13 @@ describe('sdk', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         },
         {
-          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          address: '1F1fu6GjuN9yUVRFVcgQKWwiTg8RMzKFv1BZFDwFcfWJq',
           attoAlphAmount: (ONE_ALPH * 3n).toString(),
         },
       ]
     })
 
-    approveTx(0, Array(2).fill(OutputType.Base))
+    approveTx(Array(2).fill(OutputType.Base))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -325,15 +369,11 @@ describe('sdk', () => {
         {
           address: multiSigAddress,
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
-        },
-        {
-          address: multiSigAddress,
-          attoAlphAmount: (ONE_ALPH * 3n).toString(),
-        },
+        }
       ]
     })
 
-    approveTx(0, Array(2).fill(OutputType.Multisig));
+    approveTx([OutputType.Multisig]);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -343,7 +383,7 @@ describe('sdk', () => {
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(testAccount.address)
-    expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
+    expect(balance1 < (ONE_ALPH * 8n)).toEqual(true)
 
     await app.close()
   }, 120000)
@@ -373,7 +413,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, [OutputType.MultisigAndToken, OutputType.Multisig])
+    approveTx([OutputType.MultisigAndToken, OutputType.Multisig])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -412,7 +452,7 @@ describe('sdk', () => {
       ]
     })
 
-    approveTx(0, [OutputType.Base])
+    approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -439,7 +479,7 @@ describe('sdk', () => {
     return { account, unlockScript }
   }
 
-  it('should transfer from different input addresses', async () => {
+  it('should test external inputs', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -475,7 +515,7 @@ describe('sdk', () => {
         hint: 0,
         key: '',
         attoAlphAmount: (ONE_ALPH * 3n).toString(),
-        address: testAccount.address,
+        address: newAccount.address,
         tokens: [],
         lockTime: 0,
         message: ''
@@ -487,7 +527,7 @@ describe('sdk', () => {
       unsignedTx: binToHex(txBytes)
     })
 
-    approveTx(2, [])
+    touchPosition(FLEX_APPROVE_POSITION).then(() => approveTx([OutputType.Base], true))
     const signature1 = await app.signUnsignedTx(path, Buffer.from(txBytes))
     expect(transactionVerifySignature(signResult0.txId, testAccount.publicKey, signature1)).toBe(true)
 
@@ -496,13 +536,44 @@ describe('sdk', () => {
       signatures: [signResult0.signature, signature1]
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
-    const balance = await getALPHBalance(testAccount.address)
+    const balance = await getALPHBalance(newAccount.address)
     expect(balance).toEqual(ONE_ALPH * 3n)
 
     await app.close()
   }, 120000)
 
-  it('should test contract deployment', async () => {
+  it('should test self transfer tx', async () => {
+    const transport = await SpeculosTransport.open({ apduPort })
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: testAccount.address,
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
+
+    approveTx([])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance > (ONE_ALPH * 9n)).toEqual(true)
+
+    await app.close()
+  }, 12000)
+
+  it('should test script execution tx', async () => {
     const transport = await SpeculosTransport.open({ apduPort })
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -516,13 +587,15 @@ describe('sdk', () => {
     await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
 
     await enableBlindSigning()
-    approveTx(0, [])
+    approveTx([])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
       unsignedTx: buildTxResult.unsignedTx,
       signature: signature
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const details = await nodeProvider.transactions.getTransactionsDetailsTxid(submitResult.txId)
+    expect(details.scriptExecutionOk).toEqual(true)
 
     await app.close()
   }, 120000)
