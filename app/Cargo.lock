@@ -23,6 +23,7 @@ version = "0.2.0"
 dependencies = [
  "ledger_device_sdk",
  "ledger_secure_sdk_sys",
+ "numtoa",
  "utils",
 ]
 

@@ -19,11 +19,8 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
-        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{
-            bitmaps::{CHECKMARK, CROSS, EYE},
-            gadgets::Field,
-        };
+        use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
+        use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 
         let review_messages = ["Review ", "Hash "];
         let fields = [Field {
@@ -72,11 +69,8 @@ pub fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
 
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
-        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{
-            bitmaps::{CHECKMARK, CROSS, EYE},
-            gadgets::Field,
-        };
+        use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
+        use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE};
 
         let review_messages = ["Review ", "Address "];
         let fields = [Field {

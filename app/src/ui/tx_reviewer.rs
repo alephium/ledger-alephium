@@ -1,5 +1,5 @@
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
+use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use crate::ui::nbgl::{
     nbgl_review_fields, nbgl_review_warning, nbgl_sync_review_status, ReviewType,
@@ -17,10 +17,7 @@ use core::str::from_utf8;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{Field, TagValueList};
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::{
-    bitmaps::{CHECKMARK, CROSS, EYE, WARNING},
-    gadgets::Field,
-};
+use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE, WARNING};
 use utils::{
     base58::ALPHABET,
     types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
