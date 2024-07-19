@@ -1,11 +1,11 @@
-use ledger_device_sdk::io;
+use ledger_device_sdk::io::{self, ApduHeader};
 use utils::deserialize_path;
 
 use crate::{
     debug::print::{println, println_slice},
     error_code::ErrorCode,
     public_key::derive_pub_key,
-    sign_tx_context::SignTxContext,
+    sign_tx_context::{check_blind_signing, SignTxContext},
     ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer},
 };
 
@@ -94,7 +94,7 @@ pub fn handle_apdu(
         }
         Ins::SignTx => {
             let data = comm.get_data()?;
-            match sign_tx_context.handle_data(apdu_header, data, tx_reviewer) {
+            match handle_sign_tx(apdu_header, data, sign_tx_context, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
                     return Ok(());
                 }
@@ -109,15 +109,36 @@ pub fn handle_apdu(
                         }
                         Err(code) => Err(code.into()),
                     };
-                    sign_tx_context.reset();
                     return result;
                 }
                 Err(code) => {
-                    sign_tx_context.reset();
                     return Err(code.into());
                 }
             }
         }
     }
     Ok(())
+}
+
+fn handle_sign_tx(
+    apdu_header: &ApduHeader,
+    data: &[u8],
+    sign_tx_context: &mut SignTxContext,
+    tx_reviewer: &mut TxReviewer,
+) -> Result<(), ErrorCode> {
+    match apdu_header.p1 {
+        0 if data.len() < 23 => Err(ErrorCode::BadLen),
+        0 => {
+            sign_tx_context.init(data)?;
+            let tx_data = &data[20..];
+            let is_tx_execute_script = tx_data[2] == 0x01;
+            if is_tx_execute_script {
+                check_blind_signing()?;
+            }
+            tx_reviewer.init(is_tx_execute_script);
+            sign_tx_context.handle_data(apdu_header, tx_data, tx_reviewer)
+        }
+        1 => sign_tx_context.handle_data(apdu_header, data, tx_reviewer),
+        _ => Err(ErrorCode::BadP1P2),
+    }
 }

@@ -43,13 +43,14 @@ impl SignTxContext {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.path = [0; 5];
+    pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+        deserialize_path(&data[0..20], &mut self.path);
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
         self.temp_data.reset();
-        self.device_address = None;
+        self.device_address = Some(Address::from_path(&self.path)?);
+        Ok(())
     }
 
     pub fn is_complete(&self) -> bool {
@@ -108,32 +109,22 @@ impl SignTxContext {
     pub fn handle_data(
         &mut self,
         apdu_header: &ApduHeader,
-        data: &[u8],
+        tx_data: &[u8],
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
-                if apdu_header.p1 == 0 && data.len() >= 23 {
-                    if !deserialize_path(&data[0..20], &mut self.path) {
-                        return Err(ErrorCode::HDPathDecodingFailed);
-                    }
-                    self.device_address = Some(Address::from_path(&self.path)?);
+                if apdu_header.p1 == 0 {
                     self.current_step = DecodeStep::DecodingTx;
-                    let tx_data = &data[20..];
-                    let is_tx_execute_script = tx_data[2] == 0x01;
-                    if is_tx_execute_script {
-                        check_blind_signing()?;
-                    }
-                    tx_reviewer.init(is_tx_execute_script);
                     self.decode_tx(tx_data, tx_reviewer)
                 } else {
-                    Err(ErrorCode::BadLen)
+                    Err(ErrorCode::BadP1P2)
                 }
             }
             DecodeStep::DecodingTx => {
                 if apdu_header.p1 == 1 {
-                    self.decode_tx(data, tx_reviewer)
+                    self.decode_tx(tx_data, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)
                 }
@@ -143,7 +134,7 @@ impl SignTxContext {
 }
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-fn check_blind_signing() -> Result<(), ErrorCode> {
+pub fn check_blind_signing() -> Result<(), ErrorCode> {
     use ledger_device_sdk::{
         buttons::{ButtonEvent, ButtonsState},
         ui::{
@@ -174,7 +165,7 @@ fn check_blind_signing() -> Result<(), ErrorCode> {
 }
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-fn check_blind_signing() -> Result<(), ErrorCode> {
+pub fn check_blind_signing() -> Result<(), ErrorCode> {
     use crate::ui::nbgl::nbgl_review_info;
 
     if is_blind_signing_enabled() {
