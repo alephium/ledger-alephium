@@ -372,20 +372,27 @@ impl TxReviewer {
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
             let fields = &[Field{ name: fee_field.name, value: fee_field.value }];
-            let review_message = if self.is_tx_execute_script {
-                &["Confirm ", "Script-execution"]
+            let review = if self.is_tx_execute_script {
+                MultiFieldReview::new(
+                    fields,
+                    &["Blind Signing"],
+                    Some(&WARNING),
+                    "Sign transaction",
+                    Some(&CHECKMARK),
+                    "Reject",
+                    Some(&CROSS),
+                )
             } else {
-                &["Confirm ", "Self-transfer"]
+                MultiFieldReview::new(
+                    fields,
+                    &["Confirm ", "Self-transfer"],
+                    Some(&EYE),
+                    "Sign transaction",
+                    Some(&CHECKMARK),
+                    "Reject",
+                    Some(&CROSS),
+                )
             };
-            let review = MultiFieldReview::new(
-                fields,
-               review_message,
-               Some(&EYE),
-               "Sign transaction",
-               Some(&CHECKMARK),
-               "Reject",
-               Some(&CROSS),
-            );
             if review.show() {
                 Ok(())
             } else {
@@ -395,12 +402,19 @@ impl TxReviewer {
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
-            let amount_value = if self.is_tx_execute_script { "Script-execution" } else { "Self-transfer" };
-            let fields = &[
-                Field{ name: "Amount", value: amount_value },
-                Field{ name: fee_field.name, value: fee_field.value }
-            ];
-            let result = review(fields, "Fees");
+            let result = if self.is_tx_execute_script {
+                if nbgl_review_warning("Blind Signing") {
+                    review(&[Field{ name: fee_field.name, value: fee_field.value }], "Fees")
+                } else {
+                    Err(ErrorCode::UserCancelled)
+                }
+            } else {
+                let fields = &[
+                    Field{ name: "Amount", value: "Self-transfer" },
+                    Field{ name: fee_field.name, value: fee_field.value }
+                ];
+                review(fields, "Fees")
+            };
             if result.is_ok() {
                 nbgl_sync_review_status(ReviewType::Transaction);
             }

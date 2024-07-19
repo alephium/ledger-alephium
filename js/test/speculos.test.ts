@@ -112,14 +112,18 @@ async function _touch(times: number) {
   await touchPosition(approvePos)
 }
 
+async function staxFlexApproveOnce() {
+  if (process.env.MODEL === 'stax') {
+    await touchPosition(STAX_APPROVE_POSITION)
+  } else {
+    await touchPosition(FLEX_APPROVE_POSITION)
+  }
+}
+
 async function touch(outputs: OutputType[], hasExternalInputs: boolean) {
   await sleep(1000);
   if (hasExternalInputs) {
-    if (process.env.MODEL === 'stax') {
-      await touchPosition(STAX_APPROVE_POSITION)
-    } else {
-      await touchPosition(FLEX_APPROVE_POSITION)
-    }
+    await staxFlexApproveOnce()
   }
 
   for (let index = 0; index < outputs.length; index += 1) {
@@ -587,7 +591,7 @@ describe('sdk', () => {
     await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
 
     await enableBlindSigning()
-    approveTx([])
+    staxFlexApproveOnce().then(() => approveTx([]))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
       unsignedTx: buildTxResult.unsignedTx,
