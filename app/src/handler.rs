@@ -1,7 +1,13 @@
 use ledger_device_sdk::io;
 use utils::deserialize_path;
 
-use crate::{debug::print::{println, println_slice}, error_code::ErrorCode, public_key::derive_pub_key, sign_tx_context::SignTxContext, ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer}};
+use crate::{
+    debug::print::{println, println_slice},
+    error_code::ErrorCode,
+    public_key::derive_pub_key,
+    sign_tx_context::SignTxContext,
+    ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer},
+};
 
 #[repr(u8)]
 pub enum Ins {

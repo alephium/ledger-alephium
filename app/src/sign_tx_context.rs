@@ -1,11 +1,11 @@
 use ledger_device_sdk::io::ApduHeader;
 use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
+use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
+use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::public_key::sign_hash;
 use crate::public_key::Address;
 use crate::settings::is_blind_signing_enabled;
-use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
-use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::ui::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},

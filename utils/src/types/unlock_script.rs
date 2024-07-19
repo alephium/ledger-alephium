@@ -21,9 +21,9 @@ impl RawDecoder for PublicKeyWithIndex {
         2
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -43,9 +43,9 @@ impl RawDecoder for P2SH {
         self.0.step_size() + self.0.step_size()
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -63,23 +63,19 @@ impl RawDecoder for P2SH {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
 pub enum UnlockScript {
     P2PKH(PublicKey),
     P2MPKH(StreamingDecoder<AVector<PublicKeyWithIndex>>),
     P2SH(StreamingDecoder<P2SH>),
     SameAsPrevious,
+    #[default]
     Unknown,
 }
 
 impl Reset for UnlockScript {
     fn reset(&mut self) {
         *self = Self::Unknown;
-    }
-}
-
-impl Default for UnlockScript {
-    fn default() -> Self {
-        UnlockScript::Unknown
     }
 }
 
@@ -100,24 +96,21 @@ impl RawDecoder for UnlockScript {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        match self {
-            UnlockScript::Unknown => {
-                let tpe = buffer.consume_byte().unwrap();
-                let result = UnlockScript::from_type(tpe);
-                if result.is_none() {
-                    return Err(DecodeError::InvalidData);
-                }
-                *self = result.unwrap();
+        if let UnlockScript::Unknown = self {
+            let tpe = buffer.consume_byte().unwrap();
+            let result = UnlockScript::from_type(tpe);
+            if result.is_none() {
+                return Err(DecodeError::InvalidData);
             }
-            _ => (),
+            *self = result.unwrap();
         };
         match self {
             UnlockScript::P2PKH(public_key) => public_key.decode(buffer, stage),
@@ -167,8 +160,7 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

@@ -113,9 +113,7 @@ impl<'a, const RAM: usize, const FLASH: usize> SwappingBuffer<'a, RAM, FLASH> {
 
                 self.switch_to_nvm(index, data)
             }
-            BufferState::WritingToFlash(_) => {
-                self.write_to_nvm(data, index)
-            }
+            BufferState::WritingToFlash(_) => self.write_to_nvm(data, index),
         }
     }
 

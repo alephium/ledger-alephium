@@ -20,10 +20,7 @@ impl Reset for UnsignedTx {
 
 impl UnsignedTx {
     pub fn is_complete(&self) -> bool {
-        match self {
-            Self::FixedOutputs(outputs) if outputs.is_complete() => true,
-            _ => false,
-        }
+        matches!(self, Self::FixedOutputs(outputs) if outputs.is_complete())
     }
 
     #[inline]
@@ -58,9 +55,9 @@ impl RawDecoder for UnsignedTx {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match self {
@@ -95,12 +92,12 @@ impl Reset for TxFee {
 
 impl RawDecoder for TxFee {
     fn step_size(&self) -> u16 {
-        return 2
+        2
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -248,7 +245,7 @@ mod tests {
             UnsignedTx::TxFee(tx_fee) => {
                 assert_eq!(&tx_fee.inner.gas_amount, &gas_amount);
                 assert_eq!(&tx_fee.inner.gas_price, &gas_price);
-            },
+            }
             UnsignedTx::Inputs(inputs) => {
                 let current_input = inputs.get_current_item();
                 if current_input.is_some() {
@@ -279,8 +276,7 @@ mod tests {
             while length < encoded_tx.len() {
                 let remain = encoded_tx.len() - length;
                 let size = min(random_usize(0, frame_size), remain);
-                let mut buffer =
-                    Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data);
+                let mut buffer = Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let mut continue_decode = true;

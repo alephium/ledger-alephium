@@ -27,9 +27,9 @@ impl RawDecoder for AssetOutput {
         3 + self.tokens.step_size() + self.additional_data.step_size()
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {

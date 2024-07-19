@@ -29,7 +29,7 @@ impl<'a, W> Buffer<'a, W> {
     }
 
     pub fn len(&self) -> usize {
-        self.data.len() - (self.index as usize)
+        self.data.len() - self.index
     }
 
     pub fn is_empty(&self) -> bool {

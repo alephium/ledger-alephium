@@ -1,18 +1,26 @@
-use crate::{
-    blake2b_hasher::Blake2bHasher,
-    error_code::ErrorCode,
-    ledger_sdk_stub::{nvm::{NVMData, NVM, NVM_DATA_SIZE}, swapping_buffer::{SwappingBuffer, RAM_SIZE}},
-    public_key::{to_base58_address, Address},
-};
-use core::str::from_utf8;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::{bitmaps::{EYE, CHECKMARK, CROSS, WARNING}, gadgets::Field};
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{Field, TagValueList};
+use crate::ui::nbgl::{
+    nbgl_review_fields, nbgl_review_warning, nbgl_sync_review_status, ReviewType,
+};
+use crate::{
+    blake2b_hasher::Blake2bHasher,
+    error_code::ErrorCode,
+    ledger_sdk_stub::{
+        nvm::{NVMData, NVM, NVM_DATA_SIZE},
+        swapping_buffer::{SwappingBuffer, RAM_SIZE},
+    },
+    public_key::{to_base58_address, Address},
+};
+use core::str::from_utf8;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::ui::nbgl::{nbgl_review_fields, nbgl_sync_review_status, nbgl_review_warning, ReviewType};
+use ledger_device_sdk::nbgl::{Field, TagValueList};
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+use ledger_device_sdk::ui::{
+    bitmaps::{CHECKMARK, CROSS, EYE, WARNING},
+    gadgets::Field,
+};
 use utils::{
     base58::ALPHABET,
     types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
@@ -145,7 +153,8 @@ impl TxReviewer {
             }
             while carry > 0 {
                 if (output_index - output_length) == output.len() {
-                    self.buffer.write_from(from_index + output_length, &output)?;
+                    self.buffer
+                        .write_from(from_index + output_length, &output)?;
                     output = [0u8; 64];
                     output_length += 64;
                 }
@@ -203,7 +212,8 @@ impl TxReviewer {
         }
 
         let review_message_from_index = self.buffer.get_index();
-        let review_message_to_index = self.write_index_with_prefix(self.next_output_index as usize, b"Output #")?;
+        let review_message_to_index =
+            self.write_index_with_prefix(self.next_output_index as usize, b"Output #")?;
         self.next_output_index += 1;
 
         let alph_amount_from_index = self.buffer.get_index();
@@ -246,7 +256,7 @@ impl TxReviewer {
         input: &TxInput,
         current_index: usize,
         input_size: usize,
-        device_address: &Address
+        device_address: &Address,
     ) -> Result<(), ErrorCode> {
         assert!(current_index < input_size);
         match &input.unlock_script {
@@ -299,7 +309,7 @@ impl TxReviewer {
         };
         if token.is_none() {
             let fields = [address_field, alph_amount_field];
-            return review(&fields, review_message)
+            return review(&fields, review_message);
         }
 
         let TokenIndexes {
@@ -338,7 +348,7 @@ impl TxReviewer {
                 }
                 self.tx_fee = Some(fee.as_ref().unwrap().clone());
                 Ok(())
-            },
+            }
             UnsignedTx::Inputs(inputs) => {
                 if let Some(current_input) = inputs.get_current_item() {
                     self.review_input(
@@ -353,11 +363,8 @@ impl TxReviewer {
             }
             UnsignedTx::FixedOutputs(outputs) => {
                 if let Some(current_output) = outputs.get_current_item() {
-                    let result = self.review_output(
-                        current_output,
-                        device_address,
-                        temp_data.read_all(),
-                    );
+                    let result =
+                        self.review_output(current_output, device_address, temp_data.read_all());
                     self.reset_buffer();
                     result
                 } else {
@@ -371,7 +378,10 @@ impl TxReviewer {
     fn review_self_transfer(&self, fee_field: &Field) -> Result<(), ErrorCode> {
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
-            let fields = &[Field{ name: fee_field.name, value: fee_field.value }];
+            let fields = &[Field {
+                name: fee_field.name,
+                value: fee_field.value,
+            }];
             let review = if self.is_tx_execute_script {
                 MultiFieldReview::new(
                     fields,
@@ -404,14 +414,26 @@ impl TxReviewer {
         {
             let result = if self.is_tx_execute_script {
                 if nbgl_review_warning("Blind Signing") {
-                    review(&[Field{ name: fee_field.name, value: fee_field.value }], "Fees")
+                    review(
+                        &[Field {
+                            name: fee_field.name,
+                            value: fee_field.value,
+                        }],
+                        "Fees",
+                    )
                 } else {
                     Err(ErrorCode::UserCancelled)
                 }
             } else {
                 let fields = &[
-                    Field{ name: "Amount", value: "Self-transfer" },
-                    Field{ name: fee_field.name, value: fee_field.value }
+                    Field {
+                        name: "Amount",
+                        value: "Self-transfer",
+                    },
+                    Field {
+                        name: fee_field.name,
+                        value: fee_field.value,
+                    },
                 ];
                 review(fields, "Fees")
             };
@@ -425,7 +447,12 @@ impl TxReviewer {
     pub fn approve_tx(&self) -> Result<(), ErrorCode> {
         assert!(self.tx_fee.is_some());
         let mut amount_output = [0u8; 33];
-        let amount_str = self.tx_fee.as_ref().unwrap().to_alph(&mut amount_output).unwrap();
+        let amount_str = self
+            .tx_fee
+            .as_ref()
+            .unwrap()
+            .to_alph(&mut amount_output)
+            .unwrap();
         let value = bytes_to_string(amount_str)?;
         let fee_field = Field {
             name: "Fees",
@@ -440,12 +467,12 @@ impl TxReviewer {
         {
             let review = MultiFieldReview::new(
                 fields,
-               &[],
-               None,
-               "Sign transaction",
-               Some(&CHECKMARK),
-               "Reject",
-               Some(&CROSS),
+                &[],
+                None,
+                "Sign transaction",
+                Some(&CHECKMARK),
+                "Reject",
+                Some(&CROSS),
             );
             if review.show() {
                 Ok(())
@@ -488,12 +515,12 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
         let review_messages = ["Review ", review_message];
         let review = MultiFieldReview::new(
             fields,
-           &review_messages,
-           Some(&EYE),
-           "Continue",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
+            &review_messages,
+            Some(&EYE),
+            "Continue",
+            Some(&CHECKMARK),
+            "Reject",
+            Some(&CROSS),
         );
         if review.show() {
             Ok(())
@@ -519,13 +546,13 @@ fn warning_external_inputs() -> Result<(), ErrorCode> {
     {
         let review_messages = ["There are ", "external inputs"];
         let review = MultiFieldReview::new(
-           &[],
-           &review_messages,
-           Some(&WARNING),
-           "Continue",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
+            &[],
+            &review_messages,
+            Some(&WARNING),
+            "Continue",
+            Some(&CHECKMARK),
+            "Reject",
+            Some(&CROSS),
         );
         if review.show() {
             Ok(())

@@ -17,7 +17,7 @@ pub mod print {
 
     #[allow(unused)]
     pub fn println_array<const N: usize, const M: usize>(tab: &[u8; N]) {
-        let hex: [u8; M] = utils::to_hex_fixed::<N, M>(tab).unwrap();
+        let hex: [u8; M] = utils::to_hex_fixed::<N, M>(tab);
         let m = core::str::from_utf8(&hex).unwrap();
         println(m);
     }

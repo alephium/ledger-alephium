@@ -436,25 +436,22 @@ impl RawDecoder for Instr {
             _ => 1,
         }
     }
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        match self {
-            Self::Unknown => {
-                let tpe = buffer.consume_byte().unwrap();
-                let result = Self::from_type(tpe);
-                if result.is_none() {
-                    *self = Instr::Unknown;
-                } else {
-                    *self = result.unwrap();
-                }
+        if let Self::Unknown = self {
+            let tpe = buffer.consume_byte().unwrap();
+            let result = Self::from_type(tpe);
+            if let Some(instr) = result {
+                *self = instr;
+            } else {
+                *self = Instr::Unknown;
             }
-            _ => (),
         };
         match self {
             Self::CallLocal(v0) => v0.decode(buffer, stage),
@@ -490,12 +487,12 @@ impl RawDecoder for Instr {
 #[cfg(test)]
 pub mod tests {
     extern crate std;
+    use super::Instr;
     use crate::buffer::Buffer;
     use crate::types::u256::tests::hex_to_bytes;
     use crate::types::{Hash, LockupScript};
     use crate::{decode::*, TempData};
     use std::mem::discriminant;
-    use super::Instr;
 
     #[test]
     fn decode_instr() {
@@ -520,10 +517,19 @@ pub mod tests {
             (15, "0f"),
             (16, "10"),
             (17, "11"),
-            (18, "12dc3d43c5d96c11b5ef8d581dd462b8d3ae8e11b9ab7726acc27fe28deee2a60f5a"),
-            (19, "13dc9303ae010e913964a4478bad3ceea341a1d76f140085f3d4c674e1a10678d74f"),
+            (
+                18,
+                "12dc3d43c5d96c11b5ef8d581dd462b8d3ae8e11b9ab7726acc27fe28deee2a60f5a",
+            ),
+            (
+                19,
+                "13dc9303ae010e913964a4478bad3ceea341a1d76f140085f3d4c674e1a10678d74f",
+            ),
             (20, "1400"),
-            (21, "15000000000000000000000000000000000000000000000000000000000000000000"),
+            (
+                21,
+                "15000000000000000000000000000000000000000000000000000000000000000000",
+            ),
             (22, "1680"),
             (23, "1700"),
             (24, "18"),
@@ -695,7 +701,7 @@ pub mod tests {
             (209, "d1"),
             (210, "d27f7f"),
             (211, "d300000000"),
-            (212, "d400000000")
+            (212, "d400000000"),
         ];
 
         for &(code, hex) in ALL_INSTRS {
@@ -706,25 +712,28 @@ pub mod tests {
 
             let instr = Instr::from_type(code);
             assert!(instr.is_some());
-            assert_eq!(discriminant(instr.as_ref().unwrap()), discriminant(decoded_instr));
+            assert_eq!(
+                discriminant(instr.as_ref().unwrap()),
+                discriminant(decoded_instr)
+            );
             match decoded_instr {
                 Instr::CallLocal(v) => assert!(v.0 == bytes[1]),
                 Instr::CallExternal(v) => assert!(v.0 == bytes[1]),
                 Instr::I256Const(v) => {
                     assert!(bytes.len() == 34);
                     assert!(v.0.bytes == &bytes[1..]);
-                },
+                }
                 Instr::U256Const(v) => {
                     assert!(bytes.len() == 34);
                     assert!(v.0.bytes == &bytes[1..]);
-                },
+                }
                 Instr::BytesConst(v) => {
                     assert!(bytes.len() == 2);
                     assert!(v.length.inner == 0);
-                },
+                }
                 Instr::AddressConst(v) => {
                     assert!(*v == LockupScript::P2PKH(Hash::from_bytes([0u8; 32])));
-                },
+                }
                 Instr::LoadLocal(v) => assert!(v.0 == bytes[1]),
                 Instr::StoreLocal(v) => assert!(v.0 == bytes[1]),
                 Instr::Jump(v) => assert!(v.inner == 0),

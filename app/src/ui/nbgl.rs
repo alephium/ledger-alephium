@@ -28,7 +28,7 @@ pub fn nbgl_review_fields(title: &str, subtitle: &str, fields: &TagValueList) ->
         );
         match sync_ret {
             UX_SYNC_RET_APPROVED => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -76,11 +76,24 @@ fn nbgl_generic_review(content: &NbglPageContent, button_str: &str) -> bool {
 }
 
 pub fn nbgl_review_warning(message: &str) -> bool {
-    let content = NbglPageContent::InfoButton(InfoButton::new(message, None, "Continue", TuneIndex::TapCasual));
+    let content = NbglPageContent::InfoButton(InfoButton::new(
+        message,
+        None,
+        "Continue",
+        TuneIndex::TapCasual,
+    ));
     nbgl_generic_review(&content, "Reject")
 }
 
 pub fn nbgl_review_info(message: &str) {
-    let content = NbglPageContent::CenteredInfo(CenteredInfo::new(message, "", "", None, false, CenteredInfoStyle::NormalInfo, 0));
+    let content = NbglPageContent::CenteredInfo(CenteredInfo::new(
+        message,
+        "",
+        "",
+        None,
+        false,
+        CenteredInfoStyle::NormalInfo,
+        0,
+    ));
     let _ = nbgl_generic_review(&content, "Tap to continue");
 }

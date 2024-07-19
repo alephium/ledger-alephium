@@ -1,8 +1,15 @@
-use ledger_device_sdk::ui::{layout::{self, Draw, StringPlace}, bagls, gadgets, screen_util};
 use ledger_device_sdk::io;
+use ledger_device_sdk::ui::{
+    bagls, gadgets,
+    layout::{self, Draw, StringPlace},
+    screen_util,
+};
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 
-use crate::{settings::{is_blind_signing_enabled, update_blind_signing}, Ins};
+use crate::{
+    settings::{is_blind_signing_enabled, update_blind_signing},
+    Ins,
+};
 
 const UI_PAGE_NUM: u8 = 4;
 
@@ -74,7 +81,7 @@ fn show_ui(index: u8) {
 }
 
 pub struct MainPages {
-    pub ui_index: u8
+    ui_index: u8,
 }
 
 impl MainPages {
@@ -122,7 +129,7 @@ impl MainPages {
                         ledger_device_sdk::exit_app(0);
                     }
                 }
-                event => return event
+                event => return event,
             }
         }
     }

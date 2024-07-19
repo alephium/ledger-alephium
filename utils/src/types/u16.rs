@@ -41,9 +41,9 @@ impl RawDecoder for U16 {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
@@ -66,7 +66,7 @@ impl RawDecoder for U16 {
 
         while !buffer.is_empty() && index < length {
             let byte = buffer.consume_byte().unwrap() as u32;
-            self.inner |= (((byte & 0xff) as u32) << ((length - index - 1) * 8)) as u16;
+            self.inner |= ((byte & 0xff) << ((length - index - 1) * 8)) as u16;
             index += 1;
         }
         if index == length {

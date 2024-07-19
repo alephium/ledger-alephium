@@ -1,6 +1,6 @@
-use core::str::from_utf8;
 use crate::blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE};
 use crate::error_code::ErrorCode;
+use core::str::from_utf8;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
@@ -82,7 +82,7 @@ pub fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), E
 
 pub struct Address {
     bytes: [u8; 46],
-    length: usize
+    length: usize,
 }
 
 impl Address {

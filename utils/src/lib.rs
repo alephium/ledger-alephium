@@ -13,9 +13,9 @@ use core::num::Wrapping;
 pub use temp_data::TempData;
 
 #[inline]
-pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {
+pub fn to_hex<const N: usize>(m: &[u8]) -> Option<[u8; N]> {
     if 2 * m.len() > N {
-        return Err(());
+        return None;
     }
     let mut hex = [0u8; N];
     let mut i = 0;
@@ -26,10 +26,10 @@ pub fn to_hex<const N: usize>(m: &[u8]) -> Result<[u8; N], ()> {
         hex[i + 1] = c1 as u8;
         i += 2;
     }
-    Ok(hex)
+    Some(hex)
 }
 
-pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> Result<[u8; M], ()> {
+pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> [u8; M] {
     assert!(M == 2 * N);
     let mut hex = [0u8; M];
     let mut i = 0;
@@ -40,20 +40,20 @@ pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> Result<[u8; 
         hex[i + 1] = c1 as u8;
         i += 2;
     }
-    Ok(hex)
+    hex
 }
 
 pub fn djb_hash(data: &[u8]) -> i32 {
-    let mut hash = Wrapping(5381 as i32);
-    data.into_iter().for_each(|&byte| {
+    let mut hash = Wrapping(5381_i32);
+    data.iter().for_each(|&byte| {
         hash = ((hash << 5) + hash) + Wrapping(byte as i32);
     });
-    return hash.0;
+    hash.0
 }
 
 pub fn xor_bytes(data: i32) -> u8 {
     let bytes = data.to_be_bytes();
-    return bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3];
+    bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3]
 }
 
 pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
@@ -62,12 +62,12 @@ pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
         return false;
     }
 
-    for i in 0..5 {
+    for (i, element) in path.iter_mut().enumerate().take(5) {
         let offset = 4 * i;
-        path[i] = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
+        *element = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
     }
 
-    return true;
+    true
 }
 
 #[cfg(test)]

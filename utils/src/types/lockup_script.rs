@@ -21,9 +21,9 @@ impl RawDecoder for P2MPKH {
         3
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         let from_index = buffer.get_index();
@@ -57,7 +57,7 @@ impl RawDecoder for P2MPKH {
             Err(err) => Err(err),
             Ok(value) => {
                 let to_index = buffer.get_index();
-                buffer.write_bytes_to_temp_data(&buffer.get_range(from_index, to_index))?;
+                buffer.write_bytes_to_temp_data(buffer.get_range(from_index, to_index))?;
                 Ok(value)
             }
         }
@@ -65,23 +65,19 @@ impl RawDecoder for P2MPKH {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
 pub enum LockupScript {
     P2PKH(Hash),
     P2MPKH(StreamingDecoder<P2MPKH>),
     P2SH(Hash),
     P2C(Hash),
+    #[default]
     Unknown,
 }
 
 impl Reset for LockupScript {
     fn reset(&mut self) {
         *self = Self::Unknown;
-    }
-}
-
-impl Default for LockupScript {
-    fn default() -> Self {
-        LockupScript::Unknown
     }
 }
 
@@ -112,24 +108,21 @@ impl RawDecoder for LockupScript {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        match self {
-            LockupScript::Unknown => {
-                let tpe = buffer.consume_byte().unwrap();
-                let result = LockupScript::from_type(tpe);
-                if result.is_none() {
-                    return Err(DecodeError::InvalidData);
-                }
-                *self = result.unwrap();
+        if let LockupScript::Unknown = self {
+            let tpe = buffer.consume_byte().unwrap();
+            let result = LockupScript::from_type(tpe);
+            if result.is_none() {
+                return Err(DecodeError::InvalidData);
             }
-            _ => (),
+            *self = result.unwrap();
         };
         match self {
             LockupScript::P2PKH(hash) => hash.decode(buffer, stage),
@@ -175,8 +168,7 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

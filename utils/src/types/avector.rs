@@ -70,8 +70,8 @@ impl<T> AVector<T> {
         if self.is_empty() {
             return true;
         }
-        return ((self.current_index as usize) == (self.size() - 1))
-            && self.current_item.stage.is_complete();
+        ((self.current_index as usize) == (self.size() - 1))
+            && self.current_item.stage.is_complete()
     }
 }
 
@@ -94,9 +94,9 @@ impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if !self.total_size_decoded() {
@@ -120,7 +120,7 @@ impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
             return Ok(DecodeStage { ..*stage });
         }
 
-        return Ok(DecodeStage::COMPLETE);
+        Ok(DecodeStage::COMPLETE)
     }
 }
 
@@ -199,8 +199,7 @@ mod tests {
 
             while length < bytes.len() {
                 let size = if length == 0 { 32 + prefix_length } else { 32 };
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data);
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

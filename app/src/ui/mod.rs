@@ -1,7 +1,10 @@
 use core::str::from_utf8;
 use ledger_device_sdk::ecc::ECPublicKey;
 
-use crate::{error_code::ErrorCode, public_key::{sign_hash, Address}};
+use crate::{
+    error_code::ErrorCode,
+    public_key::{sign_hash, Address},
+};
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 pub mod display;
@@ -11,24 +14,30 @@ pub mod nbgl;
 pub mod tx_reviewer;
 
 pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
-    let hex: [u8; 64] = utils::to_hex(message).map_err(|_| ErrorCode::BadLen)?;
+    let hex: [u8; 64] = utils::to_hex(message).ok_or(ErrorCode::BadLen)?;
     let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InternalError)?;
 
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
         use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
+        use ledger_device_sdk::ui::{
+            bitmaps::{CHECKMARK, CROSS, EYE},
+            gadgets::Field,
+        };
 
         let review_messages = ["Review ", "Hash "];
-        let fields = [Field{ name: "Hash", value: hex_str }];
+        let fields = [Field {
+            name: "Hash",
+            value: hex_str,
+        }];
         let review = MultiFieldReview::new(
             &fields,
-           &review_messages,
-           Some(&EYE),
-           "Approve",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
+            &review_messages,
+            Some(&EYE),
+            "Approve",
+            Some(&CHECKMARK),
+            "Reject",
+            Some(&CROSS),
         );
         if review.show() {
             sign_hash(path, message)
@@ -39,10 +48,13 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        use ledger_device_sdk::nbgl::{Field, TagValueList};
         use crate::ui::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
+        use ledger_device_sdk::nbgl::{Field, TagValueList};
 
-        let fields = [Field{ name: "Hash", value: hex_str }];
+        let fields = [Field {
+            name: "Hash",
+            value: hex_str,
+        }];
         let values = TagValueList::new(&fields, 0, false, false);
         let approved = nbgl_review_fields("Review", "Hash", &values);
         if approved {
@@ -61,18 +73,24 @@ pub fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {
         use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
+        use ledger_device_sdk::ui::{
+            bitmaps::{CHECKMARK, CROSS, EYE},
+            gadgets::Field,
+        };
 
         let review_messages = ["Review ", "Address "];
-        let fields = [Field{ name: "Address", value: address_str }];
+        let fields = [Field {
+            name: "Address",
+            value: address_str,
+        }];
         let review = MultiFieldReview::new(
             &fields,
-           &review_messages,
-           Some(&EYE),
-           "Confirm address",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
+            &review_messages,
+            Some(&EYE),
+            "Confirm address",
+            Some(&CHECKMARK),
+            "Reject",
+            Some(&CROSS),
         );
         if review.show() {
             Ok(())
