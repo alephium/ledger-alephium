@@ -33,7 +33,6 @@ export default class AlephiumApp {
     return `${response[0]}.${response[1]}.${response[2]}`
   }
 
-  // TODO: make address display optional
   async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType, display = false): Promise<readonly [Account, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)

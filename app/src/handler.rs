@@ -99,8 +99,10 @@ pub fn handle_apdu(
                     return Ok(());
                 }
                 Ok(()) => {
-                    tx_reviewer.approve_tx()?;
-                    let result = match sign_tx_context.sign_tx() {
+                    let sign_result = tx_reviewer
+                        .approve_tx()
+                        .and_then(|_| sign_tx_context.sign_tx());
+                    let result = match sign_result {
                         Ok((signature_buf, length, _)) => {
                             comm.append(&signature_buf[..length as usize]);
                             Ok(())
