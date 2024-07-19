@@ -144,14 +144,34 @@ impl SignTxContext {
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 fn check_blind_signing() -> Result<(), ErrorCode> {
-    use ledger_device_sdk::ui::gadgets::MessageScroller;
+    use ledger_device_sdk::{
+        buttons::{ButtonEvent, ButtonsState},
+        ui::{
+            bagls,
+            gadgets::{clear_screen, get_event},
+            layout::{self, StringPlace},
+            screen_util::screen_update,
+        },
+    };
 
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let scroller = MessageScroller::new("Blind signing must be enabled");
-    scroller.event_loop();
-    Err(ErrorCode::BlindSigningDisabled)
+    clear_screen();
+    let lines = [
+        bagls::Label::from_const("Blind signing"),
+        bagls::Label::from_const("must be enabled"),
+    ];
+    lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+    screen_update();
+    let mut buttons = ButtonsState::new();
+
+    loop {
+        match get_event(&mut buttons) {
+            Some(ButtonEvent::BothButtonsRelease) => return Err(ErrorCode::BlindSigningDisabled),
+            _ => (),
+        }
+    }
 }
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
