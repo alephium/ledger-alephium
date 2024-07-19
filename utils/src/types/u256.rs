@@ -205,34 +205,38 @@ impl U256 {
 
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
-        let postfix = b" ALPH";
+        let prefix = b"ALPH ";
         if self.is_zero() {
-            output[0] = b'0';
-            let total_size = 1 + postfix.len();
-            output[1..total_size].copy_from_slice(postfix);
+            let total_size = 1 + prefix.len();
+            output[..prefix.len()].copy_from_slice(prefix);
+            output[prefix.len()] = b'0';
             return Some(&output[..total_size]);
         }
 
         if self.is_less_than_1000_nano() {
             let str = b"<0.000001";
-            let total_size = str.len() + postfix.len();
+            let total_size = str.len() + prefix.len();
             if output.len() < total_size {
                 return None;
             }
-            output[..str.len()].copy_from_slice(str);
-            output[str.len()..total_size].copy_from_slice(postfix);
+            output[..prefix.len()].copy_from_slice(prefix);
+            output[prefix.len()..total_size].copy_from_slice(str);
             return Some(&output[..total_size]);
         }
 
-        if output.len() < 28 + postfix.len() {
+        if output.len() < 28 + prefix.len() {
             // max ALPH amount
             return None;
         }
 
-        let str = self.to_str_with_decimals(output, Self::ALPH_DECIMALS, Self::DECIMAL_PLACES)?;
+        output[..prefix.len()].copy_from_slice(prefix);
+        let str = self.to_str_with_decimals(
+            &mut output[prefix.len()..],
+            Self::ALPH_DECIMALS,
+            Self::DECIMAL_PLACES,
+        )?;
         let str_length = str.len();
-        let total_size = str_length + postfix.len();
-        output[str_length..total_size].copy_from_slice(postfix);
+        let total_size = str_length + prefix.len();
         Some(&output[..total_size])
     }
 }
@@ -253,11 +257,13 @@ impl RawDecoder for U256 {
 
 #[cfg(test)]
 pub mod tests {
+    extern crate alloc;
     extern crate std;
 
     use crate::buffer::Buffer;
     use crate::types::u256::U256;
     use crate::{decode::*, TempData};
+    use alloc::borrow::ToOwned;
     use core::str::from_utf8;
     use rand::Rng;
     use std::string::String;
@@ -461,7 +467,7 @@ pub mod tests {
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());
             let expected = from_utf8(result.unwrap()).unwrap();
-            let amount_str = String::from(str) + " ALPH";
+            let amount_str = "ALPH ".to_owned() + str;
             assert_eq!(amount_str, String::from(expected));
         }
 

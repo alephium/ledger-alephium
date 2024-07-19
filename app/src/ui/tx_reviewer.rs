@@ -305,7 +305,7 @@ impl TxReviewer {
             value: alph_amount,
         };
         if token.is_none() {
-            let fields = [address_field, alph_amount_field];
+            let fields = [alph_amount_field, address_field];
             return review(&fields, review_message);
         }
 
@@ -316,7 +316,6 @@ impl TxReviewer {
         let token_id = self.get_str_from_range(token_id)?;
         let token_amount = self.get_str_from_range(token_amount)?;
         let fields = [
-            address_field,
             alph_amount_field,
             Field {
                 name: "Token ID",
@@ -326,6 +325,7 @@ impl TxReviewer {
                 name: "Token Amount",
                 value: token_amount,
             },
+            address_field,
         ];
         review(&fields, review_message)
     }
