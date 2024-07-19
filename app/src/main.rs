@@ -171,6 +171,7 @@ fn handle_apdu(
                     return Ok(());
                 }
                 Ok(()) => {
+                    tx_reviewer.approve_tx()?;
                     let result = match sign_tx_context.sign_tx() {
                         Ok((signature_buf, length, _)) => {
                             comm.append(&signature_buf[..length as usize]);

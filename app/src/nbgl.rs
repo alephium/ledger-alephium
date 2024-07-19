@@ -43,34 +43,44 @@ pub fn nbgl_sync_review_status(tpe: ReviewType) {
     }
 }
 
-pub fn nbgl_review_info(message: &str) {
+fn nbgl_generic_review(content: &NbglPageContent, button_str: &str) -> bool {
     unsafe {
-        let contents: Vec<NbglPageContent> = vec![
-            NbglPageContent::CenteredInfo(CenteredInfo::new(message, "", "", None, false, CenteredInfoStyle::NormalInfo, 0))
-        ];
-        let c_content_list: Vec<nbgl_content_t> = contents
-            .iter()
-            .map(|content| {
-                let (c_struct, content_type, action_callback) = content.into();
-                nbgl_content_t {
-                    content: c_struct,
-                    contentActionCallback: action_callback,
-                    type_: content_type,
-                }
-            })
-            .collect();
+        let (c_struct, content_type, action_callback) = content.into();
+        let c_content_list: Vec<nbgl_content_t> = vec![nbgl_content_t {
+            content: c_struct,
+            contentActionCallback: action_callback,
+            type_: content_type,
+        }];
+
         let content_struct = nbgl_genericContents_t {
             callbackCallNeeded: false,
             __bindgen_anon_1: nbgl_genericContents_t__bindgen_ty_1 {
                 contentsList: c_content_list.as_ptr() as *const nbgl_content_t,
             },
-            nbContents: contents.len() as u8,
+            nbContents: 1,
         };
 
-        let button_cstring = CString::new("Tap to continue").unwrap();
-        let _ = ux_sync_genericReview(
+        let button_cstring = CString::new(button_str).unwrap();
+
+        let sync_ret = ux_sync_genericReview(
             &content_struct as *const nbgl_genericContents_t,
             button_cstring.as_ptr() as *const c_char,
         );
+
+        // Return true if the user approved the transaction, false otherwise.
+        match sync_ret {
+            ledger_secure_sdk_sys::UX_SYNC_RET_APPROVED => return true,
+            _ => false,
+        }
     }
+}
+
+pub fn nbgl_review_warning(message: &str) -> bool {
+    let content = NbglPageContent::InfoButton(InfoButton::new(message, None, "Continue", TuneIndex::TapCasual));
+    nbgl_generic_review(&content, "Reject")
+}
+
+pub fn nbgl_review_info(message: &str) {
+    let content = NbglPageContent::CenteredInfo(CenteredInfo::new(message, "", "", None, false, CenteredInfoStyle::NormalInfo, 0));
+    let _ = nbgl_generic_review(&content, "Tap to continue");
 }

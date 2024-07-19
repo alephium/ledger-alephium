@@ -13,7 +13,7 @@ use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{Field, TagValueList};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
+use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, nbgl_review_warning, ReviewType};
 use utils::{
     base58::{base58_encode_inputs, ALPHABET},
     types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
@@ -360,11 +360,7 @@ impl TxReviewer {
                         temp_data.read_all(),
                     );
                     self.reset_buffer();
-                    if result.is_ok() && (outputs.current_index as usize == outputs.size() - 1) {
-                        self.review_tx_fee()
-                    } else {
-                        result
-                    }
+                    result
                 } else {
                     Ok(())
                 }
@@ -407,18 +403,13 @@ impl TxReviewer {
             ];
             let result = review(fields, "Fees");
             if result.is_ok() {
-                if NbglStreamingReview::new().finish("Click to sign") {
-                    Ok(())
-                } else {
-                    Err(ErrorCode::UserCancelled)
-                }
-            } else {
-                result
+                nbgl_sync_review_status(ReviewType::Transaction);
             }
+            result
         }
     }
 
-    pub fn review_tx_fee(&self) -> Result<(), ErrorCode> {
+    pub fn approve_tx(&self) -> Result<(), ErrorCode> {
         assert!(self.tx_fee.is_some());
         let mut amount_output = [0u8; 33];
         let amount_str = self.tx_fee.as_ref().unwrap().to_alph(&mut amount_output).unwrap();
@@ -532,8 +523,11 @@ fn warning_external_inputs() -> Result<(), ErrorCode> {
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        // TODO: support stax & flex
-        Ok(())
+        if nbgl_review_warning("There are external inputs") {
+            Ok(())
+        } else {
+            Err(ErrorCode::UserCancelled)
+        }
     }
 }
 
