@@ -43,7 +43,7 @@ extern "C" fn sample_main() {
                         Ok(()) => comm.reply_ok(),
                         Err(sw) => comm.reply(sw),
                     }
-                    main_pages.show_ui(main_pages.ui_index);
+                    main_pages.show_ui();
                 }
                 _ => ()
             }

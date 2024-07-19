@@ -83,8 +83,7 @@ impl MainPages {
         MainPages { ui_index: 0 }
     }
 
-    pub fn show_ui(&mut self, new_ui_index: u8) {
-        self.ui_index = new_ui_index;
+    pub fn show_ui(&mut self) {
         show_ui(self.ui_index);
     }
 

@@ -2,7 +2,7 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     ledger_sdk_stub::{nvm::{NVMData, NVM, NVM_DATA_SIZE}, swapping_buffer::{SwappingBuffer, RAM_SIZE}},
-    public_key::{to_base58_address, DeviceAddress},
+    public_key::{to_base58_address, Address},
 };
 use core::str::from_utf8;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -185,7 +185,7 @@ impl TxReviewer {
     fn prepare_output(
         &mut self,
         output: &AssetOutput,
-        device_address: &DeviceAddress,
+        device_address: &Address,
         temp_data: &[u8],
     ) -> Result<Option<OutputIndexes>, ErrorCode> {
         let address_from_index = self.buffer.get_index();
@@ -246,7 +246,7 @@ impl TxReviewer {
         input: &TxInput,
         current_index: usize,
         input_size: usize,
-        device_address: &DeviceAddress
+        device_address: &Address
     ) -> Result<(), ErrorCode> {
         assert!(current_index < input_size);
         match &input.unlock_script {
@@ -273,7 +273,7 @@ impl TxReviewer {
     pub fn review_output(
         &mut self,
         output: &AssetOutput,
-        device_address: &DeviceAddress,
+        device_address: &Address,
         temp_data: &[u8],
     ) -> Result<(), ErrorCode> {
         let output_indexes_opt = self.prepare_output(output, device_address, temp_data)?;
@@ -326,7 +326,7 @@ impl TxReviewer {
     pub fn review_tx_details(
         &mut self,
         unsigned_tx: &UnsignedTx,
-        device_address: &DeviceAddress,
+        device_address: &Address,
         temp_data: &SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     ) -> Result<(), ErrorCode> {
         match unsigned_tx {

@@ -1,7 +1,7 @@
 use core::str::from_utf8;
 use ledger_device_sdk::ecc::ECPublicKey;
 
-use crate::{error_code::ErrorCode, public_key::{sign_hash, DeviceAddress}};
+use crate::{error_code::ErrorCode, public_key::{sign_hash, Address}};
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 pub mod display;
@@ -55,7 +55,7 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 }
 
 pub fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
-    let address = DeviceAddress::from_pub_key(pub_key)?;
+    let address = Address::from_pub_key(pub_key)?;
     let address_str = address.get_address_str()?;
 
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]

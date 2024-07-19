@@ -3,7 +3,7 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
-use crate::public_key::DeviceAddress;
+use crate::public_key::Address;
 use crate::settings::is_blind_signing_enabled;
 use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
@@ -29,7 +29,7 @@ pub struct SignTxContext {
     current_step: DecodeStep,
     hasher: Blake2bHasher,
     temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
-    device_address: Option<DeviceAddress>,
+    device_address: Option<Address>,
 }
 
 impl SignTxContext {
@@ -122,7 +122,7 @@ impl SignTxContext {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::HDPathDecodingFailed);
                     }
-                    self.device_address = Some(DeviceAddress::from_path(&self.path)?);
+                    self.device_address = Some(Address::from_path(&self.path)?);
                     self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
                     let is_tx_execute_script = tx_data[2] == 0x01;

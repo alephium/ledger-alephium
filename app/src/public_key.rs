@@ -80,12 +80,12 @@ pub fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), E
         .map_err(|_| ErrorCode::TxSigningFailed)
 }
 
-pub struct DeviceAddress {
+pub struct Address {
     bytes: [u8; 46],
     length: usize
 }
 
-impl DeviceAddress {
+impl Address {
     pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
         let mut bytes = [0u8; 46];
         let device_public_key =
