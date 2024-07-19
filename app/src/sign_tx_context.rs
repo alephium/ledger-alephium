@@ -1,8 +1,7 @@
-use ledger_device_sdk::ecc::Secp256k1;
-use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
+use crate::public_key::sign_hash;
 use crate::public_key::Address;
 use crate::settings::is_blind_signing_enabled;
 use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
@@ -64,10 +63,7 @@ impl SignTxContext {
 
     pub fn sign_tx(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
-        let signature = Secp256k1::derive_from_path(&self.path)
-            .deterministic_sign(&tx_id)
-            .map_err(|_| ErrorCode::TxSigningFailed)?;
-        Ok(signature)
+        sign_hash(&self.path, &tx_id)
     }
 
     fn _decode_tx(
