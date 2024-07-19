@@ -104,9 +104,10 @@ impl<'a> MultiFieldReview<'a> {
                         match get_event(&mut buttons) {
                             Some(ButtonEvent::LeftButtonRelease) => {
                                 cur_page = cur_page.saturating_sub(1);
-                                if cur_page == 0 {
-                                    // this is for the case where the fields are empty
+                                if cur_page == 0 && self.fields.len() == 0 {
                                     display_first_page(&first_page_opt);
+                                } else {
+                                    direction = ButtonEvent::LeftButtonRelease;
                                 }
                                 break;
                             }
