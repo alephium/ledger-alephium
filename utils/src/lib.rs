@@ -62,9 +62,9 @@ pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
         return false;
     }
 
-    for (i, element) in path.iter_mut().enumerate().take(5) {
+    for i in 0..5 {
         let offset = 4 * i;
-        *element = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
+        path[i] = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
     }
 
     true

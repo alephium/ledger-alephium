@@ -64,8 +64,8 @@ set-github-action:
 run-github-ci:
 	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo $(ledger_app_builder) \
 		bash -c "cd app && cargo ledger build $(path) -- --no-default-features --features debug"
-	docker run -d --name speculos --rm -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 \
-		$(ledger_app_dev_tools) speculos -m $(device) /app/app/target/$(path)/release/app --display headless
+	docker run --name speculos --rm -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 \
+		$(ledger_app_dev_tools) speculos -m $(device) /app/app/target/$(path)/release/app --display headless &
 	cd js && sleep 3 && MODEL=$(device) npm run test && docker stop speculos && cd ..
 
 .PHONY: release clean
