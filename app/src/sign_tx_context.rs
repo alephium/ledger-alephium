@@ -3,11 +3,11 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
 use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
+use crate::public_key::DeviceAddress;
 use crate::settings::is_blind_signing_enabled;
 use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
-use crate::tx_reviewer::DeviceAddress;
-use crate::tx_reviewer::TxReviewer;
+use crate::ui::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
     error_code::ErrorCode,
@@ -160,7 +160,7 @@ fn check_blind_signing() -> Result<(), ErrorCode> {
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 fn check_blind_signing() -> Result<(), ErrorCode> {
-    use crate::nbgl::nbgl_review_info;
+    use crate::ui::nbgl::nbgl_review_info;
 
     if is_blind_signing_enabled() {
         return Ok(());
