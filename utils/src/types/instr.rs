@@ -486,3 +486,269 @@ impl RawDecoder for Instr {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    extern crate std;
+    use crate::buffer::Buffer;
+    use crate::types::u256::tests::hex_to_bytes;
+    use crate::types::{Hash, LockupScript};
+    use crate::{decode::*, TempData};
+    use std::mem::discriminant;
+    use super::Instr;
+
+    #[test]
+    fn decode_instr() {
+        let mut temp_data = TempData::new();
+
+        // TODO: use randomly generated data to improve this test
+        const ALL_INSTRS: &[(u8, &str)] = &[
+            (0, "0012"),
+            (1, "017f"),
+            (2, "02"),
+            (3, "03"),
+            (4, "04"),
+            (5, "05"),
+            (6, "06"),
+            (7, "07"),
+            (8, "08"),
+            (9, "09"),
+            (10, "0a"),
+            (11, "0b"),
+            (12, "0c"),
+            (13, "0d"),
+            (14, "0e"),
+            (15, "0f"),
+            (16, "10"),
+            (17, "11"),
+            (18, "12dc3d43c5d96c11b5ef8d581dd462b8d3ae8e11b9ab7726acc27fe28deee2a60f5a"),
+            (19, "13dc9303ae010e913964a4478bad3ceea341a1d76f140085f3d4c674e1a10678d74f"),
+            (20, "1400"),
+            (21, "15000000000000000000000000000000000000000000000000000000000000000000"),
+            (22, "1680"),
+            (23, "1700"),
+            (24, "18"),
+            (25, "19"),
+            (26, "1a"),
+            (27, "1b"),
+            (28, "1c"),
+            (29, "1d"),
+            (30, "1e"),
+            (31, "1f"),
+            (32, "20"),
+            (33, "21"),
+            (34, "22"),
+            (35, "23"),
+            (36, "24"),
+            (37, "25"),
+            (38, "26"),
+            (39, "27"),
+            (40, "28"),
+            (41, "29"),
+            (42, "2a"),
+            (43, "2b"),
+            (44, "2c"),
+            (45, "2d"),
+            (46, "2e"),
+            (47, "2f"),
+            (48, "30"),
+            (49, "31"),
+            (50, "32"),
+            (51, "33"),
+            (52, "34"),
+            (53, "35"),
+            (54, "36"),
+            (55, "37"),
+            (56, "38"),
+            (57, "39"),
+            (58, "3a"),
+            (59, "3b"),
+            (60, "3c"),
+            (61, "3d"),
+            (62, "3e"),
+            (63, "3f"),
+            (64, "40"),
+            (65, "41"),
+            (66, "42"),
+            (67, "43"),
+            (68, "44"),
+            (69, "45"),
+            (70, "46"),
+            (71, "47"),
+            (72, "48"),
+            (73, "49"),
+            (74, "4a00"),
+            (75, "4b80010000"),
+            (76, "4cbfff0000"),
+            (77, "4d"),
+            (78, "4e"),
+            (79, "4f"),
+            (80, "50"),
+            (81, "51"),
+            (82, "52"),
+            (83, "53"),
+            (84, "54"),
+            (85, "55"),
+            (86, "56"),
+            (87, "57"),
+            (88, "58"),
+            (89, "59"),
+            (90, "5a"),
+            (91, "5b"),
+            (92, "5c"),
+            (93, "5d"),
+            (94, "5e"),
+            (95, "5f"),
+            (96, "60"),
+            (97, "61"),
+            (98, "62"),
+            (99, "63"),
+            (100, "64"),
+            (101, "65"),
+            (102, "66"),
+            (103, "67"),
+            (104, "68"),
+            (105, "69"),
+            (106, "6a"),
+            (107, "6b"),
+            (108, "6c"),
+            (109, "6d"),
+            (110, "6e"),
+            (111, "6f"),
+            (112, "70"),
+            (113, "71"),
+            (114, "72"),
+            (115, "73"),
+            (116, "74"),
+            (117, "75"),
+            (118, "76"),
+            (119, "77"),
+            (120, "78"),
+            (121, "79"),
+            (122, "7a"),
+            (123, "7b"),
+            (124, "7c"),
+            (125, "7d"),
+            (126, "7e00"),
+            (127, "7f"),
+            (128, "80"),
+            (129, "81"),
+            (130, "82"),
+            (131, "83"),
+            (132, "84"),
+            (133, "85"),
+            (134, "86"),
+            (135, "87"),
+            (136, "88"),
+            (137, "89"),
+            (138, "8a"),
+            (139, "8b"),
+            (140, "8c"),
+            (160, "a07f"),
+            (161, "a180"),
+            (162, "a2"),
+            (163, "a3"),
+            (164, "a4"),
+            (165, "a5"),
+            (166, "a6"),
+            (167, "a7"),
+            (168, "a8"),
+            (169, "a9"),
+            (170, "aa"),
+            (171, "ab"),
+            (172, "ac"),
+            (173, "ad"),
+            (174, "ae"),
+            (175, "af"),
+            (176, "b0"),
+            (177, "b1"),
+            (178, "b2"),
+            (179, "b3"),
+            (180, "b4"),
+            (181, "b5"),
+            (182, "b6"),
+            (183, "b7"),
+            (184, "b8"),
+            (185, "b9"),
+            (186, "ba"),
+            (187, "bb"),
+            (188, "bc"),
+            (189, "bd"),
+            (190, "be"),
+            (191, "bf"),
+            (192, "c0"),
+            (193, "c1"),
+            (194, "c2"),
+            (195, "c3"),
+            (196, "c4"),
+            (197, "c5"),
+            (198, "c6"),
+            (199, "c7"),
+            (200, "c8"),
+            (201, "c9"),
+            (202, "ca"),
+            (203, "cb"),
+            (204, "cc"),
+            (205, "cd"),
+            (206, "ce00"),
+            (207, "cf"),
+            (208, "d0"),
+            (209, "d1"),
+            (210, "d27f7f"),
+            (211, "d300000000"),
+            (212, "d400000000")
+        ];
+
+        for &(code, hex) in ALL_INSTRS {
+            let bytes = hex_to_bytes(hex).unwrap();
+            let mut decoder = new_decoder::<Instr>();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data);
+            let decoded_instr = decoder.decode(&mut buffer).unwrap().unwrap();
+
+            let instr = Instr::from_type(code);
+            assert!(instr.is_some());
+            assert_eq!(discriminant(instr.as_ref().unwrap()), discriminant(decoded_instr));
+            match decoded_instr {
+                Instr::CallLocal(v) => assert!(v.0 == bytes[1]),
+                Instr::CallExternal(v) => assert!(v.0 == bytes[1]),
+                Instr::I256Const(v) => {
+                    assert!(bytes.len() == 34);
+                    assert!(v.0.bytes == &bytes[1..]);
+                },
+                Instr::U256Const(v) => {
+                    assert!(bytes.len() == 34);
+                    assert!(v.0.bytes == &bytes[1..]);
+                },
+                Instr::BytesConst(v) => {
+                    assert!(bytes.len() == 2);
+                    assert!(v.length.inner == 0);
+                },
+                Instr::AddressConst(v) => {
+                    assert!(*v == LockupScript::P2PKH(Hash::from_bytes([0u8; 32])));
+                },
+                Instr::LoadLocal(v) => assert!(v.0 == bytes[1]),
+                Instr::StoreLocal(v) => assert!(v.0 == bytes[1]),
+                Instr::Jump(v) => assert!(v.inner == 0),
+                Instr::IfTrue(v) => assert!(v.inner == 65536),
+                Instr::IfFalse(v) => assert!(v.inner == -65536),
+                Instr::DEBUG(v) => assert!(v.is_empty()),
+                Instr::LoadMutField(v) => assert!(v.0 == bytes[1]),
+                Instr::StoreMutField(v) => assert!(v.0 == bytes[1]),
+                Instr::LoadImmField(v) => assert!(v.0 == bytes[1]),
+                Instr::CreateMapEntry(v0, v1) => assert!(v0.0 == bytes[1] && v1.0 == bytes[2]),
+                Instr::MethodSelector(v) => assert!(v.0 == 0),
+                Instr::CallExternalBySelector(v) => assert!(v.0 == 0),
+                instr => assert!(*decoded_instr == *instr),
+            }
+        }
+    }
+
+    #[test]
+    fn decode_unknown_instr() {
+        let mut temp_data = TempData::new();
+        let mut decoder = new_decoder::<Instr>();
+        let mut buffer = Buffer::new(&[255], &mut temp_data);
+        let instr = decoder.decode(&mut buffer).unwrap().unwrap();
+        assert!(*instr == Instr::Unknown);
+    }
+}

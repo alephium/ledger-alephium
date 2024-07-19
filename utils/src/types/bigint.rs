@@ -27,6 +27,14 @@ impl PartialEq for BigInt {
 }
 
 impl BigInt {
+    #[cfg(test)]
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        assert!(bytes.len() == 33);
+        let mut bs = [0u8; 33];
+        bs.copy_from_slice(bytes);
+        Self { bytes: bs }
+    }
+
     #[inline]
     pub fn get_length(&self) -> usize {
         decode_length(self.bytes[0])
