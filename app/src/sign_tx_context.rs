@@ -118,7 +118,6 @@ impl SignTxContext {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
-                tx_reviewer.reset();
                 if apdu_header.p1 == 0 && data.len() >= 23 {
                     if !deserialize_path(&data[0..20], &mut self.path) {
                         return Err(ErrorCode::HDPathDecodingFailed);
@@ -126,10 +125,11 @@ impl SignTxContext {
                     self.device_address = Some(DeviceAddress::from_path(&self.path)?);
                     self.current_step = DecodeStep::DecodingTx;
                     let tx_data = &data[20..];
-                    if tx_data[2] == 0x01 {
-                        // if this tx calls contract
+                    let is_tx_execute_script = tx_data[2] == 0x01;
+                    if is_tx_execute_script {
                         check_blind_signing()?;
                     }
+                    tx_reviewer.init(is_tx_execute_script);
                     self.decode_tx(tx_data, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadLen)

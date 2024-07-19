@@ -29,6 +29,7 @@ pub struct TxReviewer {
     has_external_inputs: bool,
     next_output_index: u16,
     tx_fee: Option<U256>,
+    is_tx_execute_script: bool,
 }
 
 impl TxReviewer {
@@ -38,6 +39,7 @@ impl TxReviewer {
             has_external_inputs: false,
             next_output_index: FIRST_OUTPUT_INDEX, // display output from index 1, similar to BTC
             tx_fee: None,
+            is_tx_execute_script: false,
         }
     }
 
@@ -47,11 +49,12 @@ impl TxReviewer {
     }
 
     #[inline]
-    pub fn reset(&mut self) {
+    pub fn init(&mut self, is_tx_execute_script: bool) {
         self.reset_buffer();
         self.has_external_inputs = false;
         self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
+        self.is_tx_execute_script = is_tx_execute_script;
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -374,9 +377,14 @@ impl TxReviewer {
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
             let fields = &[Field{ name: fee_field.name, value: fee_field.value }];
+            let review_message = if self.is_tx_execute_script {
+                &["Confirm ", "Script-execution"]
+            } else {
+                &["Confirm ", "Self-transfer"]
+            };
             let review = MultiFieldReview::new(
                 fields,
-               &["Confirm self-transfer"],
+               review_message,
                Some(&EYE),
                "Sign transaction",
                Some(&CHECKMARK),
@@ -392,8 +400,9 @@ impl TxReviewer {
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
+            let amount_value = if self.is_tx_execute_script { "Script-execution" } else { "Self-transfer" };
             let fields = &[
-                Field{ name: "Amount", value: "Self-transfer" }, // same as app-bitcoin
+                Field{ name: "Amount", value: amount_value },
                 Field{ name: fee_field.name, value: fee_field.value }
             ];
             let result = review(fields, "Fees");
