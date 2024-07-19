@@ -100,6 +100,9 @@ impl<'a> MultiFieldReview<'a> {
                         match get_event(&mut buttons) {
                             Some(ButtonEvent::LeftButtonRelease) => {
                                 cur_page = cur_page.saturating_sub(1);
+                                if cur_page == 0 { // this is for the case where the fields are empty
+                                    display_first_page(&first_page_opt);
+                                }
                                 break;
                             }
                             Some(ButtonEvent::RightButtonRelease) => {
@@ -116,6 +119,7 @@ impl<'a> MultiFieldReview<'a> {
                     match direction {
                         ButtonEvent::LeftButtonRelease => {
                             if cur_page == 0 {
+                                display_first_page(&first_page_opt);
                                 direction = ButtonEvent::RightButtonRelease;
                             } else {
                                 cur_page -= 1;
@@ -129,5 +133,25 @@ impl<'a> MultiFieldReview<'a> {
                 }
             }
         }
+    }
+}
+
+pub fn display_first_page(page_opt: &Option<Page>) {
+    match page_opt {
+        Some(page) => {
+            clear_screen();
+            page.place();
+            screen_update();
+
+            let mut buttons = ButtonsState::new();
+            loop {
+                match get_event(&mut buttons) {
+                    Some(ButtonEvent::RightButtonRelease)
+                    | Some(ButtonEvent::BothButtonsRelease) => return,
+                    _ => (),
+                }
+            }
+        }
+        None => (),
     }
 }

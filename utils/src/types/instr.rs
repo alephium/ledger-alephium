@@ -501,7 +501,6 @@ pub mod tests {
     fn decode_instr() {
         let mut temp_data = TempData::new();
 
-        // TODO: use randomly generated data to improve this test
         const ALL_INSTRS: &[(u8, &str)] = &[
             (0, "0012"),
             (1, "017f"),

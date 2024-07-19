@@ -527,7 +527,7 @@ describe('sdk', () => {
       unsignedTx: binToHex(txBytes)
     })
 
-    touchPosition(FLEX_APPROVE_POSITION).then(() => approveTx([OutputType.Base], true))
+    approveTx([OutputType.Base], true)
     const signature1 = await app.signUnsignedTx(path, Buffer.from(txBytes))
     expect(transactionVerifySignature(signResult0.txId, testAccount.publicKey, signature1)).toBe(true)
 
