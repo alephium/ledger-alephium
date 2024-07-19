@@ -2,10 +2,9 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     ledger_sdk_stub::{nvm::{NVMData, NVM, NVM_DATA_SIZE}, swapping_buffer::{SwappingBuffer, RAM_SIZE}},
-    public_key::{derive_pub_key_by_path, hash_of_public_key},
+    public_key::{to_base58_address, DeviceAddress},
 };
 use core::str::from_utf8;
-use ledger_device_sdk::ecc::ECPublicKey;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use ledger_device_sdk::ui::{bitmaps::{EYE, CHECKMARK, CROSS, WARNING}, gadgets::Field};
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -13,9 +12,9 @@ use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{Field, TagValueList};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, nbgl_review_warning, ReviewType};
+use crate::ui::nbgl::{nbgl_review_fields, nbgl_sync_review_status, nbgl_review_warning, ReviewType};
 use utils::{
-    base58::{base58_encode_inputs, ALPHABET},
+    base58::ALPHABET,
     types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
 };
 
@@ -528,51 +527,5 @@ fn warning_external_inputs() -> Result<(), ErrorCode> {
         } else {
             Err(ErrorCode::UserCancelled)
         }
-    }
-}
-
-#[inline]
-pub fn to_base58_address<'a>(
-    prefix: u8,
-    hash: &[u8; 32],
-    output: &'a mut [u8],
-) -> Result<&'a [u8], ErrorCode> {
-    if let Some(str_bytes) = base58_encode_inputs(&[&[prefix], &hash[..]], output) {
-        Ok(str_bytes)
-    } else {
-        Err(ErrorCode::Overflow)
-    }
-}
-
-pub struct DeviceAddress {
-    bytes: [u8; 46],
-    length: usize
-}
-
-impl DeviceAddress {
-    pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
-        let device_public_key =
-            derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
-        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
-        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
-        let length = device_address.len();
-        Ok(Self { bytes, length })
-    }
-
-    pub fn from_pub_key(pub_key: &ECPublicKey<65, 'W'>) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
-        let public_key_hash = hash_of_public_key(pub_key.as_ref());
-        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
-        let length = device_address.len();
-        Ok(Self { bytes, length })
-    }
-
-    pub fn get_address_str(&self) -> Result<&str, ErrorCode> {
-        bytes_to_string(&self.bytes[..self.length])
-    }
-
-    pub fn eq(&self, addr: &[u8]) -> bool {
-        &self.bytes[..self.length] == addr
     }
 }

@@ -1,35 +1,26 @@
 #![no_std]
 #![no_main]
 
-use core::str::from_utf8;
-
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use display::MainPages;
+use crate::ui::display::MainPages;
+use handler::{handle_apdu, Ins};
+use ledger_device_sdk::io;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::{NbglHomeAndSettings, init_comm};
-use error_code::ErrorCode;
-use public_key::derive_pub_key;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use settings::SETTINGS_DATA;
 use sign_tx_context::SignTxContext;
-use tx_reviewer::{DeviceAddress, TxReviewer};
-use utils::{self, deserialize_path};
+use crate::ui::tx_reviewer::TxReviewer;
 
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-mod display;
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-mod nbgl;
 mod blake2b_hasher;
 mod settings;
 mod debug;
 mod error_code;
 mod public_key;
 mod sign_tx_context;
-mod tx_reviewer;
 mod ledger_sdk_stub;
-
-use debug::print::{println, println_slice};
-use ledger_device_sdk::{ecc::{ECPublicKey, Secp256k1, SeedDerive}, io};
+mod ui;
+mod handler;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 
@@ -77,209 +68,6 @@ extern "C" fn sample_main() {
                 }
                 _ => ()
             }
-        }
-    }
-}
-
-#[repr(u8)]
-pub enum Ins {
-    GetVersion,
-    GetPubKey,
-    SignHash,
-    SignTx,
-}
-
-impl TryFrom<io::ApduHeader> for Ins {
-    type Error = ErrorCode;
-    fn try_from(header: io::ApduHeader) -> Result<Self, Self::Error> {
-        match header.ins {
-            0 => Ok(Ins::GetVersion),
-            1 => Ok(Ins::GetPubKey),
-            2 => Ok(Ins::SignHash),
-            3 => Ok(Ins::SignTx),
-            _ => Err(ErrorCode::BadIns),
-        }
-    }
-}
-
-fn handle_apdu(
-    comm: &mut io::Comm,
-    ins: Ins,
-    sign_tx_context: &mut SignTxContext,
-    tx_reviewer: &mut TxReviewer,
-) -> Result<(), io::Reply> {
-    if comm.rx == 0 {
-        return Err(ErrorCode::BadLen.into());
-    }
-
-    let mut path: [u32; 5] = [0; 5];
-    let apdu_header = comm.get_apdu_metadata();
-    if apdu_header.cla != 0x80 {
-        return Err(ErrorCode::BadCla.into());
-    }
-
-    match ins {
-        Ins::GetVersion => {
-            let version_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u8>().unwrap();
-            let version_minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u8>().unwrap();
-            let version_patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u8>().unwrap();
-            comm.append([version_major, version_minor, version_patch].as_slice());
-        }
-        Ins::GetPubKey => {
-            let data = comm.get_data()?;
-            if data.len() != 21 {
-                return Err(ErrorCode::BadLen.into());
-            }
-            let raw_path = &data[..20];
-            if !deserialize_path(raw_path, &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
-
-            println("raw path");
-            println_slice::<40>(raw_path);
-            let p1 = apdu_header.p1;
-            let p2 = apdu_header.p2;
-            let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
-
-            let need_to_display = data[20] != 0;
-            if need_to_display {
-                review_address(&pk)?;
-            }
-
-            comm.append(pk.as_ref());
-            comm.append(hd_index.to_be_bytes().as_slice());
-        }
-        Ins::SignHash => {
-            let data = comm.get_data()?;
-            if data.len() != 4 * 5 + 32 {
-                return Err(ErrorCode::BadLen.into());
-            }
-            // This check can be removed, but we keep it for double checking
-            if !deserialize_path(&data[..20], &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
-
-            match sign_ui(&path, &data[20..]) {
-                Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),
-                Err(code) => return Err(code.into()),
-            }
-        }
-        Ins::SignTx => {
-            let data = comm.get_data()?;
-            match sign_tx_context.handle_data(apdu_header, data, tx_reviewer) {
-                Ok(()) if !sign_tx_context.is_complete() => {
-                    return Ok(());
-                }
-                Ok(()) => {
-                    tx_reviewer.approve_tx()?;
-                    let result = match sign_tx_context.sign_tx() {
-                        Ok((signature_buf, length, _)) => {
-                            comm.append(&signature_buf[..length as usize]);
-                            Ok(())
-                        }
-                        Err(code) => Err(code.into()),
-                    };
-                    sign_tx_context.reset();
-                    return result;
-                }
-                Err(code) => {
-                    sign_tx_context.reset();
-                    return Err(code.into());
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn sign_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
-    let hex: [u8; 64] = utils::to_hex(message).map_err(|_| ErrorCode::BadLen)?;
-    let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InternalError)?;
-
-    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-    {
-        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
-
-        let review_messages = ["Review ", "Hash "];
-        let fields = [Field{ name: "Hash", value: hex_str }];
-        let review = MultiFieldReview::new(
-            &fields,
-           &review_messages,
-           Some(&EYE),
-           "Approve",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
-        );
-        if review.show() {
-            sign_hash(path, message)
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    {
-        use ledger_device_sdk::nbgl::{Field, TagValueList};
-        use crate::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
-
-        let fields = [Field{ name: "Hash", value: hex_str }];
-        let values = TagValueList::new(&fields, 0, false, false);
-        let approved = nbgl_review_fields("Review", "Hash", &values);
-        if approved {
-            nbgl_sync_review_status(ReviewType::Hash);
-            sign_hash(path, message)
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-}
-
-fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
-    Secp256k1::derive_from_path(path)
-        .deterministic_sign(message)
-        .map_err(|_| ErrorCode::TxSigningFailed)
-}
-
-fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
-    let address = DeviceAddress::from_pub_key(pub_key)?;
-    let address_str = address.get_address_str()?;
-
-    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-    {
-        use crate::ledger_sdk_stub::multi_field_review::MultiFieldReview;
-        use ledger_device_sdk::ui::{bitmaps::{CHECKMARK, CROSS, EYE}, gadgets::Field};
-
-        let review_messages = ["Review ", "Address "];
-        let fields = [Field{ name: "Address", value: address_str }];
-        let review = MultiFieldReview::new(
-            &fields,
-           &review_messages,
-           Some(&EYE),
-           "Confirm address",
-           Some(&CHECKMARK),
-           "Reject",
-           Some(&CROSS),
-        );
-        if review.show() {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    {
-        use ledger_device_sdk::nbgl::NbglAddressReview;
-
-        let result = NbglAddressReview::new()
-            .verify_str("Confirm address")
-            .show(address_str);
-        if result {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
         }
     }
 }
