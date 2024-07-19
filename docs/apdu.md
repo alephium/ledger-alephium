@@ -78,12 +78,13 @@ This command returns the public key corresponding to the secret key found at the
 | INS     | byte (1) | Instruction ID            | 0x01            |
 | P1      | byte (1) | Parameter 1               | 0 or 4          |
 | P2      | byte (1) | Parameter 2               | Any value between [0-3]         |
-| L       | byte (1) | Bytes in payload          | 0x14            |
+| L       | byte (1) | Bytes in payload          | 0x15            |
 | Path[0] | byte (4) | Derivation Path Data      | ?               |
 | Path[1] | byte (4) | Derivation Path Data      | ?               |
 | Path[2] | byte (4) | Derivation Path Data      | ?               |
 | Path[3] | byte (4) | Derivation Path Data      | ?               |
 | Path[4] | byte (4) | Derivation Path Data      | ?               |
+| Flag    | byte (1) | Whether confirmation is needed | If not 0, display address and confirm before returning |
 
 #### Response
 
