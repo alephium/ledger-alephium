@@ -1,5 +1,13 @@
 target
 app.json
 app/app*.json
+nanos.hex
+nanos.json
+nanosplus.hex
+nanosplus.json
 nanox.hex
 nanox.json
+stax.hex
+stax.json
+flex.hex
+flex.json

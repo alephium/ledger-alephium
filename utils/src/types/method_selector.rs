@@ -31,17 +31,17 @@ pub mod tests {
 
         for step in steps {
             let mut decoder = new_decoder::<MethodSelector>();
-            let mut buffer = Buffer::new(&bytes[..0], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[..0], &mut temp_data);
             assert_eq!(decoder.decode(&mut buffer), Ok(None));
 
             let end_index = bytes.len() - step;
             for i in (0..end_index).step_by(step) {
                 let to = std::cmp::min(end_index, i + step);
-                let mut buffer = Buffer::new(&bytes[i..to], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[i..to], &mut temp_data);
                 assert_eq!(decoder.decode(&mut buffer), Ok(None));
             }
 
-            let mut buffer = Buffer::new(&bytes[(bytes.len() - step)..], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[(bytes.len() - step)..], &mut temp_data);
             assert_eq!(
                 decoder.decode(&mut buffer),
                 Ok(Some(&MethodSelector(number)))

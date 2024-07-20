@@ -21,9 +21,9 @@ impl RawDecoder for PublicKeyWithIndex {
         2
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -43,9 +43,9 @@ impl RawDecoder for P2SH {
         self.0.step_size() + self.0.step_size()
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -54,7 +54,7 @@ impl RawDecoder for P2SH {
                 let result = self.0.decode(buffer, stage);
                 let to_index = buffer.get_index();
                 let bytes = buffer.get_range(from_index, to_index);
-                buffer.write_bytes_to_temp_data(bytes);
+                buffer.write_bytes_to_temp_data(bytes)?;
                 result
             }
             _ => self.1.decode(buffer, stage),
@@ -63,11 +63,13 @@ impl RawDecoder for P2SH {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
 pub enum UnlockScript {
     P2PKH(PublicKey),
-    P2MPKH(PartialDecoder<AVector<PublicKeyWithIndex>>),
-    P2SH(PartialDecoder<P2SH>),
+    P2MPKH(StreamingDecoder<AVector<PublicKeyWithIndex>>),
+    P2SH(StreamingDecoder<P2SH>),
     SameAsPrevious,
+    #[default]
     Unknown,
 }
 
@@ -77,18 +79,12 @@ impl Reset for UnlockScript {
     }
 }
 
-impl Default for UnlockScript {
-    fn default() -> Self {
-        UnlockScript::Unknown
-    }
-}
-
 impl UnlockScript {
     fn from_type(tpe: u8) -> Option<Self> {
         match tpe {
             0 => Some(UnlockScript::P2PKH(PublicKey::default())),
-            1 => Some(UnlockScript::P2MPKH(PartialDecoder::default())),
-            2 => Some(UnlockScript::P2SH(PartialDecoder::default())),
+            1 => Some(UnlockScript::P2MPKH(StreamingDecoder::default())),
+            2 => Some(UnlockScript::P2SH(StreamingDecoder::default())),
             3 => Some(UnlockScript::SameAsPrevious),
             _ => None,
         }
@@ -100,24 +96,21 @@ impl RawDecoder for UnlockScript {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        match self {
-            UnlockScript::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
-                let result = UnlockScript::from_type(tpe);
-                if result.is_none() {
-                    return Err(DecodeError::InvalidData);
-                }
-                *self = result.unwrap();
+        if let UnlockScript::Unknown = self {
+            let tpe = buffer.consume_byte().unwrap();
+            let result = UnlockScript::from_type(tpe);
+            if result.is_none() {
+                return Err(DecodeError::InvalidData);
             }
-            _ => (),
+            *self = result.unwrap();
         };
         match self {
             UnlockScript::P2PKH(public_key) => public_key.decode(buffer, stage),
@@ -155,7 +148,7 @@ mod tests {
             ));
 
             {
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let mut decoder = new_decoder::<UnlockScript>();
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&unlock_script));
@@ -167,8 +160,7 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();
@@ -194,7 +186,7 @@ mod tests {
         while length < bytes.len() {
             let remain = bytes.len() - length;
             let size = random_usize(0, remain);
-            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
             length += size;
 
             let result = decoder.decode(&mut buffer).unwrap();

@@ -1,31 +1,12 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
-import fetch from 'node-fetch'
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
+import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function pressButton(button: 'left' | 'right' | 'both') {
-  await sleep(500)
-  return fetch(`http://localhost:25000/button/${button}`, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'press-and-release' })
-  })
-}
-
-function getRandomInt(min, max) {
-  min = Math.ceil(min)
-  max = Math.floor(max)
-  return Math.floor(Math.random() * (max - min) + min) // The maximum is exclusive and the minimum is inclusive
-}
-
-describe('sdk', () => {
-  const apduPort = 9999
+describe('ledger wallet', () => {
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
   web3.setCurrentNodeProvider(nodeProvider)
   let pathIndex: number
@@ -34,44 +15,6 @@ describe('sdk', () => {
   beforeEach(() => {
     pathIndex = getRandomInt(0, 1000000)
     path = `m/44'/1234'/0'/0/` + pathIndex
-  })
-
-  it('should get version', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
-    const app = new AlephiumApp(transport)
-    const version = await app.getVersion()
-    expect(version).toBe('0.2.0')
-    await app.close()
-  })
-
-  it('should get public key', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
-    const app = new AlephiumApp(transport)
-    const [account, hdIndex] = await app.getAccount(path)
-    expect(hdIndex).toBe(pathIndex)
-    console.log(account)
-    await app.close()
-  })
-
-  it('should get public key for group', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
-    const app = new AlephiumApp(transport)
-    for (let group = 0; group < GROUP_NUM; group++) {
-      const [account, hdIndex] = await app.getAccount(path, group)
-      expect(hdIndex >= pathIndex).toBe(true)
-      expect(groupOfAddress(account.address)).toBe(group)
-      expect(account.keyType).toBe('default')
-    }
-    await app.close()
-  })
-
-  it('should get public key for group for Schnorr signature', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
-    const app = new AlephiumApp(transport)
-    for (let group = 0; group < GROUP_NUM; group++) {
-      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
-    }
-    await app.close()
   })
 
   async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
@@ -88,15 +31,103 @@ describe('sdk', () => {
     return BigInt(balances.balance)
   }
 
-  async function clickAndApprove(times: number) {
-    for (let i = 0; i < times; i++) {
-      await pressButton('right')
-    }
-    await pressButton('both')
-  }
+  it('should get version', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const version = await app.getVersion()
+    expect(version).toBe('0.2.0')
+    await app.close()
+  })
 
-  it('should transfer alph to p2pkh address', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
+  it('should get public key', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account, hdIndex] = await app.getAccount(path)
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  })
+
+  it('should get public key and confirm address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    approveAddress()
+    const [account, hdIndex] = await app.getAccount(path, undefined, undefined, true)
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  }, 30000)
+
+  it('should get public key for group', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    for (let group = 0; group < GROUP_NUM; group++) {
+      const [account, hdIndex] = await app.getAccount(path, group)
+      expect(hdIndex >= pathIndex).toBe(true)
+      expect(groupOfAddress(account.address)).toBe(group)
+      expect(account.keyType).toBe('default')
+    }
+    await app.close()
+  })
+
+  it('should get public key for group for Schnorr signature', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    for (let group = 0; group < GROUP_NUM; group++) {
+      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
+    }
+    await app.close()
+  })
+
+  it('should sign hash', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+
+    const [account] = await app.getAccount(path)
+    console.log(account)
+
+    const hash = Buffer.from(blake.blake2b(Buffer.from([0, 1, 2, 3, 4]), undefined, 32))
+    approveHash()
+    const signature = await app.signHash(path, hash)
+    console.log(signature)
+    await app.close()
+
+    expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
+  }, 10000)
+
+  it('shoudl transfer alph to one address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
+
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer alph to multiple addresses', async () => {
+    const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
@@ -109,28 +140,13 @@ describe('sdk', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         },
         {
-          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          address: '1F1fu6GjuN9yUVRFVcgQKWwiTg8RMzKFv1BZFDwFcfWJq',
           attoAlphAmount: (ONE_ALPH * 3n).toString(),
         },
       ]
     })
 
-    function approve(index: number) {
-      if (index >= 7) return
-      if (index >= 3) { // outputs and signature
-        setTimeout(async () => {
-          await clickAndApprove(5)
-          approve(index + 1)
-        }, 1000)
-      } else {
-        setTimeout(async () => {
-          await clickAndApprove(2)
-          approve(index + 1)
-        }, 1000)
-      }
-    }
-
-    approve(0)
+    approveTx(Array(2).fill(OutputType.Base))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -143,10 +159,10 @@ describe('sdk', () => {
     expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
   it('should transfer alph to multisig address', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
+    const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
@@ -158,35 +174,11 @@ describe('sdk', () => {
         {
           address: multiSigAddress,
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
-        },
-        {
-          address: multiSigAddress,
-          attoAlphAmount: (ONE_ALPH * 3n).toString(),
-        },
+        }
       ]
     })
 
-    function approve(index: number) {
-      if (index >= 7) return
-      if (index == 3 || index == 4) { // multi-sig outputs
-        setTimeout(async () => {
-          await clickAndApprove(10)
-          approve(index + 1)
-        }, 1000)
-      } else if (index > 4) { // change output and signature
-        setTimeout(async () => {
-          await clickAndApprove(5)
-          approve(index + 1)
-        }, 1000)
-      } else {
-        setTimeout(async () => {
-          await clickAndApprove(2)
-          approve(index + 1)
-        }, 1000)
-      }
-    }
-
-    approve(0);
+    approveTx([OutputType.Multisig]);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -196,13 +188,13 @@ describe('sdk', () => {
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(testAccount.address)
-    expect(balance1 < (ONE_ALPH * 5n)).toEqual(true)
+    expect(balance1 < (ONE_ALPH * 8n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
   it('should transfer token to multisig address', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
+    const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
@@ -226,37 +218,7 @@ describe('sdk', () => {
       ]
     })
 
-    function approve(index: number) {
-      if (index > 7) return
-      if (index <= 2) {
-        setTimeout(async () => {
-          await clickAndApprove(2)
-          approve(index + 1)
-        }, 1000)
-      } else if (index === 3) { // multi-sig token output
-        setTimeout(async () => {
-          await clickAndApprove(16)
-          approve(index + 1)
-        }, 1000)
-      } else if (index === 4) { // multi-sig alph output
-        setTimeout(async () => {
-          await clickAndApprove(10)
-          approve(index + 1)
-        }, 1000)
-      } else if (index === 5) { // token change output
-        setTimeout(async () => {
-          await clickAndApprove(11)
-          approve(index + 1)
-        }, 1000)
-      } else if (index >= 6) { // alph change output and signature
-        setTimeout(async () => {
-          await clickAndApprove(5)
-          approve(index + 1)
-        }, 1000)
-      }
-    }
-
-    approve(0);
+    approveTx([OutputType.MultisigAndToken, OutputType.Multisig])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -275,10 +237,10 @@ describe('sdk', () => {
     expect(token.amount).toEqual('1111111111111111111111111')
 
     await app.close()
-  }, 90000)
+  }, 120000)
 
   it('should transfer from multiple inputs', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
+    const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
     for (let i = 0; i < 20; i += 1) {
@@ -295,22 +257,7 @@ describe('sdk', () => {
       ]
     })
 
-    function approve(index: number) {
-      if (index >= 6) return
-      if (index >= 3) { // outputs and signature
-        setTimeout(async () => {
-          await clickAndApprove(5)
-          approve(index + 1)
-        }, 1000)
-      } else {
-        setTimeout(async () => {
-          await clickAndApprove(2)
-          approve(index + 1)
-        }, 1000)
-      }
-    }
-
-    approve(0)
+    approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
@@ -323,13 +270,25 @@ describe('sdk', () => {
     expect(balance < (ONE_ALPH * 1n)).toEqual(true)
 
     await app.close()
-  }, 60000)
+  }, 120000)
 
-  it('should transfer from different input addresses', async () => {
-    const transport = await SpeculosTransport.open({ apduPort })
+  function getAccount(groupIndex: number): { account: PrivateKeyWallet, unlockScript: string } {
+    const useDefaultKeyType = Math.random() >= 0.5
+    if (useDefaultKeyType) {
+      const account = PrivateKeyWallet.Random(groupIndex)
+      return { account, unlockScript: '00' + account.publicKey }
+    }
+
+    const account = PrivateKeyWallet.Random(groupIndex, nodeProvider, 'bip340-schnorr')
+    const unlockScript = '02' + `0101000000000458144020${account.publicKey}8685` + '00'
+    return { account, unlockScript }
+  }
+
+  it('should test external inputs', async () => {
+    const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
-    const newAccount = PrivateKeyWallet.Random(testAccount.group)
+    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(testAccount.group)
     for (let i = 0; i < 2; i += 1) {
       await transferToAddress(testAccount.address, ONE_ALPH)
       await transferToAddress(newAccount.address, ONE_ALPH)
@@ -341,7 +300,6 @@ describe('sdk', () => {
     expect(utxos1.utxos.length).toEqual(2)
 
     const useSameAsPrevious = Math.random() >= 0.5
-    const unlockScript0 = '00' + newAccount.publicKey
     const inputs0: node.AssetInput[] = utxos0.utxos.map((utxo, index) => {
       const unlockScript = index > 0 && useSameAsPrevious ? '03' : unlockScript0
       return { outputRef: utxo.ref, unlockScript }
@@ -362,7 +320,7 @@ describe('sdk', () => {
         hint: 0,
         key: '',
         attoAlphAmount: (ONE_ALPH * 3n).toString(),
-        address: testAccount.address,
+        address: newAccount.address,
         tokens: [],
         lockTime: 0,
         message: ''
@@ -374,27 +332,7 @@ describe('sdk', () => {
       unsignedTx: binToHex(txBytes)
     })
 
-    function approve(index: number) {
-      if (index > 6) return
-      if (index === 3 || index === 4) { // inputs
-        setTimeout(async () => {
-          await clickAndApprove(4)
-          approve(index + 1)
-        }, 1000)
-      } else if (index >= 5) { // outputs and tx id
-        setTimeout(async () => {
-          await clickAndApprove(5)
-          approve(index + 1)
-        }, 1000)
-      } else {
-        setTimeout(async () => {
-          await clickAndApprove(2)
-          approve(index + 1)
-        }, 1000)
-      }
-    }
-
-    approve(0)
+    approveTx([OutputType.Base], true)
     const signature1 = await app.signUnsignedTx(path, Buffer.from(txBytes))
     expect(transactionVerifySignature(signResult0.txId, testAccount.publicKey, signature1)).toBe(true)
 
@@ -403,9 +341,72 @@ describe('sdk', () => {
       signatures: [signResult0.signature, signature1]
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
-    const balance = await getALPHBalance(testAccount.address)
+    const balance = await getALPHBalance(newAccount.address)
     expect(balance).toEqual(ONE_ALPH * 3n)
 
     await app.close()
-  }, 60000)
+  }, 120000)
+
+  it('should test self transfer tx', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: testAccount.address,
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
+
+    approveTx([])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance > (ONE_ALPH * 9n)).toEqual(true)
+
+    await app.close()
+  }, 12000)
+
+  it('should test script execution tx', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+    const buildTxResult = await nodeProvider.contracts.postContractsUnsignedTxDeployContract({
+      fromPublicKey: testAccount.publicKey,
+      bytecode: '00010c010000000002d38d0b3636020000'
+    })
+
+    setTimeout(() => skipBlindSigningWarning(), 1000)
+    await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
+
+    await enableBlindSigning()
+    if (needToAutoApprove()) {
+      staxFlexApproveOnce().then(() => approveTx([]))
+    } else {
+      // waiting for blind signing setting to be enabled
+      await sleep(20000)
+    }
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const details = await nodeProvider.transactions.getTransactionsDetailsTxid(submitResult.txId)
+    expect(details.scriptExecutionOk).toEqual(true)
+
+    await app.close()
+  }, 120000)
 })

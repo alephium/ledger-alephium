@@ -41,16 +41,16 @@ impl RawDecoder for U16 {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
         if stage.index == 0 {
-            self.first_byte = buffer.next_byte().unwrap();
+            self.first_byte = buffer.consume_byte().unwrap();
         }
         let length = self.get_length();
         if length > 4 {
@@ -65,8 +65,8 @@ impl RawDecoder for U16 {
         };
 
         while !buffer.is_empty() && index < length {
-            let byte = buffer.next_byte().unwrap() as u32;
-            self.inner |= (((byte & 0xff) as u32) << ((length - index - 1) * 8)) as u16;
+            let byte = buffer.consume_byte().unwrap() as u32;
+            self.inner |= ((byte & 0xff) << ((length - index - 1) * 8)) as u16;
             index += 1;
         }
         if index == length {
@@ -101,7 +101,7 @@ pub mod tests {
 
         let mut temp_data = TempData::new();
         for (bytes, num) in items {
-            let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data);
             let mut decoder = new_decoder::<U16>();
             let result = decoder.decode(&mut buffer).unwrap().unwrap();
             assert_eq!(result.inner, num);

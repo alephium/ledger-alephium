@@ -5,7 +5,7 @@ use crate::types::compact_integer::*;
 use super::{reset, BigInt};
 
 #[cfg_attr(test, derive(Debug))]
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone)]
 pub struct U256(pub BigInt);
 
 impl Reset for U256 {
@@ -33,10 +33,8 @@ fn trim(dest: &[u8]) -> &[u8] {
 impl U256 {
     const ALPH_DECIMALS: usize = 18;
     const DECIMAL_PLACES: usize = 6;
-    const _1000_NANO_ALPH: u64 =
-        (10 as u64).pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
+    const _1000_NANO_ALPH: u64 = 10_u64.pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
 
-    #[cfg(test)]
     pub fn from_encoded_bytes(bytes: &[u8]) -> Self {
         let mut bs = [0u8; 33];
         bs[..bytes.len()].copy_from_slice(bytes);
@@ -47,20 +45,77 @@ impl U256 {
         self.0.get_length() == 1 && self.0.bytes.iter().all(|v| *v == 0)
     }
 
+    pub fn to_u128(&self) -> Option<u128> {
+        let length = self.0.get_length();
+        if self.0.is_fixed_size() {
+            Some(Self::decode_fixed_size(&self.0.bytes[..length]) as u128)
+        } else if length <= 16 {
+            let mut bytes = [0u8; 16];
+            let tail = &self.0.bytes[1..length];
+            bytes[(16 - tail.len())..].copy_from_slice(tail);
+            Some(u128::from_be_bytes(bytes))
+        } else {
+            None
+        }
+    }
+
+    pub fn multiply(&self, num: u32) -> Option<U256> {
+        self.to_u128()
+            .map(|value| U256::encode_u128(value * num as u128))
+    }
+
+    fn encode_fixed_bytes(n: u32) -> U256 {
+        if n < 0x40 {
+            U256::from_encoded_bytes(&[n as u8])
+        } else if n < (0x40 << 8) {
+            U256::from_encoded_bytes(&[((n >> 8) + 0x40) as u8, n as u8])
+        } else if n < (0x40 << 24) {
+            U256::from_encoded_bytes(&[
+                ((n >> 24) + 0x40) as u8,
+                (n >> 16) as u8,
+                (n >> 8) as u8,
+                n as u8,
+            ])
+        } else {
+            panic!()
+        }
+    }
+
+    fn encode_u128(value: u128) -> U256 {
+        if value < (0x40 << 24) {
+            U256::encode_fixed_bytes(value as u32)
+        } else {
+            let bytes = value.to_be_bytes();
+            let mut index: usize = 0;
+            for (i, &byte) in bytes.iter().enumerate() {
+                if byte != 0 {
+                    index = i;
+                    break;
+                }
+            }
+            let length = bytes.len() - index;
+            let header: u8 = ((length - 4) as u8) | 0xc0;
+            let mut bs = [0u8; 33];
+            bs[0] = header;
+            bs[1..(length + 1)].copy_from_slice(&bytes[index..]);
+            Self(BigInt { bytes: bs })
+        }
+    }
+
     fn decode_fixed_size(bytes: &[u8]) -> u32 {
         assert!(bytes.len() <= 4);
         let mut result: u32 = ((bytes[0] as u32) & MASK_MODE) << ((bytes.len() - 1) * 8);
         let mut index = 1;
         while index < bytes.len() {
             let byte = bytes[index];
-            result |= ((byte & 0xff) as u32) << ((bytes.len() - index - 1) * 8);
+            result |= (byte as u32) << ((bytes.len() - index - 1) * 8);
             index += 1;
         }
         result
     }
 
     pub fn to_str<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
-        if output.len() == 0 {
+        if output.is_empty() {
             return None;
         }
         if self.is_zero() {
@@ -83,10 +138,10 @@ impl U256 {
             }
             index -= 1;
             let mut carry = 0u16;
-            for i in 0..32 {
-                let v = (carry << 8) | (bytes[i] as u16);
+            for element in &mut bytes {
+                let v = (carry << 8) | (*element as u16);
                 let rem = v % 10;
-                bytes[i] = (v / 10) as u8;
+                *element = (v / 10) as u8;
                 carry = rem;
             }
             output[index] = b'0' + (carry as u8);
@@ -117,11 +172,11 @@ impl U256 {
 
         let pad_size = decimals - str_length;
         output.copy_within(0..str_length, 2 + pad_size);
-        for i in 0..(2 + pad_size) {
+        for (i, element) in output.iter_mut().enumerate().take(2 + pad_size) {
             if i == 1 {
-                output[i] = b'.';
+                *element = b'.';
             } else {
-                output[i] = b'0';
+                *element = b'0';
             }
         }
         return Some(trim(&output[..(2 + decimal_places)]));
@@ -139,46 +194,50 @@ impl U256 {
         let mut index = 1;
         while index < length {
             let byte = self.0.bytes[index];
-            value = (value << 8) | ((byte & 0xff) as u64);
+            value = (value << 8) | (byte as u64);
             if value >= Self::_1000_NANO_ALPH {
                 return false;
             }
             index += 1
         }
-        return true;
+        true
     }
 
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
-        let postfix = b" ALPH";
+        let prefix = b"ALPH ";
         if self.is_zero() {
-            output[0] = b'0';
-            let total_size = 1 + postfix.len();
-            output[1..total_size].copy_from_slice(postfix);
+            let total_size = 1 + prefix.len();
+            output[..prefix.len()].copy_from_slice(prefix);
+            output[prefix.len()] = b'0';
             return Some(&output[..total_size]);
         }
 
         if self.is_less_than_1000_nano() {
             let str = b"<0.000001";
-            let total_size = str.len() + postfix.len();
+            let total_size = str.len() + prefix.len();
             if output.len() < total_size {
                 return None;
             }
-            output[..str.len()].copy_from_slice(str);
-            output[str.len()..total_size].copy_from_slice(postfix);
+            output[..prefix.len()].copy_from_slice(prefix);
+            output[prefix.len()..total_size].copy_from_slice(str);
             return Some(&output[..total_size]);
         }
 
-        if output.len() < 28 + postfix.len() {
+        if output.len() < 28 + prefix.len() {
             // max ALPH amount
             return None;
         }
 
-        let str = self.to_str_with_decimals(output, Self::ALPH_DECIMALS, Self::DECIMAL_PLACES)?;
+        output[..prefix.len()].copy_from_slice(prefix);
+        let str = self.to_str_with_decimals(
+            &mut output[prefix.len()..],
+            Self::ALPH_DECIMALS,
+            Self::DECIMAL_PLACES,
+        )?;
         let str_length = str.len();
-        let total_size = str_length + postfix.len();
-        output[str_length..total_size].copy_from_slice(postfix);
-        return Some(&output[..total_size]);
+        let total_size = str_length + prefix.len();
+        Some(&output[..total_size])
     }
 }
 
@@ -187,9 +246,9 @@ impl RawDecoder for U256 {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         self.0.decode(buffer, stage)
@@ -198,11 +257,13 @@ impl RawDecoder for U256 {
 
 #[cfg(test)]
 pub mod tests {
+    extern crate alloc;
     extern crate std;
 
     use crate::buffer::Buffer;
     use crate::types::u256::U256;
     use crate::{decode::*, TempData};
+    use alloc::borrow::ToOwned;
     use core::str::from_utf8;
     use rand::Rng;
     use std::string::String;
@@ -308,7 +369,7 @@ pub mod tests {
 
             {
                 let mut decoder = new_decoder::<U256>();
-                let mut buffer = Buffer::new(bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(bytes, &mut temp_data);
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert!(result.is_some());
                 let result = result.unwrap();
@@ -323,8 +384,7 @@ pub mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();
@@ -342,50 +402,28 @@ pub mod tests {
         }
     }
 
-    const MAX_OF_4_BYTES_ENCODED: u128 = 1073741823;
-    fn encode_fixed_bytes(n: u32) -> U256 {
-        if n < 0x40 {
-            U256::from_encoded_bytes(&[n as u8])
-        } else if n < (0x40 << 8) {
-            U256::from_encoded_bytes(&[((n >> 8) + 0x40) as u8, n as u8])
-        } else if n < (0x40 << 24) {
-            U256::from_encoded_bytes(&[
-                ((n >> 24) + 0x40) as u8,
-                (n >> 16) as u8,
-                (n >> 8) as u8,
-                n as u8,
-            ])
-        } else {
-            panic!()
-        }
-    }
-
-    fn encode_u128(value: u128) -> U256 {
-        if value <= MAX_OF_4_BYTES_ENCODED {
-            encode_fixed_bytes(value as u32)
-        } else {
-            let mut bytes: Vec<u8> = value
-                .to_be_bytes()
-                .iter()
-                .cloned()
-                .skip_while(|&b| b == 0)
-                .collect();
-            let header: u8 = ((bytes.len() - 4) as u8) | 0xc0;
-            bytes.insert(0, header);
-            U256::from_encoded_bytes(&bytes)
-        }
-    }
-
     #[test]
     fn test_is_less_than_1000_nano_alph() {
-        let u2560 = encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
-        let u2561 = encode_u128((U256::_1000_NANO_ALPH) as u128);
-        let u2562 = encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
+        let u2560 = U256::encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
+        let u2561 = U256::encode_u128((U256::_1000_NANO_ALPH) as u128);
+        let u2562 = U256::encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
 
         assert!(u2560.is_less_than_1000_nano());
         assert!(!u2561.is_less_than_1000_nano());
         assert!(!u2562.is_less_than_1000_nano());
-        assert!(!encode_u128(u128::MAX).is_less_than_1000_nano())
+        assert!(!U256::encode_u128(u128::MAX).is_less_than_1000_nano())
+    }
+
+    #[test]
+    fn test_multiply() {
+        let min_gas_price = u128::pow(10, 11);
+        let gas_amount = random_usize(1, 5000000) as u32;
+        let fee = min_gas_price * (gas_amount as u128);
+        let u256 = U256::encode_u128(min_gas_price)
+            .multiply(gas_amount)
+            .unwrap();
+        assert!(u256.to_u128().unwrap() == fee);
+        assert!(U256::encode_u128(u128::MAX).multiply(2).is_none());
     }
 
     #[test]
@@ -424,12 +462,12 @@ pub mod tests {
             (alph("1.9999999"), "1.999999"),
         ];
         for (number, str) in cases {
-            let u256 = encode_u128(number);
+            let u256 = U256::encode_u128(number);
             let mut output = [0u8; 33];
             let result = u256.to_alph(&mut output);
             assert!(result.is_some());
             let expected = from_utf8(result.unwrap()).unwrap();
-            let amount_str = String::from(str) + " ALPH";
+            let amount_str = "ALPH ".to_owned() + str;
             assert_eq!(amount_str, String::from(expected));
         }
 

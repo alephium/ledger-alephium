@@ -3,24 +3,20 @@ use crate::decode::*;
 use crate::types::*;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
 pub enum Val {
     Bool(Bool),
     I256(I256),
     U256(U256),
     ByteVec(ByteString),
     Address(LockupScript),
+    #[default]
     Unknown,
 }
 
 impl Reset for Val {
     fn reset(&mut self) {
         *self = Self::Unknown;
-    }
-}
-
-impl Default for Val {
-    fn default() -> Self {
-        Val::Unknown
     }
 }
 
@@ -49,24 +45,21 @@ impl RawDecoder for Val {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut crate::buffer::Buffer<'a, W>,
+        buffer: &mut crate::buffer::Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
-        match self {
-            Val::Unknown => {
-                let tpe = buffer.next_byte().unwrap();
-                let result = Val::from_type(tpe);
-                if result.is_none() {
-                    return Err(DecodeError::InvalidData);
-                }
-                *self = result.unwrap();
+        if let Val::Unknown = self {
+            let tpe = buffer.consume_byte().unwrap();
+            let result = Val::from_type(tpe);
+            if result.is_none() {
+                return Err(DecodeError::InvalidData);
             }
-            _ => (),
+            *self = result.unwrap();
         };
 
         match self {

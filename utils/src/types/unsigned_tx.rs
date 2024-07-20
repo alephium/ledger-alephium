@@ -6,9 +6,8 @@ use crate::decode::*;
 pub enum UnsignedTx {
     Version(Byte),
     NetworkId(Byte),
-    ScriptOpt(PartialDecoder<Option<Script>>),
-    GasAmount(I32),
-    GasPrice(U256),
+    ScriptOpt(StreamingDecoder<Option<Script>>),
+    TxFee(StreamingDecoder<TxFee>),
     Inputs(AVector<TxInput>),
     FixedOutputs(AVector<AssetOutput>),
 }
@@ -21,20 +20,16 @@ impl Reset for UnsignedTx {
 
 impl UnsignedTx {
     pub fn is_complete(&self) -> bool {
-        match self {
-            Self::FixedOutputs(outputs) if outputs.is_complete() => true,
-            _ => false,
-        }
+        matches!(self, Self::FixedOutputs(outputs) if outputs.is_complete())
     }
 
     #[inline]
     pub fn next_step(&mut self) {
         match self {
             Self::Version(_) => *self = Self::NetworkId(Byte::default()),
-            Self::NetworkId(_) => *self = Self::ScriptOpt(PartialDecoder::default()),
-            Self::ScriptOpt(_) => *self = Self::GasAmount(I32::default()),
-            Self::GasAmount(_) => *self = Self::GasPrice(U256::default()),
-            Self::GasPrice(_) => *self = Self::Inputs(AVector::default()),
+            Self::NetworkId(_) => *self = Self::ScriptOpt(StreamingDecoder::default()),
+            Self::ScriptOpt(_) => *self = Self::TxFee(StreamingDecoder::default()),
+            Self::TxFee(_) => *self = Self::Inputs(AVector::default()),
             Self::Inputs(inputs) => {
                 if inputs.is_complete() {
                     *self = Self::FixedOutputs(AVector::default())
@@ -60,19 +55,55 @@ impl RawDecoder for UnsignedTx {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match self {
             Self::Version(byte) => byte.decode(buffer, stage),
             Self::NetworkId(byte) => byte.decode(buffer, stage),
             Self::ScriptOpt(script) => script.decode_children(buffer, stage),
-            Self::GasAmount(amount) => amount.decode(buffer, stage),
-            Self::GasPrice(amount) => amount.decode(buffer, stage),
+            Self::TxFee(tx_fee) => tx_fee.decode_children(buffer, stage),
             Self::Inputs(inputs) => inputs.decode(buffer, stage),
             Self::FixedOutputs(outputs) => outputs.decode(buffer, stage),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug))]
+#[derive(Default)]
+pub struct TxFee {
+    pub gas_amount: I32,
+    pub gas_price: U256,
+}
+
+impl TxFee {
+    pub fn get(&self) -> Option<U256> {
+        self.gas_price.multiply(self.gas_amount.inner as u32)
+    }
+}
+
+impl Reset for TxFee {
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
+impl RawDecoder for TxFee {
+    fn step_size(&self) -> u16 {
+        2
+    }
+
+    fn decode<W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'_, W>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            0 => self.gas_amount.decode(buffer, stage),
+            1 => self.gas_price.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
         }
     }
 }
@@ -99,7 +130,7 @@ mod tests {
 
     fn decode<'a, W: Writable>(
         buffer: &mut Buffer<'a, W>,
-        decoder: &mut PartialDecoder<UnsignedTx>,
+        decoder: &mut StreamingDecoder<UnsignedTx>,
         hasher: &mut Blake2b256,
     ) -> DecodeResult<bool> {
         let from_index = buffer.get_index();
@@ -211,8 +242,10 @@ mod tests {
                     assert!(script.inner.is_none())
                 }
             }
-            UnsignedTx::GasAmount(amount) => assert_eq!(amount, &gas_amount),
-            UnsignedTx::GasPrice(amount) => assert_eq!(amount, &gas_price),
+            UnsignedTx::TxFee(tx_fee) => {
+                assert_eq!(&tx_fee.inner.gas_amount, &gas_amount);
+                assert_eq!(&tx_fee.inner.gas_price, &gas_price);
+            }
             UnsignedTx::Inputs(inputs) => {
                 let current_input = inputs.get_current_item();
                 if current_input.is_some() {
@@ -243,8 +276,7 @@ mod tests {
             while length < encoded_tx.len() {
                 let remain = encoded_tx.len() - length;
                 let size = min(random_usize(0, frame_size), remain);
-                let mut buffer =
-                    Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&encoded_tx[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let mut continue_decode = true;

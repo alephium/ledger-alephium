@@ -2,9 +2,15 @@
 
 This project is still under active development.
 
-## Install
+## Build from source
 
-All of the release files are in the root folder. To build everything from source code, please refer to the next section.
+The following command will build the releases for Ledger devices.
+
+```shell
+make release
+```
+
+## Install
 
 You will need to install the tool `ledgerctl` to load Alphium app. The official guide is here: [https://github.com/LedgerHQ/ledgerctl#quick-install](https://github.com/LedgerHQ/ledgerctl#quick-install).
 
@@ -27,13 +33,4 @@ Nano X manual installation isn't supported. The device no longer supports applic
 To uninstall the app:
 ```
 ledgerctl delete Alephium
-```
-
-## Build from source
-
-The following command will build the releases for Ledger Nano.
-
-```shell
-make app-builder-image
-make release
 ```

@@ -1,9 +1,10 @@
 use crate::blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE};
-use crate::debug::print::{println, println_slice};
 use crate::error_code::ErrorCode;
+use core::str::from_utf8;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
+use utils::base58::base58_encode_inputs;
 use utils::{djb_hash, xor_bytes};
 
 pub const TOTAL_NUMBER_OF_GROUPS: u8 = 4;
@@ -45,8 +46,6 @@ fn derive_pub_key_for_group(
     target_group: u8,
 ) -> Result<(ECPublicKey<65, 'W'>, u32), Reply> {
     loop {
-        println("path");
-        println_slice::<8>(&path.last().unwrap().to_be_bytes());
         let pk = derive_pub_key_by_path(path)?;
         if get_pub_key_group(pk.as_ref(), group_num) == target_group {
             return Ok((pk, path[path.len() - 1]));
@@ -57,8 +56,6 @@ fn derive_pub_key_for_group(
 
 pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
     assert!(pub_key.len() == 65);
-    println("pub_key 65");
-    println_slice::<130>(pub_key);
     let mut compressed = [0_u8; 33];
     compressed[1..33].copy_from_slice(&pub_key[1..33]);
     if pub_key.last().unwrap() % 2 == 0 {
@@ -66,24 +63,65 @@ pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
     } else {
         compressed[0] = 0x03
     }
-    println("compressed");
-    println_slice::<66>(&compressed);
 
     Blake2bHasher::hash(&compressed).unwrap()
 }
 
 fn get_pub_key_group(pub_key: &[u8], group_num: u8) -> u8 {
     let pub_key_hash = hash_of_public_key(pub_key);
-    println("blake2b done");
     let script_hint = djb_hash(&pub_key_hash) | 1;
-    println("hint done");
     let group_index = xor_bytes(script_hint);
-    println("pub key hash");
-    println_slice::<64>(&pub_key_hash);
-    println("script hint");
-    println_slice::<8>(&script_hint.to_be_bytes());
-    println("group index");
-    println_slice::<2>(&[group_index]);
-
     group_index % group_num
+}
+
+pub fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), ErrorCode> {
+    Secp256k1::derive_from_path(path)
+        .deterministic_sign(message)
+        .map_err(|_| ErrorCode::TxSigningFailed)
+}
+
+pub struct Address {
+    bytes: [u8; 46],
+    length: usize,
+}
+
+impl Address {
+    pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
+        let mut bytes = [0u8; 46];
+        let device_public_key =
+            derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
+        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
+        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
+        let length = device_address.len();
+        Ok(Self { bytes, length })
+    }
+
+    pub fn from_pub_key(pub_key: &ECPublicKey<65, 'W'>) -> Result<Self, ErrorCode> {
+        let mut bytes = [0u8; 46];
+        let public_key_hash = hash_of_public_key(pub_key.as_ref());
+        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
+        let length = device_address.len();
+        Ok(Self { bytes, length })
+    }
+
+    pub fn get_address_str(&self) -> Result<&str, ErrorCode> {
+        from_utf8(&self.bytes[..self.length]).map_err(|_| ErrorCode::InternalError)
+    }
+
+    pub fn eq(&self, addr: &[u8]) -> bool {
+        &self.bytes[..self.length] == addr
+    }
+}
+
+#[inline]
+pub fn to_base58_address<'a>(
+    prefix: u8,
+    hash: &[u8; 32],
+    output: &'a mut [u8],
+) -> Result<&'a [u8], ErrorCode> {
+    if let Some(str_bytes) = base58_encode_inputs(&[&[prefix], &hash[..]], output) {
+        Ok(str_bytes)
+    } else {
+        Err(ErrorCode::Overflow)
+    }
 }

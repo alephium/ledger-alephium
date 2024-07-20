@@ -32,7 +32,7 @@ pub mod tests {
 
         while bytes.len() < Byte32::ENCODED_LENGTH {
             let data = gen_bytes(0, Byte32::ENCODED_LENGTH * 2);
-            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data);
             bytes.extend(&data);
 
             let result = decoder.decode(&mut buffer);

@@ -5,6 +5,7 @@ pub enum DecodeError {
     InvalidSize,
     InvalidData,
     InternalError,
+    Overflow,
 }
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
@@ -37,15 +38,15 @@ impl DecodeStage {
 pub trait RawDecoder: Sized {
     fn step_size(&self) -> u16;
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage>;
 }
 
 pub trait Decoder<T>: Sized {
-    fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>>;
+    fn decode<W: Writable>(&mut self, buffer: &mut Buffer<'_, W>) -> DecodeResult<Option<&T>>;
 }
 
 pub trait Reset {
@@ -53,19 +54,19 @@ pub trait Reset {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
-pub struct PartialDecoder<T> {
+pub struct StreamingDecoder<T> {
     pub inner: T,
     pub stage: DecodeStage,
 }
 
-impl<T> PartialDecoder<T> {
+impl<T> StreamingDecoder<T> {
     pub fn reset_stage(&mut self) {
         self.stage.index = 0;
         self.stage.step = 0;
     }
 }
 
-impl<T: Reset> PartialDecoder<T> {
+impl<T: Reset> StreamingDecoder<T> {
     pub fn reset(&mut self) {
         self.inner.reset();
         self.stage.index = 0;
@@ -73,17 +74,17 @@ impl<T: Reset> PartialDecoder<T> {
     }
 }
 
-impl<T: Default> Default for PartialDecoder<T> {
+impl<T: Default> Default for StreamingDecoder<T> {
     fn default() -> Self {
-        PartialDecoder {
+        StreamingDecoder {
             inner: T::default(),
             stage: DecodeStage::default(),
         }
     }
 }
 
-impl<T: RawDecoder> PartialDecoder<T> {
-    pub fn step<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<bool> {
+impl<T: RawDecoder> StreamingDecoder<T> {
+    pub fn step<W: Writable>(&mut self, buffer: &mut Buffer<'_, W>) -> DecodeResult<bool> {
         if buffer.is_empty() {
             return Ok(false);
         }
@@ -109,9 +110,9 @@ impl<T: RawDecoder> PartialDecoder<T> {
         }
     }
 
-    pub fn decode_children<'a, W: Writable>(
+    pub fn decode_children<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         parent_stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         self.decode(buffer).map(|result| {
@@ -124,8 +125,8 @@ impl<T: RawDecoder> PartialDecoder<T> {
     }
 }
 
-impl<T: RawDecoder> Decoder<T> for PartialDecoder<T> {
-    fn decode<'a, W: Writable>(&mut self, buffer: &mut Buffer<'a, W>) -> DecodeResult<Option<&T>> {
+impl<T: RawDecoder> Decoder<T> for StreamingDecoder<T> {
+    fn decode<W: Writable>(&mut self, buffer: &mut Buffer<'_, W>) -> DecodeResult<Option<&T>> {
         loop {
             match self.step(buffer) {
                 Ok(true) => {
@@ -148,9 +149,9 @@ impl<T: Default + RawDecoder> RawDecoder for Option<T> {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
@@ -158,7 +159,7 @@ impl<T: Default + RawDecoder> RawDecoder for Option<T> {
         }
 
         if self.is_none() {
-            let byte = buffer.next_byte().unwrap();
+            let byte = buffer.consume_byte().unwrap();
             if byte == 0 {
                 return Ok(DecodeStage::COMPLETE);
             } else if byte == 1 {
@@ -180,9 +181,9 @@ impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
         self.0.step_size() + self.1.step_size()
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         match stage.step {
@@ -193,6 +194,6 @@ impl<T1: RawDecoder, T2: RawDecoder> RawDecoder for (T1, T2) {
     }
 }
 
-pub fn new_decoder<T: Default + RawDecoder>() -> PartialDecoder<T> {
-    PartialDecoder::<T>::default()
+pub fn new_decoder<T: Default + RawDecoder>() -> StreamingDecoder<T> {
+    StreamingDecoder::<T>::default()
 }

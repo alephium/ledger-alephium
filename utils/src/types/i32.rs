@@ -18,7 +18,7 @@ impl Reset for I32 {
     }
 }
 
-fn trim<'a>(dest: &'a mut [u8], is_negative: bool) -> &'a [u8] {
+fn trim(dest: &mut [u8], is_negative: bool) -> &[u8] {
     let mut index = 0;
     while index < dest.len() {
         if dest[index] == b'0' {
@@ -71,7 +71,7 @@ impl I32 {
 
     pub fn to_str<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
         reset(output);
-        if output.len() < 1 {
+        if output.is_empty() {
             return None;
         }
         if self.inner == 0 {
@@ -98,15 +98,15 @@ impl I32 {
                 } else {
                     number as u8
                 };
-            raw_number = raw_number / 10;
+            raw_number /= 10;
             length += 1;
         }
         Some(trim(output, self.inner < 0))
     }
 
-    fn decode_fixed_size<'a, W: Writable>(
+    fn decode_fixed_size<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         length: usize,
         from_index: usize,
     ) -> usize {
@@ -124,15 +124,15 @@ impl I32 {
         }
     }
 
-    fn decode_i32<'a, W: Writable>(
+    fn decode_i32<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         length: usize,
         from_index: usize,
     ) -> usize {
         let mut index = from_index;
         while !buffer.is_empty() && index < length {
-            let byte = buffer.next_byte().unwrap() as u32;
+            let byte = buffer.consume_byte().unwrap() as u32;
             self.inner |= ((byte & 0xff) as i32) << ((length - index - 1) * 8);
             index += 1;
         }
@@ -151,16 +151,16 @@ impl RawDecoder for I32 {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
         if stage.index == 0 {
-            self.first_byte = buffer.next_byte().unwrap();
+            self.first_byte = buffer.consume_byte().unwrap();
         }
         let length = self.get_length();
         if length > 5 {
@@ -249,7 +249,7 @@ pub mod tests {
 
             {
                 let mut decoder = new_decoder::<I32>();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let result = decoder.decode(&mut buffer).unwrap();
                 assert_eq!(result, Some(&I32::from(item.1)));
                 assert!(decoder.stage.is_complete())
@@ -261,8 +261,7 @@ pub mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

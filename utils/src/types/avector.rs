@@ -6,7 +6,7 @@ use crate::decode::*;
 
 #[cfg_attr(test, derive(Debug))]
 pub struct AVector<T> {
-    current_item: PartialDecoder<T>,
+    current_item: StreamingDecoder<T>,
     total_size: U16,
     pub current_index: i16,
 }
@@ -30,7 +30,7 @@ impl<T: PartialEq> PartialEq for AVector<T> {
 impl<T: Default + RawDecoder> AVector<T> {
     pub fn from_item(value: T) -> Self {
         AVector {
-            current_item: PartialDecoder {
+            current_item: StreamingDecoder {
                 inner: value,
                 stage: DecodeStage::default(),
             },
@@ -70,8 +70,8 @@ impl<T> AVector<T> {
         if self.is_empty() {
             return true;
         }
-        return ((self.current_index as usize) == (self.size() - 1))
-            && self.current_item.stage.is_complete();
+        ((self.current_index as usize) == (self.size() - 1))
+            && self.current_item.stage.is_complete()
     }
 }
 
@@ -94,9 +94,9 @@ impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
         }
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if !self.total_size_decoded() {
@@ -120,7 +120,7 @@ impl<T: Reset + RawDecoder> RawDecoder for AVector<T> {
             return Ok(DecodeStage { ..*stage });
         }
 
-        return Ok(DecodeStage::COMPLETE);
+        Ok(DecodeStage::COMPLETE)
     }
 }
 
@@ -142,13 +142,13 @@ mod tests {
     fn test_decode_empty_avector() {
         let mut temp_data = TempData::new();
         let empty_avector_encoded = vec![0u8];
-        let mut buffer0 = Buffer::new(&empty_avector_encoded, &mut temp_data).unwrap();
+        let mut buffer0 = Buffer::new(&empty_avector_encoded, &mut temp_data);
         let mut decoder0 = new_decoder::<AVector<Hash>>();
         let result0 = decoder0.decode(&mut buffer0).unwrap().unwrap();
         assert!(result0.get_current_item().is_none());
         assert!(result0.is_complete());
 
-        let mut buffer1 = Buffer::new(&empty_avector_encoded, &mut temp_data).unwrap();
+        let mut buffer1 = Buffer::new(&empty_avector_encoded, &mut temp_data);
         let mut decoder1 = new_decoder::<AVector<U256>>();
         let result1 = decoder1.decode(&mut buffer1).unwrap().unwrap();
         assert!(result1.get_current_item().is_none());
@@ -186,7 +186,7 @@ mod tests {
             }
 
             if bytes.len() <= (u8::MAX as usize) {
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let mut decoder = new_decoder::<AVector<Hash>>();
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
                 assert_eq!(result.total_size, U16::from(size as u16));
@@ -199,8 +199,7 @@ mod tests {
 
             while length < bytes.len() {
                 let size = if length == 0 { 32 + prefix_length } else { 32 };
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

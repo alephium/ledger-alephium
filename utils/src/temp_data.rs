@@ -29,7 +29,7 @@ impl TempData {
     #[inline]
     pub fn write_byte(&mut self, byte: u8) {
         if self.size == TempData::MAX_SIZE {
-            return;
+            panic!();
         }
         self.data[self.size] = byte;
         self.size += 1;
@@ -41,10 +41,11 @@ impl TempData {
 }
 
 impl Writable for TempData {
-    fn write(&mut self, bytes: &[u8]) {
+    fn write(&mut self, bytes: &[u8]) -> bool {
         for byte in bytes {
             self.write_byte(*byte)
         }
+        true
     }
 }
 

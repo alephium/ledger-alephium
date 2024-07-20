@@ -17,9 +17,9 @@ impl RawDecoder for I256 {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         self.0.decode(buffer, stage)
@@ -79,7 +79,7 @@ mod tests {
 
             {
                 let mut decoder = new_decoder::<I256>();
-                let mut buffer = Buffer::new(&bytes, &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes, &mut temp_data);
                 let result = decoder.decode(&mut buffer).unwrap().unwrap();
                 let length = result.0.get_length();
                 assert_eq!(&bytes, &result.0.bytes[..length]);
@@ -92,8 +92,7 @@ mod tests {
             while length < bytes.len() {
                 let remain = bytes.len() - length;
                 let size = random_usize(0, remain);
-                let mut buffer =
-                    Buffer::new(&bytes[length..(length + size)], &mut temp_data).unwrap();
+                let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
                 length += size;
 
                 let result = decoder.decode(&mut buffer).unwrap();

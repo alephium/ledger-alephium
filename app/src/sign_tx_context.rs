@@ -1,12 +1,12 @@
-use ledger_device_sdk::ecc::Secp256k1;
-use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::io::ApduHeader;
-use ledger_device_sdk::ui::gadgets::MessageScroller;
-use utils::{buffer::Buffer, decode::PartialDecoder, deserialize_path, types::UnsignedTx};
+use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
 
-use crate::blind_signing::is_blind_signing_enabled;
-use crate::nvm_buffer::{NVMBuffer, NVMData, NVM, NVM_DATA_SIZE};
-use crate::tx_reviewer::TxReviewer;
+use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
+use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
+use crate::public_key::sign_hash;
+use crate::public_key::Address;
+use crate::settings::is_blind_signing_enabled;
+use crate::ui::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
     error_code::ErrorCode,
@@ -24,29 +24,33 @@ enum DecodeStep {
 
 pub struct SignTxContext {
     pub path: [u32; 5],
-    tx_decoder: PartialDecoder<UnsignedTx>,
+    tx_decoder: StreamingDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
-    temp_data: NVMBuffer<'static, NVM_DATA_SIZE>,
+    temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
+    device_address: Option<Address>,
 }
 
 impl SignTxContext {
     pub fn new() -> Self {
         SignTxContext {
             path: [0; 5],
-            tx_decoder: PartialDecoder::default(),
+            tx_decoder: StreamingDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
-            temp_data: unsafe { NVMBuffer::new(&mut DATA) },
+            temp_data: unsafe { SwappingBuffer::new(&mut DATA) },
+            device_address: None,
         }
     }
 
-    pub fn reset(&mut self) {
-        self.path = [0; 5];
+    pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+        deserialize_path(&data[0..20], &mut self.path);
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
         self.temp_data.reset();
+        self.device_address = Some(Address::from_path(&self.path)?);
+        Ok(())
     }
 
     pub fn is_complete(&self) -> bool {
@@ -58,18 +62,14 @@ impl SignTxContext {
         self.hasher.finalize()
     }
 
-    pub fn review_tx_id_and_sign(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
+    pub fn sign_tx(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
-        TxReviewer::review_tx_id(&tx_id)?;
-        let signature = Secp256k1::derive_from_path(&self.path)
-            .deterministic_sign(&tx_id)
-            .map_err(|_| ErrorCode::TxSigningFailed)?;
-        Ok(signature)
+        sign_hash(&self.path, &tx_id)
     }
 
     fn _decode_tx(
         &mut self,
-        buffer: &mut Buffer<'_, NVMBuffer<'static, NVM_DATA_SIZE>>,
+        buffer: &mut Buffer<'_, SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>>,
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {
@@ -77,7 +77,7 @@ impl SignTxContext {
                 Ok(true) => {
                     tx_reviewer.review_tx_details(
                         &self.tx_decoder.inner,
-                        &self.path,
+                        self.device_address.as_ref().unwrap(),
                         &self.temp_data,
                     )?;
                     self.temp_data.reset();
@@ -100,7 +100,7 @@ impl SignTxContext {
         if data.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
-        let mut buffer = Buffer::new(data, &mut self.temp_data).unwrap();
+        let mut buffer = Buffer::new(data, &mut self.temp_data);
         let result = self._decode_tx(&mut buffer, tx_reviewer);
         self.hasher.update(data)?;
         result
@@ -109,30 +109,22 @@ impl SignTxContext {
     pub fn handle_data(
         &mut self,
         apdu_header: &ApduHeader,
-        data: &[u8],
+        tx_data: &[u8],
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
-                if apdu_header.p1 == 0 && data.len() >= 23 {
-                    if !deserialize_path(&data[0..20], &mut self.path) {
-                        return Err(ErrorCode::HDPathDecodingFailed);
-                    }
+                if apdu_header.p1 == 0 {
                     self.current_step = DecodeStep::DecodingTx;
-                    let tx_data = &data[20..];
-                    if tx_data[2] == 0x01 {
-                        // if this tx calls contract
-                        check_blind_signing()?;
-                    }
                     self.decode_tx(tx_data, tx_reviewer)
                 } else {
-                    Err(ErrorCode::BadLen)
+                    Err(ErrorCode::BadP1P2)
                 }
             }
             DecodeStep::DecodingTx => {
                 if apdu_header.p1 == 1 {
-                    self.decode_tx(data, tx_reviewer)
+                    self.decode_tx(tx_data, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)
                 }
@@ -141,11 +133,44 @@ impl SignTxContext {
     }
 }
 
-fn check_blind_signing() -> Result<(), ErrorCode> {
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+pub fn check_blind_signing() -> Result<(), ErrorCode> {
+    use ledger_device_sdk::{
+        buttons::{ButtonEvent, ButtonsState},
+        ui::{
+            bitmaps::CROSSMARK,
+            gadgets::{clear_screen, get_event, Page, PageStyle},
+            screen_util::screen_update,
+        },
+    };
+
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let scroller = MessageScroller::new("Blind signing must be enabled");
-    scroller.event_loop();
+    let page = Page::new(
+        PageStyle::PictureNormal,
+        ["Blind signing", "must be enabled"],
+        Some(&CROSSMARK),
+    );
+    clear_screen();
+    page.place();
+    screen_update();
+    let mut buttons = ButtonsState::new();
+
+    loop {
+        if let Some(ButtonEvent::BothButtonsRelease) = get_event(&mut buttons) {
+            return Err(ErrorCode::BlindSigningDisabled);
+        }
+    }
+}
+
+#[cfg(any(target_os = "stax", target_os = "flex"))]
+pub fn check_blind_signing() -> Result<(), ErrorCode> {
+    use crate::ui::nbgl::nbgl_review_info;
+
+    if is_blind_signing_enabled() {
+        return Ok(());
+    }
+    nbgl_review_info("Blind signing must be enabled in Settings");
     Err(ErrorCode::BlindSigningDisabled)
 }

@@ -3,6 +3,7 @@ use crate::decode::*;
 use crate::types::compact_integer::*;
 
 #[cfg_attr(test, derive(Debug))]
+#[derive(Clone)]
 pub struct BigInt {
     pub bytes: [u8; 33],
 }
@@ -26,6 +27,14 @@ impl PartialEq for BigInt {
 }
 
 impl BigInt {
+    #[cfg(test)]
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        assert!(bytes.len() == 33);
+        let mut bs = [0u8; 33];
+        bs.copy_from_slice(bytes);
+        Self { bytes: bs }
+    }
+
     #[inline]
     pub fn get_length(&self) -> usize {
         decode_length(self.bytes[0])
@@ -42,16 +51,16 @@ impl RawDecoder for BigInt {
         1
     }
 
-    fn decode<'a, W: Writable>(
+    fn decode<W: Writable>(
         &mut self,
-        buffer: &mut Buffer<'a, W>,
+        buffer: &mut Buffer<'_, W>,
         stage: &DecodeStage,
     ) -> DecodeResult<DecodeStage> {
         if buffer.is_empty() {
             return Ok(DecodeStage { ..*stage });
         }
         let from_index = if stage.index == 0 {
-            self.bytes[0] = buffer.next_byte().unwrap();
+            self.bytes[0] = buffer.consume_byte().unwrap();
             1
         } else {
             stage.index
@@ -59,7 +68,7 @@ impl RawDecoder for BigInt {
         let length = self.get_length();
         let mut idx = 0;
         while !buffer.is_empty() && idx < (length - (from_index as usize)) {
-            self.bytes[(from_index as usize) + idx] = buffer.next_byte().unwrap();
+            self.bytes[(from_index as usize) + idx] = buffer.consume_byte().unwrap();
             idx += 1;
         }
         let new_index = (from_index as usize) + idx;

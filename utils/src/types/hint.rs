@@ -23,7 +23,7 @@ mod tests {
 
         while bytes.len() < Hint::ENCODED_LENGTH {
             let data = gen_bytes(0, Hint::ENCODED_LENGTH * 2);
-            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data).unwrap();
+            let mut buffer = Buffer::new(data.as_slice(), &mut temp_data);
             bytes.extend(&data);
 
             let result = decoder.decode(&mut buffer);
