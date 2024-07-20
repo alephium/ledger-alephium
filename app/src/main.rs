@@ -37,15 +37,12 @@ extern "C" fn sample_main() {
         loop {
             // Wait for either a specific button push to exit the app
             // or an APDU command
-            match main_pages.show(&mut comm) {
-                io::Event::Command(ins) => {
-                    match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
-                        Ok(()) => comm.reply_ok(),
-                        Err(sw) => comm.reply(sw),
-                    }
-                    main_pages.show_ui();
+            if let io::Event::Command(ins) = main_pages.show(&mut comm) {
+                match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
+                    Ok(()) => comm.reply_ok(),
+                    Err(sw) => comm.reply(sw),
                 }
-                _ => (),
+                main_pages.show_ui();
             }
         }
     }
@@ -63,14 +60,11 @@ extern "C" fn sample_main() {
                     env!("CARGO_PKG_AUTHORS"),
                 )
                 .show::<Ins>();
-            match event {
-                io::Event::Command(ins) => {
-                    match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
-                        Ok(_) => comm.reply_ok(),
-                        Err(sw) => comm.reply(sw),
-                    }
+            if let io::Event::Command(ins) = event {
+                match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
+                    Ok(_) => comm.reply_ok(),
+                    Err(sw) => comm.reply(sw),
                 }
-                _ => (),
             }
         }
     }

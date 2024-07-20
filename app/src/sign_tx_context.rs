@@ -76,7 +76,7 @@ impl SignTxContext {
                 Ok(true) => {
                     tx_reviewer.review_tx_details(
                         &self.tx_decoder.inner,
-                        &self.device_address.as_ref().unwrap(),
+                        self.device_address.as_ref().unwrap(),
                         &self.temp_data,
                     )?;
                     self.temp_data.reset();
@@ -167,9 +167,8 @@ fn check_blind_signing() -> Result<(), ErrorCode> {
     let mut buttons = ButtonsState::new();
 
     loop {
-        match get_event(&mut buttons) {
-            Some(ButtonEvent::BothButtonsRelease) => return Err(ErrorCode::BlindSigningDisabled),
-            _ => (),
+        if let Some(ButtonEvent::BothButtonsRelease) = get_event(&mut buttons) {
+            return Err(ErrorCode::BlindSigningDisabled);
         }
     }
 }

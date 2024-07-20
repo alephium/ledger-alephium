@@ -20,12 +20,15 @@ _release:
 			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
 		"
 
-format:
+check:
 	@docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo $(ledger_app_builder) \
 		bash -c " \
 			cd app && \
 			echo 'Cargo fmt' && \
-			cargo fmt --all -- --check \
+			cargo fmt --all -- --check && \
+			echo 'Cargo clippy' && \
+			cargo +nightly-2023-11-10 clippy --target=nanos && \
+			cargo +nightly-2023-11-10 clippy --target=stax \
 		"
 
 _run-speculos:

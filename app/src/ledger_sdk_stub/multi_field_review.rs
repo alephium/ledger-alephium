@@ -104,7 +104,7 @@ impl<'a> MultiFieldReview<'a> {
                         match get_event(&mut buttons) {
                             Some(ButtonEvent::LeftButtonRelease) => {
                                 cur_page = cur_page.saturating_sub(1);
-                                if cur_page == 0 && self.fields.len() == 0 {
+                                if cur_page == 0 && self.fields.is_empty() {
                                     display_first_page(&first_page_opt);
                                 } else {
                                     direction = ButtonEvent::LeftButtonRelease;
@@ -153,9 +153,8 @@ pub fn display_first_page(page_opt: &Option<Page>) {
 
             let mut buttons = ButtonsState::new();
             loop {
-                match get_event(&mut buttons) {
-                    Some(ButtonEvent::RightButtonRelease) => return,
-                    _ => (),
+                if let Some(ButtonEvent::RightButtonRelease) = get_event(&mut buttons) {
+                    return;
                 }
             }
         }

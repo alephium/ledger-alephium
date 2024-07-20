@@ -26,10 +26,7 @@ pub fn nbgl_review_fields(title: &str, subtitle: &str, fields: &TagValueList) ->
             subtitle.as_ptr() as *const c_char,
             finish.as_ptr() as *const c_char,
         );
-        match sync_ret {
-            UX_SYNC_RET_APPROVED => true,
-            _ => false,
-        }
+        matches!(sync_ret, UX_SYNC_RET_APPROVED)
     }
 }
 
@@ -55,7 +52,7 @@ fn nbgl_generic_review(content: &NbglPageContent, button_str: &str) -> bool {
         let content_struct = nbgl_genericContents_t {
             callbackCallNeeded: false,
             __bindgen_anon_1: nbgl_genericContents_t__bindgen_ty_1 {
-                contentsList: c_content_list.as_ptr() as *const nbgl_content_t,
+                contentsList: c_content_list.as_ptr(),
             },
             nbContents: 1,
         };
@@ -68,10 +65,7 @@ fn nbgl_generic_review(content: &NbglPageContent, button_str: &str) -> bool {
         );
 
         // Return true if the user approved the transaction, false otherwise.
-        match sync_ret {
-            ledger_secure_sdk_sys::UX_SYNC_RET_APPROVED => return true,
-            _ => false,
-        }
+        matches!(sync_ret, ledger_secure_sdk_sys::UX_SYNC_RET_APPROVED)
     }
 }
 
