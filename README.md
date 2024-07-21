@@ -1,18 +1,40 @@
-# Ledger Alephium Nano App
-
-This project is still under active development.
+# Ledger Alephium App
 
 ## Build from source
 
-The following command will build the releases for Ledger devices.
+To build the artifacts for Ledger devices, run the following command:
 
 ```shell
 make release
 ```
 
+## Test
+
+### Test with Speculos
+
+Start the Speculos simulator:
+
+```shell
+make run-speculos-<device>
+```
+
+Run the tests:
+
+```shell
+cd js && npm run speculos-test
+```
+
+### Test with a Ledger Device
+
+Connect your Ledger device and run the tests:
+
+```shell
+cd js && npm run device-test
+```
+
 ## Install
 
-You will need to install the tool `ledgerctl` to load Alphium app. The official guide is here: [https://github.com/LedgerHQ/ledgerctl#quick-install](https://github.com/LedgerHQ/ledgerctl#quick-install).
+To install the Alephium app on your Ledger device, you will need the ledgerctl tool. Follow the official installation guide here: [https://github.com/LedgerHQ/ledgerctl#quick-install](https://github.com/LedgerHQ/ledgerctl#quick-install).
 
 To install the app for Nano S:
 
@@ -26,11 +48,11 @@ To install the app for Nano S+:
 make install_nanosplus
 ```
 
-Nano X manual installation isn't supported. The device no longer supports application side-loading.
+Note: Manual installation for Nano X is not supported as the device no longer supports application side-loading.
 
 ## Uninstall
 
-To uninstall the app:
+To uninstall the Alephium app from your Ledger device:
 ```
 ledgerctl delete Alephium
 ```
