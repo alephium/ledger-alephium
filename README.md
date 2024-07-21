@@ -32,6 +32,10 @@ Connect your Ledger device and run the tests:
 cd js && npm run device-test
 ```
 
+### Test a Single Test Case
+
+To test a specific test case, change `it` to `it.only` in the test file `wallet.test.ts`. This allows Jest to run only that test case.
+
 ## Install
 
 To install the Alephium app on your Ledger device, you will need the ledgerctl tool. Follow the official installation guide here: [https://github.com/LedgerHQ/ledgerctl#quick-install](https://github.com/LedgerHQ/ledgerctl#quick-install).
