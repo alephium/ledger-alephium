@@ -17,7 +17,7 @@ _release:
 			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
 			cp ./target/$(device)/release/app.hex ../$(device).hex && \
 			mv ./app_$(device).json ../$(device).json && \
-			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph.gif|./app/alph.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g' ../$(device).json \
+			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph_16x16.gif|./app/alph_16x16.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g;s|alph_32x32.gif|./app/alph_32x32.gif|g;s|alph_64x64.gif|./app/alph_64x64.gif|g' ../$(device).json \
 		"
 
 check:

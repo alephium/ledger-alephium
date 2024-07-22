@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.0"
+version = "0.4.0"
 authors = ["alephium devs"]
 edition = "2021"
 
@@ -26,7 +26,7 @@ flags = "0"
 path = ["m/44'/1234'"]
 
 [package.metadata.ledger.nanos]
-icon = "alph.gif"
+icon = "alph_16x16.gif"
 
 [package.metadata.ledger.nanox]
 icon = "alph_14x14.gif"
@@ -35,7 +35,7 @@ icon = "alph_14x14.gif"
 icon = "alph_14x14.gif"
 
 [package.metadata.ledger.stax]
-icon = "alph_14x14.gif"
+icon = "alph_32x32.gif"
 
 [package.metadata.ledger.flex]
-icon = "alph_14x14.gif"
+icon = "alph_64x64.gif"
