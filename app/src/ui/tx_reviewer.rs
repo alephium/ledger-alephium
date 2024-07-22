@@ -301,7 +301,7 @@ impl TxReviewer {
             value: address,
         };
         let alph_amount_field = Field {
-            name: "ALPH",
+            name: "Amount",
             value: alph_amount,
         };
         if token.is_none() {
@@ -322,7 +322,7 @@ impl TxReviewer {
                 value: token_id,
             },
             Field {
-                name: "Token Amount",
+                name: "Raw Amount",
                 value: token_amount,
             },
             address_field,
