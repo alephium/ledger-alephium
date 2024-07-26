@@ -289,24 +289,25 @@ impl TxReviewer {
     }
 
     fn prepare_token(&mut self, token: &Token) -> Result<TokenIndexes, ErrorCode> {
+        let token_id_from_index = self.buffer.get_index();
+        let token_id_to_index = self.write_token_id(&token.id)?;
         match self.get_token_metadata(&token.id) {
             Some((token_symbol, token_decimals)) => {
                 let token_amount_from_index = self.buffer.get_index();
                 let token_amount_to_index =
                     self.write_token_amount(&token.amount, token_symbol, token_decimals)?;
                 Ok(TokenIndexes {
-                    token_id: None,
+                    has_token_metadata: true,
+                    token_id: (token_id_from_index, token_id_to_index),
                     token_amount: (token_amount_from_index, token_amount_to_index),
                 })
             }
             None => {
-                let token_id_from_index = self.buffer.get_index();
-                let token_id_to_index = self.write_token_id(&token.id)?;
-
                 let token_amount_from_index = self.buffer.get_index();
                 let token_amount_to_index = self.write_token_raw_amount(&token.amount)?;
                 Ok(TokenIndexes {
-                    token_id: Some((token_id_from_index, token_id_to_index)),
+                    has_token_metadata: false,
+                    token_id: (token_id_from_index, token_id_to_index),
                     token_amount: (token_amount_from_index, token_amount_to_index),
                 })
             }
@@ -380,24 +381,27 @@ impl TxReviewer {
         }
 
         let TokenIndexes {
+            has_token_metadata,
             token_id,
             token_amount,
         } = token.unwrap();
-        if token_id.is_none() {
-            let token_amount = self.get_str_from_range(token_amount)?;
-            let fields = [
+        let token_id = self.get_str_from_range(token_id)?;
+        let token_amount = self.get_str_from_range(token_amount)?;
+        let fields = if has_token_metadata {
+            [
                 alph_amount_field,
                 Field {
                     name: "Token Amount",
                     value: token_amount,
                 },
+                Field {
+                    name: "Token ID",
+                    value: token_id,
+                },
                 address_field,
-            ];
-            review(&fields, review_message)
+            ]
         } else {
-            let token_id = self.get_str_from_range(token_id.unwrap())?;
-            let token_amount = self.get_str_from_range(token_amount)?;
-            let fields = [
+            [
                 alph_amount_field,
                 Field {
                     name: "Token ID",
@@ -408,9 +412,9 @@ impl TxReviewer {
                     value: token_amount,
                 },
                 address_field,
-            ];
-            review(&fields, review_message)
-        }
+            ]
+        };
+        review(&fields, review_message)
     }
 
     pub fn review_tx_details(
@@ -580,7 +584,8 @@ pub struct OutputIndexes {
 }
 
 pub struct TokenIndexes {
-    pub token_id: Option<(usize, usize)>,
+    pub has_token_metadata: bool,
+    pub token_id: (usize, usize),
     pub token_amount: (usize, usize),
 }
 
