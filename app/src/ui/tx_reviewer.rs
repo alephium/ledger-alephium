@@ -389,20 +389,19 @@ impl TxReviewer {
         let token_amount = self.get_str_from_range(token_amount)?;
         let fields = if has_token_metadata {
             [
-                alph_amount_field,
-                Field {
-                    name: "Token Amount",
-                    value: token_amount,
-                },
                 Field {
                     name: "Token ID",
                     value: token_id,
                 },
+                Field {
+                    name: "Token Amount",
+                    value: token_amount,
+                },
+                alph_amount_field,
                 address_field,
             ]
         } else {
             [
-                alph_amount_field,
                 Field {
                     name: "Token ID",
                     value: token_id,
@@ -411,6 +410,7 @@ impl TxReviewer {
                     name: "Raw Amount",
                     value: token_amount,
                 },
+                alph_amount_field,
                 address_field,
             ]
         };
