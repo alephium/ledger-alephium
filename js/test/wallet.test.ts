@@ -1,10 +1,11 @@
-import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
-import AlephiumApp, { GROUP_NUM } from '../src'
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
+import { AlephiumApp, GROUP_NUM } from '../src/ledger-app'
+import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
 import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
+import { TokenMetadata } from '../src/types'
+import { randomInt } from 'crypto'
 
 describe('ledger wallet', () => {
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
@@ -95,7 +96,7 @@ describe('ledger wallet', () => {
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
   }, 10000)
 
-  it('shoudl transfer alph to one address', async () => {
+  it('should transfer alph to one address', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -235,6 +236,96 @@ describe('ledger wallet', () => {
     const token = balances.tokenBalances![0]
     expect(token.id).toEqual(tokenInfo.contractId)
     expect(token.amount).toEqual('1111111111111111111111111')
+
+    await app.close()
+  }, 120000)
+
+  async function genTokensAndDestinations(
+    fromAddress: string,
+    toAddress: string,
+    mintAmount: bigint,
+    transferAmount: bigint
+  ) {
+    const tokens: TokenMetadata[] = []
+    const tokenSymbol = 'TestTokenABC'
+    const destinations: node.Destination[] = []
+    for (let i = 0; i < 5; i += 1) {
+      const tokenInfo = await mintToken(fromAddress, mintAmount);
+      const tokenMetadata: TokenMetadata = {
+        version: 0,
+        tokenId: tokenInfo.contractId,
+        symbol: tokenSymbol.slice(0, tokenSymbol.length - i),
+        decimals: 18 - i
+      }
+      tokens.push(tokenMetadata)
+      destinations.push({
+        address: toAddress,
+        attoAlphAmount: DUST_AMOUNT.toString(),
+        tokens: [
+          {
+            id: tokenMetadata.tokenId,
+            amount: transferAmount.toString()
+          }
+        ]
+      })
+    }
+    return { tokens, destinations }
+  }
+
+  it('should transfer token with metadata', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
+    const transferAmount = 1234567890123456789012345n
+    const mintAmount = 2222222222222222222222222n
+    const { tokens, destinations } = await genTokensAndDestinations(testAccount.address, toAddress, mintAmount, transferAmount)
+
+    const randomOrderTokens = tokens.sort((a, b) => b.tokenId.localeCompare(a.tokenId))
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: destinations
+    })
+
+    approveTx(Array(5).fill(OutputType.BaseAndToken))
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), randomOrderTokens)
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balances = await nodeProvider.addresses.getAddressesAddressBalance(toAddress)
+    tokens.forEach((metadata) => {
+      const tokenBalance = balances.tokenBalances!.find((t) => t.id === metadata.tokenId)!
+      expect(BigInt(tokenBalance.amount)).toEqual(transferAmount)
+    })
+
+    await app.close()
+  }, 120000)
+
+  it('should reject tx if the metadata version is invalid', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
+    const transferAmount = 1234567890123456789012345n
+    const mintAmount = 2222222222222222222222222n
+    const { tokens, destinations } = await genTokensAndDestinations(testAccount.address, toAddress, mintAmount, transferAmount)
+
+    const invalidTokenIndex = randomInt(5)
+    tokens[invalidTokenIndex] = { ...tokens[invalidTokenIndex], version: 1 }
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: destinations
+    })
+
+    await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), tokens)).rejects.toThrow()
 
     await app.close()
   }, 120000)
