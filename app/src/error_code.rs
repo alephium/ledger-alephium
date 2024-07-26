@@ -17,6 +17,7 @@ pub enum ErrorCode {
     BlindSigningDisabled = 0xE004,
     DerivingPublicKeyFailed = 0xE005,
     InvalidTokenSize = 0xE006,
+    InvalidMetadataVersion = 0xE007,
     InternalError = 0xEF00,
 }
 

@@ -149,10 +149,21 @@ fn handle_sign_tx(
                 check_blind_signing()?;
             }
             let token_metadata = &data[21..tx_data_index];
+            check_token_metadata(token_size, token_metadata)?;
             tx_reviewer.init(is_tx_execute_script, token_metadata)?;
             sign_tx_context.handle_data(apdu_header, tx_data, tx_reviewer)
         }
         1 => sign_tx_context.handle_data(apdu_header, data, tx_reviewer),
         _ => Err(ErrorCode::BadP1P2),
     }
+}
+
+fn check_token_metadata(token_size: u8, token_metadata: &[u8]) -> Result<(), ErrorCode> {
+    for i in 0..token_size {
+        let version_index = (i as usize) * TOKEN_METADATA_SIZE;
+        if token_metadata[version_index] != 0 {
+            return Err(ErrorCode::InvalidMetadataVersion);
+        }
+    }
+    Ok(())
 }

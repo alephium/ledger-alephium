@@ -40,6 +40,7 @@ The general structure of a reqeuest and response is as followed:
 | 0xE004      | Blind signing is disabled |
 | 0xE005      | Failed to derive pub key  |
 | 0xE006      | Invalid token size        |
+| 0xE007      | Invalid metadata version  |
 | 0xEF00      | Internal error            |
 
 ## Commands definitions
