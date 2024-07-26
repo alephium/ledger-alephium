@@ -67,12 +67,17 @@ export default class AlephiumApp {
     return decodeSignature(response)
   }
 
-  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
+  async signUnsignedTx(
+    path: string,
+    unsignedTx: Buffer,
+    tokenMetadata: serde.TokenMetadata[] = []
+  ): Promise<string> {
     console.log(`unsigned tx size: ${unsignedTx.length}`)
     const encodedPath = serde.serializePath(path)
-    const firstFrameTxLength = 256 - 25;
+    const encodedTokenMetadata = serde.serializeTokenMetadata(tokenMetadata)
+    const firstFrameTxLength = 256 - 25 - encodedTokenMetadata.length;
     const txData = unsignedTx.slice(0, unsignedTx.length > firstFrameTxLength ? firstFrameTxLength : unsignedTx.length)
-    const data = Buffer.concat([encodedPath, txData])
+    const data = Buffer.concat([encodedPath, encodedTokenMetadata, txData])
     let response = await this.transport.send(CLA, INS.SIGN_TX, 0x00, 0x00, data, [StatusCodes.OK])
     if (unsignedTx.length <= firstFrameTxLength) {
       return decodeSignature(response)

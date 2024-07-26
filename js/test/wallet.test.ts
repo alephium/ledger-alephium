@@ -1,10 +1,10 @@
-import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
 import AlephiumApp, { GROUP_NUM } from '../src'
 import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
 import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
+import { TokenMetadata } from '../src/serde'
 
 describe('ledger wallet', () => {
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
@@ -95,7 +95,7 @@ describe('ledger wallet', () => {
     expect(transactionVerifySignature(hash.toString('hex'), account.publicKey, signature)).toBe(true)
   }, 10000)
 
-  it('shoudl transfer alph to one address', async () => {
+  it('should transfer alph to one address', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -235,6 +235,60 @@ describe('ledger wallet', () => {
     const token = balances.tokenBalances![0]
     expect(token.id).toEqual(tokenInfo.contractId)
     expect(token.amount).toEqual('1111111111111111111111111')
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer token with metadata', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const mintAmount = 2222222222222222222222222n
+    const tokenInfo = await mintToken(testAccount.address, mintAmount);
+    const tokenMetadata: TokenMetadata = {
+      version: 0,
+      tokenId: tokenInfo.contractId,
+      symbol: 'MT',
+      decimals: 18
+    }
+
+    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
+    const transferAmount = 1234567890123456789012345n
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: toAddress,
+          attoAlphAmount: (ONE_ALPH * 5n).toString(),
+          tokens: [
+            {
+              id: tokenInfo.contractId,
+              amount: transferAmount.toString()
+            }
+          ]
+        }
+      ]
+    })
+
+    approveTx([OutputType.BaseAndToken, OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), [tokenMetadata])
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balances = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
+    const alphBalance = BigInt(balances.balance)
+    expect(alphBalance < (ONE_ALPH * 5n)).toEqual(true)
+
+    expect(balances.tokenBalances!.length).toEqual(1)
+    const token = balances.tokenBalances![0]
+    expect(token.id).toEqual(tokenInfo.contractId)
+    expect(BigInt(token.amount)).toEqual(mintAmount - transferAmount)
 
     await app.close()
   }, 120000)

@@ -19,10 +19,16 @@ async function clickAndApprove(times: number) {
   await pressButton('both')
 }
 
+function getModel(): string {
+  const model = process.env.MODEL
+  return model ? model as string : 'nanos'
+}
+
 export enum OutputType {
   Base,
   Multisig,
   Token,
+  BaseAndToken,
   MultisigAndToken
 }
 
@@ -30,6 +36,7 @@ const NanosClickTable = new Map([
   [OutputType.Base, 5],
   [OutputType.Multisig, 10],
   [OutputType.Token, 11],
+  [OutputType.BaseAndToken, 10],
   [OutputType.MultisigAndToken, 16],
 ])
 
@@ -37,6 +44,7 @@ const NanospClickTable = new Map([
   [OutputType.Base, 3],
   [OutputType.Multisig, 5],
   [OutputType.Token, 6],
+  [OutputType.BaseAndToken, 6],
   [OutputType.MultisigAndToken, 8],
 ])
 
@@ -44,11 +52,12 @@ const StaxClickTable = new Map([
   [OutputType.Base, 2],
   [OutputType.Multisig, 3],
   [OutputType.Token, 3],
+  [OutputType.BaseAndToken, 3],
   [OutputType.MultisigAndToken, 4],
 ])
 
 function getOutputClickSize(outputType: OutputType) {
-  const model = process.env.MODEL
+  const model = getModel()
   switch (model) {
     case 'nanos': return NanosClickTable.get(outputType)!
     case 'nanosp':
@@ -98,16 +107,17 @@ async function touchPosition(pos: Position) {
 }
 
 async function _touch(times: number) {
-  let continuePos = process.env.MODEL === 'stax' ? STAX_CONTINUE_POSITION : FLEX_CONTINUE_POSITION
+  const model = getModel()
+  const continuePos = model === 'stax' ? STAX_CONTINUE_POSITION : FLEX_CONTINUE_POSITION
   for (let i = 0; i < times; i += 1) {
     await touchPosition(continuePos)
   }
-  let approvePos = process.env.MODEL === 'stax' ? STAX_APPROVE_POSITION : FLEX_APPROVE_POSITION
+  const approvePos = model === 'stax' ? STAX_APPROVE_POSITION : FLEX_APPROVE_POSITION
   await touchPosition(approvePos)
 }
 
 export async function staxFlexApproveOnce() {
-  if (process.env.MODEL === 'stax') {
+  if (getModel() === 'stax') {
     await touchPosition(STAX_APPROVE_POSITION)
   } else {
     await touchPosition(FLEX_APPROVE_POSITION)
@@ -151,7 +161,7 @@ export async function approveHash() {
   if (isStaxOrFlex()) {
     return await _touch(3)
   }
-  if (process.env.MODEL === 'nanos') {
+  if (getModel() === 'nanos') {
     await clickAndApprove(5)
   } else {
     await clickAndApprove(3)
@@ -163,7 +173,7 @@ export async function approveAddress() {
   if (isStaxOrFlex()) {
     return await _touch(2)
   }
-  if (process.env.MODEL === 'nanos') {
+  if (getModel() === 'nanos') {
     await clickAndApprove(4)
   } else {
     await clickAndApprove(2)
@@ -171,13 +181,13 @@ export async function approveAddress() {
 }
 
 function isStaxOrFlex(): boolean {
-  return !process.env.MODEL!.startsWith('nano')
+  return !getModel().startsWith('nano')
 }
 
 export function skipBlindSigningWarning() {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
-    const rejectPos = process.env.MODEL === 'stax' ? STAX_REJECT_POSITION : FLEX_REJECT_POSITION
+    const rejectPos = getModel() === 'stax' ? STAX_REJECT_POSITION : FLEX_REJECT_POSITION
     touchPosition(rejectPos)
   } else {
     clickAndApprove(3)
@@ -187,8 +197,9 @@ export function skipBlindSigningWarning() {
 export async function enableBlindSigning() {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
-    const settingsPos = process.env.MODEL === 'stax' ? STAX_SETTINGS_POSITION : FLEX_SETTINGS_POSITION
-    const blindSettingPos = process.env.MODEL === 'stax' ? STAX_BLIND_SETTING_POSITION : FLEX_BLIND_SETTING_POSITION
+    const model = getModel()
+    const settingsPos = model === 'stax' ? STAX_SETTINGS_POSITION : FLEX_SETTINGS_POSITION
+    const blindSettingPos = model === 'stax' ? STAX_BLIND_SETTING_POSITION : FLEX_BLIND_SETTING_POSITION
     await touchPosition(settingsPos)
     await touchPosition(blindSettingPos)
     await touchPosition(settingsPos)
