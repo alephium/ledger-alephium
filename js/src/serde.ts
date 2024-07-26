@@ -1,4 +1,5 @@
 import { isHexString } from "@alephium/web3"
+import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TOKEN_METADATA_SIZE, TokenMetadata } from "./types"
 
 export const TRUE = 0x10
 export const FALSE = 0x00
@@ -29,16 +30,6 @@ export function serializePath(path: string): Buffer {
   const buffer = Buffer.alloc(nodes.length * 4)
   nodes.forEach((element, index) => buffer.writeUInt32BE(element, 4 * index))
   return buffer
-}
-
-export const MAX_TOKEN_SIZE = 5
-export const MAX_TOKEN_SYMBOL_LENGTH = 12
-export const TOKEN_METADATA_SIZE = 46
-export interface TokenMetadata {
-  version: number,
-  tokenId: string,
-  symbol: string,
-  decimals: number
 }
 
 function symbolToBytes(symbol: string): Buffer {

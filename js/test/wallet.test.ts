@@ -1,10 +1,10 @@
-import AlephiumApp, { GROUP_NUM } from '../src'
+import AlephiumApp, { GROUP_NUM } from '../src/ledger-app'
 import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
 import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
-import { TokenMetadata } from '../src/serde'
+import { TokenMetadata } from '../src/types'
 import { randomInt } from 'crypto'
 
 describe('ledger wallet', () => {

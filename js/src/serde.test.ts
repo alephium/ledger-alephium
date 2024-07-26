@@ -1,6 +1,7 @@
 import { binToHex } from '@alephium/web3'
-import { MAX_TOKEN_SYMBOL_LENGTH, serializePath, serializeTokenMetadata, splitPath, TokenMetadata } from './serde'
+import { serializePath, serializeTokenMetadata, splitPath } from './serde'
 import { randomBytes } from 'crypto'
+import { MAX_TOKEN_SYMBOL_LENGTH, TokenMetadata } from './types'
 
 describe('serde', () => {
   it('should split path', () => {
