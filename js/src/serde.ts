@@ -31,8 +31,9 @@ export function serializePath(path: string): Buffer {
   return buffer
 }
 
-const MAX_TOKEN_SIZE = 5
-const TOKEN_METADATA_SIZE = 42
+export const MAX_TOKEN_SIZE = 5
+export const MAX_TOKEN_SYMBOL_LENGTH = 12
+export const TOKEN_METADATA_SIZE = 46
 export interface TokenMetadata {
   version: number,
   tokenId: string,
@@ -41,7 +42,7 @@ export interface TokenMetadata {
 }
 
 function symbolToBytes(symbol: string): Buffer {
-  const buffer = Buffer.alloc(8, 0)
+  const buffer = Buffer.alloc(MAX_TOKEN_SYMBOL_LENGTH, 0)
   for (let i = 0; i < symbol.length; i++) {
     buffer[i] = symbol.charCodeAt(i) & 0xFF
   }
@@ -58,12 +59,12 @@ function check(tokens: TokenMetadata[]) {
     if (!(isHexString(token.tokenId) && token.tokenId.length === 64)) {
       throw new Error(`Invalid token id: ${token.tokenId}`)
     }
-    if (token.symbol.length > 8) {
+    if (token.symbol.length > MAX_TOKEN_SYMBOL_LENGTH) {
       throw new Error(`The token symbol is too long: ${token.symbol}`)
     }
   })
 
-  if (tokens.length > 5) {
+  if (tokens.length > MAX_TOKEN_SIZE) {
     throw new Error(`The token size exceeds maximum size`)
   }
 }

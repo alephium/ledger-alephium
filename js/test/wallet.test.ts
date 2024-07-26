@@ -250,7 +250,7 @@ describe('ledger wallet', () => {
     const tokenMetadata: TokenMetadata = {
       version: 0,
       tokenId: tokenInfo.contractId,
-      symbol: 'MT',
+      symbol: 'TestTokenABC',
       decimals: 18
     }
 

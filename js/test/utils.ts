@@ -36,7 +36,7 @@ const NanosClickTable = new Map([
   [OutputType.Base, 5],
   [OutputType.Multisig, 10],
   [OutputType.Token, 11],
-  [OutputType.BaseAndToken, 11],
+  [OutputType.BaseAndToken, 12],
   [OutputType.MultisigAndToken, 16],
 ])
 

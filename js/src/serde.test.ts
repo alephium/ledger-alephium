@@ -1,5 +1,5 @@
 import { binToHex } from '@alephium/web3'
-import { serializePath, serializeTokenMetadata, splitPath, TokenMetadata } from './serde'
+import { MAX_TOKEN_SYMBOL_LENGTH, serializePath, serializeTokenMetadata, splitPath, TokenMetadata } from './serde'
 import { randomBytes } from 'crypto'
 
 describe('serde', () => {
@@ -50,7 +50,7 @@ describe('serde', () => {
     }
 
     const encodeSymbol = (symbol: string) => {
-      return binToHex(Buffer.from(symbol, 'ascii')).padEnd(16, '0')
+      return binToHex(Buffer.from(symbol, 'ascii')).padEnd(MAX_TOKEN_SYMBOL_LENGTH * 2, '0')
     }
 
     expect(binToHex(serializeTokenMetadata([]))).toEqual('00')

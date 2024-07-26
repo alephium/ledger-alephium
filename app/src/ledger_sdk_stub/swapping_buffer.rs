@@ -131,8 +131,8 @@ impl<'a, const RAM: usize, const FLASH: usize> SwappingBuffer<'a, RAM, FLASH> {
         }
     }
 
-    pub fn reset(&mut self, index: usize) {
-        self.state = BufferState::WritingToRam(index);
+    pub fn reset(&mut self, from_index: usize) {
+        self.state = BufferState::WritingToRam(from_index);
     }
 }
 

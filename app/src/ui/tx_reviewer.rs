@@ -30,8 +30,9 @@ use utils::{
 static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 const FIRST_OUTPUT_INDEX: u16 = 1;
-pub const TOKEN_METADATA_SIZE: usize = 42;
-type TokenSymbol = [u8; 8];
+pub const TOKEN_METADATA_SIZE: usize = 46;
+const MAX_TOKEN_SYMBOL_LENGTH: usize = 12;
+type TokenSymbol = [u8; MAX_TOKEN_SYMBOL_LENGTH];
 
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
@@ -55,8 +56,8 @@ impl TxReviewer {
     }
 
     #[inline]
-    fn reset_buffer(&mut self, index: usize) {
-        self.buffer.reset(index);
+    fn reset_buffer(&mut self, from_index: usize) {
+        self.buffer.reset(from_index);
     }
 
     #[inline]
@@ -231,8 +232,9 @@ impl TxReviewer {
             let to_index = from_index + TOKEN_METADATA_SIZE;
             let token_metadata_bytes = self.buffer.read(from_index, to_index);
             if token_metadata_bytes[1..33] == token_id.0 {
-                let token_symbol = token_metadata_bytes[33..41].try_into().unwrap();
-                let token_decimals = token_metadata_bytes[41];
+                let last_index = TOKEN_METADATA_SIZE - 1;
+                let token_symbol = token_metadata_bytes[33..last_index].try_into().unwrap();
+                let token_decimals = token_metadata_bytes[last_index];
                 return Some((token_symbol, token_decimals));
             }
         }

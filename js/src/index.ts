@@ -16,6 +16,9 @@ export enum INS {
 export const GROUP_NUM = 4
 export const HASH_LEN = 32
 
+// The maximum payload size is 255: https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-transport/src/Transport.ts#L261
+const MAX_PAYLOAD_SIZE = 255
+
 export default class AlephiumApp {
   readonly transport: Transport
 
@@ -75,7 +78,7 @@ export default class AlephiumApp {
     console.log(`unsigned tx size: ${unsignedTx.length}`)
     const encodedPath = serde.serializePath(path)
     const encodedTokenMetadata = serde.serializeTokenMetadata(tokenMetadata)
-    const firstFrameTxLength = 256 - 25 - encodedTokenMetadata.length;
+    const firstFrameTxLength = MAX_PAYLOAD_SIZE - 20 - encodedTokenMetadata.length;
     const txData = unsignedTx.slice(0, unsignedTx.length > firstFrameTxLength ? firstFrameTxLength : unsignedTx.length)
     const data = Buffer.concat([encodedPath, encodedTokenMetadata, txData])
     let response = await this.transport.send(CLA, INS.SIGN_TX, 0x00, 0x00, data, [StatusCodes.OK])
@@ -83,7 +86,7 @@ export default class AlephiumApp {
       return decodeSignature(response)
     }
 
-    const frameLength = 256 - 5
+    const frameLength = MAX_PAYLOAD_SIZE
     let fromIndex = firstFrameTxLength
     while (fromIndex < unsignedTx.length) {
       const remain = unsignedTx.length - fromIndex
