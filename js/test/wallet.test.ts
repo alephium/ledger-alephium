@@ -1,5 +1,5 @@
 import AlephiumApp, { GROUP_NUM } from '../src'
-import { ALPH_TOKEN_ID, Address, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
+import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
@@ -245,35 +245,41 @@ describe('ledger wallet', () => {
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
 
-    const mintAmount = 2222222222222222222222222n
-    const tokenInfo = await mintToken(testAccount.address, mintAmount);
-    const tokenMetadata: TokenMetadata = {
-      version: 0,
-      tokenId: tokenInfo.contractId,
-      symbol: 'TestTokenABC',
-      decimals: 18
-    }
-
     const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
     const transferAmount = 1234567890123456789012345n
+    const mintAmount = 2222222222222222222222222n
+    const tokens: TokenMetadata[] = []
+    const tokenSymbol = 'TestTokenABC'
+    const destinations: node.Destination[] = []
+    for (let i = 0; i < 5; i += 1) {
+      const tokenInfo = await mintToken(testAccount.address, mintAmount);
+      const tokenMetadata: TokenMetadata = {
+        version: 0,
+        tokenId: tokenInfo.contractId,
+        symbol: tokenSymbol.slice(0, tokenSymbol.length - i),
+        decimals: 18 - i
+      }
+      tokens.push(tokenMetadata)
+      destinations.push({
+        address: toAddress,
+        attoAlphAmount: DUST_AMOUNT.toString(),
+        tokens: [
+          {
+            id: tokenMetadata.tokenId,
+            amount: transferAmount.toString()
+          }
+        ]
+      })
+    }
+
+    const randomOrderTokens = tokens.sort((a, b) => b.tokenId.localeCompare(a.tokenId))
     const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
       fromPublicKey: testAccount.publicKey,
-      destinations: [
-        {
-          address: toAddress,
-          attoAlphAmount: (ONE_ALPH * 5n).toString(),
-          tokens: [
-            {
-              id: tokenInfo.contractId,
-              amount: transferAmount.toString()
-            }
-          ]
-        }
-      ]
+      destinations: destinations
     })
 
-    approveTx([OutputType.BaseAndToken, OutputType.Base])
-    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), [tokenMetadata])
+    approveTx(Array(5).fill(OutputType.BaseAndToken))
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), randomOrderTokens)
     expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
 
     const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
@@ -281,14 +287,11 @@ describe('ledger wallet', () => {
       signature: signature
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
-    const balances = await nodeProvider.addresses.getAddressesAddressBalance(testAccount.address)
-    const alphBalance = BigInt(balances.balance)
-    expect(alphBalance < (ONE_ALPH * 5n)).toEqual(true)
-
-    expect(balances.tokenBalances!.length).toEqual(1)
-    const token = balances.tokenBalances![0]
-    expect(token.id).toEqual(tokenInfo.contractId)
-    expect(BigInt(token.amount)).toEqual(mintAmount - transferAmount)
+    const balances = await nodeProvider.addresses.getAddressesAddressBalance(toAddress)
+    tokens.forEach((metadata) => {
+      const tokenBalance = balances.tokenBalances!.find((t) => t.id === metadata.tokenId)!
+      expect(BigInt(tokenBalance.amount)).toEqual(transferAmount)
+    })
 
     await app.close()
   }, 120000)
