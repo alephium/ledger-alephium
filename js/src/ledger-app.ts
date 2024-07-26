@@ -20,7 +20,7 @@ export const HASH_LEN = 32
 // The maximum payload size is 255: https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-transport/src/Transport.ts#L261
 const MAX_PAYLOAD_SIZE = 255
 
-export default class AlephiumApp {
+export class AlephiumApp {
   readonly transport: Transport
 
   constructor(transport: Transport) {

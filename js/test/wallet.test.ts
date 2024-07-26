@@ -1,4 +1,4 @@
-import AlephiumApp, { GROUP_NUM } from '../src/ledger-app'
+import { AlephiumApp, GROUP_NUM } from '../src/ledger-app'
 import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
