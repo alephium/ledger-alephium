@@ -91,21 +91,19 @@ impl TxReviewer {
         &mut self,
         u256: &U256,
         symbol: TokenSymbol,
-        decimals: u8,
+        decimals: usize,
     ) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 86]; // u256 max
         let symbol_bytes = get_token_symbol_bytes(&symbol[..]);
         amount_output[..symbol_bytes.len()].copy_from_slice(symbol_bytes);
         amount_output[symbol_bytes.len()] = b' ';
         let prefix_length = symbol_bytes.len() + 1;
-        let amount_str =
-            u256.to_str_with_decimals(&mut amount_output[prefix_length..], decimals as usize, 6);
+        let amount_str = u256.to_str_with_decimals(&mut amount_output[prefix_length..], decimals);
         if amount_str.is_none() {
             return Err(ErrorCode::Overflow);
         }
-        let amount_length = amount_str.unwrap().len();
-        self.buffer
-            .write(&amount_output[..(prefix_length + amount_length)])
+        let total_length = prefix_length + amount_str.unwrap().len();
+        self.buffer.write(&amount_output[..total_length])
     }
 
     fn write_token_id(&mut self, token_id: &Byte32) -> Result<usize, ErrorCode> {
@@ -295,7 +293,7 @@ impl TxReviewer {
             Some((token_symbol, token_decimals)) => {
                 let token_amount_from_index = self.buffer.get_index();
                 let token_amount_to_index =
-                    self.write_token_amount(&token.amount, token_symbol, token_decimals)?;
+                    self.write_token_amount(&token.amount, token_symbol, token_decimals as usize)?;
                 Ok(TokenIndexes {
                     has_token_metadata: true,
                     token_id: (token_id_from_index, token_id_to_index),
