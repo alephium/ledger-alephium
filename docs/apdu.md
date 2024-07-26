@@ -78,7 +78,7 @@ This command returns the public key corresponding to the secret key found at the
 | CLA     | byte (1) | Application Identifier    | 0x8A            |
 | INS     | byte (1) | Instruction ID            | 0x01            |
 | P1      | byte (1) | Parameter 1               | 0 or 4          |
-| P2      | byte (1) | Parameter 2               | Any value between [0-3]         |
+| P2      | byte (1) | Parameter 2               | Any value between 0 and 3, inclusive |
 | L       | byte (1) | Bytes in payload          | 0x15            |
 | Path[0] | byte (4) | Derivation Path Data      | ?               |
 | Path[1] | byte (4) | Derivation Path Data      | ?               |
@@ -136,14 +136,16 @@ This command returns a signature of the passed transaction
 
 Input data (first transaction data block):
 
-| Field   | Type     | Content                   | Expected          |
-|---------|----------|---------------------------|-------------------|
-| Path[0] | byte (4) | Derivation Path Data      | ?                 |
-| Path[1] | byte (4) | Derivation Path Data      | ?                 |
-| Path[2] | byte (4) | Derivation Path Data      | ?                 |
-| Path[3] | byte (4) | Derivation Path Data      | ?                 |
-| Path[4] | byte (4) | Derivation Path Data      | ?                 |
-| Payload | byte (?) | Transaction payload       | ?                 |
+| Field          | Type                   | Content              | Expected          |
+|----------------|------------------------|----------------------|-------------------|
+| Path[0]        | byte (4)               | Derivation Path Data | ?                 |
+| Path[1]        | byte (4)               | Derivation Path Data | ?                 |
+| Path[2]        | byte (4)               | Derivation Path Data | ?                 |
+| Path[3]        | byte (4)               | Derivation Path Data | ?                 |
+| Path[4]        | byte (4)               | Derivation Path Data | ?                 |
+| Token Size     | byte (1)               | Token Size           | Any value between 0 and 5, inclusive |
+| Token Metadata | byte (Token Size * 46) | Token Metadata       | ?                 |
+| Payload        | byte (?)               | Transaction Payload  | ?                 |
 
 Input data (subsequent transaction data block):
 
