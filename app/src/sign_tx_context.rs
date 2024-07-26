@@ -48,7 +48,7 @@ impl SignTxContext {
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
-        self.temp_data.reset();
+        self.temp_data.reset(0);
         self.device_address = Some(Address::from_path(&self.path)?);
         Ok(())
     }
@@ -80,7 +80,7 @@ impl SignTxContext {
                         self.device_address.as_ref().unwrap(),
                         &self.temp_data,
                     )?;
-                    self.temp_data.reset();
+                    self.temp_data.reset(0);
                     if self.tx_decoder.inner.is_complete() {
                         self.current_step = DecodeStep::Complete;
                         return Ok(());

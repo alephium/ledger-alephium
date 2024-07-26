@@ -20,13 +20,18 @@ use ledger_device_sdk::nbgl::{Field, TagValueList};
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE, WARNING};
 use utils::{
     base58::ALPHABET,
-    types::{AssetOutput, Byte32, LockupScript, TxInput, UnlockScript, UnsignedTx, I32, U256},
+    types::{
+        AssetOutput, Byte32, Hash, LockupScript, Token, TxInput, UnlockScript, UnsignedTx, I32,
+        U256,
+    },
 };
 
 #[link_section = ".nvm_data"]
 static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 const FIRST_OUTPUT_INDEX: u16 = 1;
+pub const TOKEN_METADATA_SIZE: usize = 42;
+type TokenSymbol = [u8; 8];
 
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
@@ -34,6 +39,7 @@ pub struct TxReviewer {
     next_output_index: u16,
     tx_fee: Option<U256>,
     is_tx_execute_script: bool,
+    token_metadata_length: usize,
 }
 
 impl TxReviewer {
@@ -44,21 +50,29 @@ impl TxReviewer {
             next_output_index: FIRST_OUTPUT_INDEX, // display output from index 1, similar to BTC
             tx_fee: None,
             is_tx_execute_script: false,
+            token_metadata_length: 0,
         }
     }
 
     #[inline]
-    fn reset_buffer(&mut self) {
-        self.buffer.reset();
+    fn reset_buffer(&mut self, index: usize) {
+        self.buffer.reset(index);
     }
 
     #[inline]
-    pub fn init(&mut self, is_tx_execute_script: bool) {
-        self.reset_buffer();
+    pub fn init(
+        &mut self,
+        is_tx_execute_script: bool,
+        token_metadata: &[u8],
+    ) -> Result<(), ErrorCode> {
+        self.reset_buffer(0);
+        self.buffer.write(token_metadata)?;
         self.has_external_inputs = false;
         self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
         self.is_tx_execute_script = is_tx_execute_script;
+        self.token_metadata_length = token_metadata.len();
+        Ok(())
     }
 
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
@@ -67,10 +81,31 @@ impl TxReviewer {
         self.buffer.write(amount_str)
     }
 
-    fn write_token_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
+    fn write_token_raw_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 78]; // u256 max
         let amount_str = u256.to_str(&mut amount_output).unwrap();
         self.buffer.write(amount_str)
+    }
+
+    fn write_token_amount(
+        &mut self,
+        u256: &U256,
+        symbol: TokenSymbol,
+        decimals: u8,
+    ) -> Result<usize, ErrorCode> {
+        let mut amount_output = [0u8; 86]; // u256 max
+        let symbol_bytes = get_token_symbol_bytes(&symbol[..]);
+        amount_output[..symbol_bytes.len()].copy_from_slice(symbol_bytes);
+        amount_output[symbol_bytes.len()] = b' ';
+        let prefix_length = symbol_bytes.len() + 1;
+        let amount_str =
+            u256.to_str_with_decimals(&mut amount_output[prefix_length..], decimals as usize, 6);
+        if amount_str.is_none() {
+            return Err(ErrorCode::Overflow);
+        }
+        let amount_length = amount_str.unwrap().len();
+        self.buffer
+            .write(&amount_output[..(prefix_length + amount_length)])
     }
 
     fn write_token_id(&mut self, token_id: &Byte32) -> Result<usize, ErrorCode> {
@@ -188,6 +223,24 @@ impl TxReviewer {
         self.buffer.write(str_bytes)
     }
 
+    fn get_token_metadata(&self, token_id: &Hash) -> Option<(TokenSymbol, u8)> {
+        let token_size = self.token_metadata_length / TOKEN_METADATA_SIZE;
+        if token_size == 0 {
+            return None;
+        }
+        for i in 0..token_size {
+            let from_index = i * TOKEN_METADATA_SIZE;
+            let to_index = from_index + TOKEN_METADATA_SIZE;
+            let token_metadata_bytes = self.buffer.read(from_index, to_index);
+            if token_metadata_bytes[1..33] == token_id.0 {
+                let token_symbol = token_metadata_bytes[33..41].try_into().unwrap();
+                let token_decimals = token_metadata_bytes[41];
+                return Some((token_symbol, token_decimals));
+            }
+        }
+        None
+    }
+
     fn prepare_output(
         &mut self,
         output: &AssetOutput,
@@ -228,19 +281,36 @@ impl TxReviewer {
 
         // Asset output has at most one token
         let token = output.tokens.get_current_item().unwrap();
-        let token_id_from_index = self.buffer.get_index();
-        let token_id_to_index = self.write_token_id(&token.id)?;
-
-        let token_amount_from_index = self.buffer.get_index();
-        let token_amount_to_index = self.write_token_amount(&token.amount)?;
-
+        let token_indexes = self.prepare_token(token)?;
         Ok(Some(OutputIndexes {
-            token: Some(TokenIndexes {
-                token_id: (token_id_from_index, token_id_to_index),
-                token_amount: (token_amount_from_index, token_amount_to_index),
-            }),
+            token: Some(token_indexes),
             ..output_indexes
         }))
+    }
+
+    fn prepare_token(&mut self, token: &Token) -> Result<TokenIndexes, ErrorCode> {
+        match self.get_token_metadata(&token.id) {
+            Some((token_symbol, token_decimals)) => {
+                let token_amount_from_index = self.buffer.get_index();
+                let token_amount_to_index =
+                    self.write_token_amount(&token.amount, token_symbol, token_decimals)?;
+                Ok(TokenIndexes {
+                    token_id: None,
+                    token_amount: (token_amount_from_index, token_amount_to_index),
+                })
+            }
+            None => {
+                let token_id_from_index = self.buffer.get_index();
+                let token_id_to_index = self.write_token_id(&token.id)?;
+
+                let token_amount_from_index = self.buffer.get_index();
+                let token_amount_to_index = self.write_token_raw_amount(&token.amount)?;
+                Ok(TokenIndexes {
+                    token_id: Some((token_id_from_index, token_id_to_index)),
+                    token_amount: (token_amount_from_index, token_amount_to_index),
+                })
+            }
+        }
     }
 
     fn get_str_from_range(&self, range: (usize, usize)) -> Result<&str, ErrorCode> {
@@ -313,21 +383,34 @@ impl TxReviewer {
             token_id,
             token_amount,
         } = token.unwrap();
-        let token_id = self.get_str_from_range(token_id)?;
-        let token_amount = self.get_str_from_range(token_amount)?;
-        let fields = [
-            alph_amount_field,
-            Field {
-                name: "Token ID",
-                value: token_id,
-            },
-            Field {
-                name: "Raw Amount",
-                value: token_amount,
-            },
-            address_field,
-        ];
-        review(&fields, review_message)
+        if token_id.is_none() {
+            let token_amount = self.get_str_from_range(token_amount)?;
+            let fields = [
+                alph_amount_field,
+                Field {
+                    name: "Token Amount",
+                    value: token_amount,
+                },
+                address_field,
+            ];
+            review(&fields, review_message)
+        } else {
+            let token_id = self.get_str_from_range(token_id.unwrap())?;
+            let token_amount = self.get_str_from_range(token_amount)?;
+            let fields = [
+                alph_amount_field,
+                Field {
+                    name: "Token ID",
+                    value: token_id,
+                },
+                Field {
+                    name: "Raw Amount",
+                    value: token_amount,
+                },
+                address_field,
+            ];
+            review(&fields, review_message)
+        }
     }
 
     pub fn review_tx_details(
@@ -362,7 +445,7 @@ impl TxReviewer {
                 if let Some(current_output) = outputs.get_current_item() {
                     let result =
                         self.review_output(current_output, device_address, temp_data.read_all());
-                    self.reset_buffer();
+                    self.reset_buffer(self.token_metadata_length);
                     result
                 } else {
                     Ok(())
@@ -497,13 +580,22 @@ pub struct OutputIndexes {
 }
 
 pub struct TokenIndexes {
-    pub token_id: (usize, usize),
+    pub token_id: Option<(usize, usize)>,
     pub token_amount: (usize, usize),
 }
 
 #[inline]
 fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
     from_utf8(bytes).map_err(|_| ErrorCode::InternalError)
+}
+
+#[inline]
+fn get_token_symbol_bytes(bytes: &[u8]) -> &[u8] {
+    let mut index = 0;
+    while index < bytes.len() && bytes[index] != 0 {
+        index += 1;
+    }
+    &bytes[..index]
 }
 
 fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {

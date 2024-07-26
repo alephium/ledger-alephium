@@ -16,6 +16,7 @@ pub enum ErrorCode {
     HDPathDecodingFailed = 0xE003,
     BlindSigningDisabled = 0xE004,
     DerivingPublicKeyFailed = 0xE005,
+    InvalidTokenSize = 0xE006,
     InternalError = 0xEF00,
 }
 

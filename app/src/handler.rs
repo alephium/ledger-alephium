@@ -6,7 +6,10 @@ use crate::{
     error_code::ErrorCode,
     public_key::derive_pub_key,
     sign_tx_context::{check_blind_signing, SignTxContext},
-    ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer},
+    ui::{
+        review_address, sign_hash_ui,
+        tx_reviewer::{TxReviewer, TOKEN_METADATA_SIZE},
+    },
 };
 
 #[repr(u8)]
@@ -120,6 +123,8 @@ pub fn handle_apdu(
     Ok(())
 }
 
+const MAX_TOKEN_SIZE: u8 = 5;
+
 fn handle_sign_tx(
     apdu_header: &ApduHeader,
     data: &[u8],
@@ -127,15 +132,24 @@ fn handle_sign_tx(
     tx_reviewer: &mut TxReviewer,
 ) -> Result<(), ErrorCode> {
     match apdu_header.p1 {
-        0 if data.len() < 23 => Err(ErrorCode::BadLen),
+        0 if data.len() < 21 => Err(ErrorCode::BadLen), // 20 bytes path + 1 byte token size
         0 => {
             sign_tx_context.init(data)?;
-            let tx_data = &data[20..];
+            let token_size = data[20];
+            if token_size > MAX_TOKEN_SIZE {
+                return Err(ErrorCode::InvalidTokenSize);
+            }
+            let tx_data_index: usize = 21 + TOKEN_METADATA_SIZE * (token_size as usize);
+            if data.len() < tx_data_index + 3 {
+                return Err(ErrorCode::BadLen);
+            }
+            let tx_data = &data[tx_data_index..];
             let is_tx_execute_script = tx_data[2] == 0x01;
             if is_tx_execute_script {
                 check_blind_signing()?;
             }
-            tx_reviewer.init(is_tx_execute_script);
+            let token_metadata = &data[21..tx_data_index];
+            tx_reviewer.init(is_tx_execute_script, token_metadata)?;
             sign_tx_context.handle_data(apdu_header, tx_data, tx_reviewer)
         }
         1 => sign_tx_context.handle_data(apdu_header, data, tx_reviewer),

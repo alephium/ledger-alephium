@@ -150,7 +150,7 @@ impl U256 {
         Some(&output[..(output.len() - index)])
     }
 
-    fn to_str_with_decimals<'a>(
+    pub fn to_str_with_decimals<'a>(
         &self,
         output: &'a mut [u8],
         decimals: usize,
