@@ -44,7 +44,6 @@ impl ByteString {
         self.current_index >= 0
     }
 
-    #[cfg(test)]
     #[inline]
     fn is_complete(&self) -> bool {
         (self.current_index as usize) == self.size()
@@ -74,7 +73,7 @@ impl RawDecoder for ByteString {
             self.current_index += 1;
         }
 
-        if (self.current_index as usize) == self.size() {
+        if self.is_complete() {
             Ok(DecodeStage::COMPLETE)
         } else {
             Ok(DecodeStage { ..*stage })
