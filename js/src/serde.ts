@@ -1,3 +1,6 @@
+import { isHexString } from "@alephium/web3"
+import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TOKEN_METADATA_SIZE, TokenMetadata } from "./types"
+
 export const TRUE = 0x10
 export const FALSE = 0x00
 
@@ -27,4 +30,51 @@ export function serializePath(path: string): Buffer {
   const buffer = Buffer.alloc(nodes.length * 4)
   nodes.forEach((element, index) => buffer.writeUInt32BE(element, 4 * index))
   return buffer
+}
+
+function symbolToBytes(symbol: string): Buffer {
+  const buffer = Buffer.alloc(MAX_TOKEN_SYMBOL_LENGTH, 0)
+  for (let i = 0; i < symbol.length; i++) {
+    buffer[i] = symbol.charCodeAt(i) & 0xFF
+  }
+  return buffer
+}
+
+function check(tokens: TokenMetadata[]) {
+  const hasDuplicate = tokens.some((token, index) => index !== tokens.findIndex((t) => t.tokenId === token.tokenId))
+  if (hasDuplicate) {
+    throw new Error(`There are duplicate tokens`)
+  }
+
+  tokens.forEach((token) => {
+    if (!(isHexString(token.tokenId) && token.tokenId.length === 64)) {
+      throw new Error(`Invalid token id: ${token.tokenId}`)
+    }
+    if (token.symbol.length > MAX_TOKEN_SYMBOL_LENGTH) {
+      throw new Error(`The token symbol is too long: ${token.symbol}`)
+    }
+  })
+
+  if (tokens.length > MAX_TOKEN_SIZE) {
+    throw new Error(`The token size exceeds maximum size`)
+  }
+}
+
+export function serializeTokenMetadata(tokens: TokenMetadata[]): Buffer {
+  check(tokens)
+  const array = tokens
+    .map((metadata) => {
+      const symbolBytes = symbolToBytes(metadata.symbol)
+      const buffer = Buffer.concat([
+        Buffer.from([metadata.version]),
+        Buffer.from(metadata.tokenId, 'hex'),
+        symbolBytes,
+        Buffer.from([metadata.decimals])
+      ])
+      if (buffer.length !== TOKEN_METADATA_SIZE) {
+        throw new Error(`Invalid token metadata: ${metadata}`)
+      }
+      return buffer
+    })
+  return Buffer.concat([Buffer.from([array.length]), ...array])
 }

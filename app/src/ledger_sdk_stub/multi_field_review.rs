@@ -171,7 +171,8 @@ impl<'a> Field<'a> {
     pub fn event_loop(&self, incoming_direction: ButtonEvent, is_first_field: bool) -> ButtonEvent {
         let mut buttons = ButtonsState::new();
         let chunk_max_lines = layout::MAX_LINES - 1;
-        let page_count = 1 + self.value.len() / (chunk_max_lines * MAX_CHAR_PER_LINE);
+        let max_size_per_page = chunk_max_lines * MAX_CHAR_PER_LINE;
+        let page_count = (self.value.len() + max_size_per_page - 1) / max_size_per_page;
 
         let mut cur_page = match incoming_direction {
             ButtonEvent::LeftButtonRelease => page_count - 1,

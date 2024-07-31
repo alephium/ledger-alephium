@@ -21,7 +21,8 @@ make run-speculos-<device>
 Run the tests:
 
 ```shell
-cd js && npm run speculos-test
+cd js/docker && docker compose up -d && cd ..
+npm install && MODEL=<device> npm run speculos-test
 ```
 
 ### Test with a Ledger Device

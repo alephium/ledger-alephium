@@ -32,8 +32,6 @@ fn trim(dest: &[u8]) -> &[u8] {
 
 impl U256 {
     const ALPH_DECIMALS: usize = 18;
-    const DECIMAL_PLACES: usize = 6;
-    const _1000_NANO_ALPH: u64 = 10_u64.pow((Self::ALPH_DECIMALS - Self::DECIMAL_PLACES) as u32);
 
     pub fn from_encoded_bytes(bytes: &[u8]) -> Self {
         let mut bs = [0u8; 33];
@@ -150,11 +148,10 @@ impl U256 {
         Some(&output[..(output.len() - index)])
     }
 
-    fn to_str_with_decimals<'a>(
+    pub fn to_str_with_decimals<'a>(
         &self,
         output: &'a mut [u8],
         decimals: usize,
-        decimal_places: usize,
     ) -> Option<&'a [u8]> {
         reset(output);
         let str = self.to_str(output)?;
@@ -167,7 +164,7 @@ impl U256 {
             let decimal_index = str_length - decimals;
             output.copy_within(decimal_index..str_length, decimal_index + 1);
             output[decimal_index] = b'.';
-            return Some(trim(&output[..(decimal_index + decimal_places + 1)]));
+            return Some(trim(&output[..(decimal_index + decimals + 1)]));
         }
 
         let pad_size = decimals - str_length;
@@ -179,28 +176,7 @@ impl U256 {
                 *element = b'0';
             }
         }
-        return Some(trim(&output[..(2 + decimal_places)]));
-    }
-
-    fn is_less_than_1000_nano(&self) -> bool {
-        if self.0.is_fixed_size() {
-            return true;
-        }
-        let length = self.0.get_length();
-        if length > 8 {
-            return false;
-        }
-        let mut value: u64 = 0;
-        let mut index = 1;
-        while index < length {
-            let byte = self.0.bytes[index];
-            value = (value << 8) | (byte as u64);
-            if value >= Self::_1000_NANO_ALPH {
-                return false;
-            }
-            index += 1
-        }
-        true
+        return Some(trim(&output[..(2 + decimals)]));
     }
 
     pub fn to_alph<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
@@ -213,30 +189,14 @@ impl U256 {
             return Some(&output[..total_size]);
         }
 
-        if self.is_less_than_1000_nano() {
-            let str = b"<0.000001";
-            let total_size = str.len() + prefix.len();
-            if output.len() < total_size {
-                return None;
-            }
-            output[..prefix.len()].copy_from_slice(prefix);
-            output[prefix.len()..total_size].copy_from_slice(str);
-            return Some(&output[..total_size]);
-        }
-
         if output.len() < 28 + prefix.len() {
             // max ALPH amount
             return None;
         }
 
         output[..prefix.len()].copy_from_slice(prefix);
-        let str = self.to_str_with_decimals(
-            &mut output[prefix.len()..],
-            Self::ALPH_DECIMALS,
-            Self::DECIMAL_PLACES,
-        )?;
-        let str_length = str.len();
-        let total_size = str_length + prefix.len();
+        let str = self.to_str_with_decimals(&mut output[prefix.len()..], Self::ALPH_DECIMALS)?;
+        let total_size = prefix.len() + str.len();
         Some(&output[..total_size])
     }
 }
@@ -268,6 +228,8 @@ pub mod tests {
     use rand::Rng;
     use std::string::String;
     use std::vec::Vec;
+
+    const _1000_NANO_ALPH: u64 = 10_u64.pow(12);
 
     pub fn hex_to_bytes(hex_string: &str) -> Result<Vec<u8>, std::num::ParseIntError> {
         (0..hex_string.len())
@@ -403,18 +365,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_is_less_than_1000_nano_alph() {
-        let u2560 = U256::encode_u128((U256::_1000_NANO_ALPH - 1) as u128);
-        let u2561 = U256::encode_u128((U256::_1000_NANO_ALPH) as u128);
-        let u2562 = U256::encode_u128((U256::_1000_NANO_ALPH + 1) as u128);
-
-        assert!(u2560.is_less_than_1000_nano());
-        assert!(!u2561.is_less_than_1000_nano());
-        assert!(!u2562.is_less_than_1000_nano());
-        assert!(!U256::encode_u128(u128::MAX).is_less_than_1000_nano())
-    }
-
-    #[test]
     fn test_multiply() {
         let min_gas_price = u128::pow(10, 11);
         let gas_amount = random_usize(1, 5000000) as u32;
@@ -448,18 +398,18 @@ pub mod tests {
 
         let cases = [
             (0, "0"),
-            (U256::_1000_NANO_ALPH as u128, "0.000001"),
+            (_1000_NANO_ALPH as u128, "0.000001"),
             ((10 as u128).pow(12), "0.000001"),
-            ((U256::_1000_NANO_ALPH as u128) - 1, "<0.000001"),
+            ((_1000_NANO_ALPH as u128) - 1, "0.000000999999999999"),
             ((10 as u128).pow(13), "0.00001"),
             ((10 as u128).pow(14), "0.0001"),
             ((10 as u128).pow(17), "0.1"),
             ((10 as u128).pow(18), "1"),
-            (alph("0.11111111111"), "0.111111"),
-            (alph("111111.11111111"), "111111.111111"),
+            (alph("0.11111111111"), "0.11111111111"),
+            (alph("111111.11111111"), "111111.11111111"),
             (alph("1.010101"), "1.010101"),
             (alph("1.101010"), "1.10101"),
-            (alph("1.9999999"), "1.999999"),
+            (alph("1.9999999"), "1.9999999"),
         ];
         for (number, str) in cases {
             let u256 = U256::encode_u128(number);
