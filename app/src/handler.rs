@@ -62,9 +62,11 @@ pub fn handle_apdu(
                 return Err(ErrorCode::BadLen.into());
             }
             let raw_path = &data[..20];
-            if !deserialize_path(raw_path, &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
+            deserialize_path::<io::Reply>(
+                raw_path,
+                &mut path,
+                ErrorCode::HDPathDecodingFailed.into(),
+            )?;
 
             println("raw path");
             println_slice::<40>(raw_path);
@@ -86,9 +88,11 @@ pub fn handle_apdu(
                 return Err(ErrorCode::BadLen.into());
             }
             // This check can be removed, but we keep it for double checking
-            if !deserialize_path(&data[..20], &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
+            deserialize_path::<io::Reply>(
+                &data[..20],
+                &mut path,
+                ErrorCode::HDPathDecodingFailed.into(),
+            )?;
 
             match sign_hash_ui(&path, &data[20..]) {
                 Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),

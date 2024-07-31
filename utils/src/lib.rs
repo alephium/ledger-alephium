@@ -56,10 +56,10 @@ pub fn xor_bytes(data: i32) -> u8 {
     bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3]
 }
 
-pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
+pub fn deserialize_path<T>(data: &[u8], path: &mut [u32; 5], t: T) -> Result<(), T> {
     // The path has to be 5 nodes
     if data.len() != 4 * 5 {
-        return false;
+        return Err(t);
     }
 
     for i in 0..5 {
@@ -67,7 +67,7 @@ pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
         path[i] = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
     }
 
-    true
+    Ok(())
 }
 
 #[cfg(test)]

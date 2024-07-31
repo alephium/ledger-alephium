@@ -44,7 +44,8 @@ impl SignTxContext {
     }
 
     pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
-        deserialize_path(&data[0..20], &mut self.path);
+        deserialize_path(&data[..20], &mut self.path, ErrorCode::HDPathDecodingFailed)?;
+
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
