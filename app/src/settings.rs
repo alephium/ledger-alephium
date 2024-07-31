@@ -13,7 +13,7 @@ pub fn is_blind_signing_enabled() -> bool {
 }
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-pub fn update_blind_signing() {
+pub fn toggle_blind_signing_setting() {
     let settings = unsafe { SETTINGS_DATA.get_mut() };
     let mut updated_data: [u8; SETTINGS_SIZE] = unsafe { *SETTINGS_DATA.get_mut().get_ref() };
     updated_data[0] = if settings.get_ref()[0] != 0 { 0 } else { 1 };
