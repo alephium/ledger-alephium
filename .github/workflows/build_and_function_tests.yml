@@ -1,0 +1,37 @@
+name: Build and run functional tests
+
+# This workflow will build the app and then run functional tests upon Speculos emulation.
+# It calls a reusable workflow developed by Ledger's internal developer team to build the
+# application and upload the resulting binaries.
+# It then runs the functional tests on the compiled application binary.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build_application:
+    name: Build application using the reusable workflow
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
+    with:
+      upload_app_binaries_artifact: "compiled_app_binaries"
+      builder: ledger-app-builder
+
+  functional-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: make set-github-action
+      - run: make run-github-ci device=nanos path=nanos
+      - run: make run-github-ci device=nanosp path=nanosplus
+      - run: make run-github-ci device=nanox path=nanox
+      - run: make run-github-ci device=stax path=stax
+      - run: make run-github-ci device=flex path=flex
