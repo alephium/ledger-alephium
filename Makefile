@@ -34,7 +34,7 @@ check:
 _run-speculos:
 	docker run --rm -it -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 -e DISPLAY='host.docker.internal:0' \
 		-v '/tmp/.X11-unix:/tmp/.X11-unix' --privileged $(ledger_app_dev_tools) \
-		speculos -m $(device) /app/app/target/$(path)/release/app
+		speculos -m $(device) /app/app/target/$(path)/release/alephium
 
 run-speculos:
 	@make run-speculos-nanos
@@ -66,7 +66,7 @@ run-github-ci:
 	docker run --rm -v $(shell pwd):/app -v ledger-alephium-cargo:/opt/.cargo $(ledger_app_builder) \
 		bash -c "cd app && cargo ledger build $(path) -- --no-default-features --features debug"
 	docker run --name speculos --rm -v $(shell pwd):/app --publish 25000:5000 --publish 9999:9999 \
-		$(ledger_app_dev_tools) speculos -m $(device) /app/app/target/$(path)/release/app --display headless &
+		$(ledger_app_dev_tools) speculos -m $(device) /app/app/target/$(path)/release/alephium --display headless &
 	cd js && sleep 3 && MODEL=$(device) npm run speculos-test && docker stop speculos && cd ..
 
 .PHONY: release clean

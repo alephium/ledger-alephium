@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "alephium"
 version = "0.4.0"
 authors = ["alephium devs"]
 edition = "2021"
@@ -24,7 +24,7 @@ lto = true
 name = "Alephium"
 curve = ["secp256k1"]
 flags = "0"
-path = ["m/44'/1234'"]
+path = ["44'/1234'"]
 
 [package.metadata.ledger.nanos]
 icon = "alph_16x16.gif"
