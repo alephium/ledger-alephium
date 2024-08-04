@@ -12,6 +12,14 @@ use crate::{
     },
 };
 
+const MAX_TOKEN_SIZE: u8 = 5;
+const PATH_LENGTH: usize = 20;
+const HASH_LENGTH: usize = 32;
+const PATH_HEX_LENGTH: usize = PATH_LENGTH * 2;
+const FIRST_FRAME_PREFIX_LENGTH: usize = PATH_LENGTH + 1; // path + 1 byte token size
+const CALL_CONTRACT_FLAG: u8 = 0x01;
+const SCRIPT_OFFSET: usize = 3; // the encoded script offset in the tx
+
 #[repr(u8)]
 pub enum Ins {
     GetVersion,
@@ -49,6 +57,7 @@ pub fn handle_apdu(
         return Err(ErrorCode::BadCla.into());
     }
 
+    // Common instructions
     match ins {
         Ins::GetVersion => {
             let version_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u8>().unwrap();
@@ -58,21 +67,24 @@ pub fn handle_apdu(
         }
         Ins::GetPubKey => {
             let data = comm.get_data()?;
-            if data.len() != 21 {
+            // 1 byte flag indicating whether address verification is needed
+            if data.len() != PATH_LENGTH + 1 {
                 return Err(ErrorCode::BadLen.into());
             }
-            let raw_path = &data[..20];
-            if !deserialize_path(raw_path, &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
+            let raw_path = &data[..PATH_LENGTH];
+            deserialize_path::<io::Reply>(
+                raw_path,
+                &mut path,
+                ErrorCode::HDPathDecodingFailed.into(),
+            )?;
 
             println("raw path");
-            println_slice::<40>(raw_path);
-            let p1 = apdu_header.p1;
-            let p2 = apdu_header.p2;
+            println_slice::<PATH_HEX_LENGTH>(raw_path);
+            let p1 = apdu_header.p1; // Group number: 0 for all groups
+            let p2 = apdu_header.p2; // Target group
             let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
 
-            let need_to_display = data[20] != 0;
+            let need_to_display = data[PATH_LENGTH] != 0;
             if need_to_display {
                 review_address(&pk)?;
             }
@@ -82,15 +94,17 @@ pub fn handle_apdu(
         }
         Ins::SignHash => {
             let data = comm.get_data()?;
-            if data.len() != 4 * 5 + 32 {
+            if data.len() != PATH_LENGTH + HASH_LENGTH {
                 return Err(ErrorCode::BadLen.into());
             }
             // This check can be removed, but we keep it for double checking
-            if !deserialize_path(&data[..20], &mut path) {
-                return Err(ErrorCode::BadLen.into());
-            }
+            deserialize_path::<io::Reply>(
+                &data[..PATH_LENGTH],
+                &mut path,
+                ErrorCode::HDPathDecodingFailed.into(),
+            )?;
 
-            match sign_hash_ui(&path, &data[20..]) {
+            match sign_hash_ui(&path, &data[PATH_LENGTH..]) {
                 Ok((signature_buf, length, _)) => comm.append(&signature_buf[..length as usize]),
                 Err(code) => return Err(code.into()),
             }
@@ -102,6 +116,8 @@ pub fn handle_apdu(
                     return Ok(());
                 }
                 Ok(()) => {
+                    // The transaction is signed when all the data is processed
+                    // The signature is returned in the response
                     let sign_result = tx_reviewer
                         .approve_tx()
                         .and_then(|_| sign_tx_context.sign_tx());
@@ -123,8 +139,10 @@ pub fn handle_apdu(
     Ok(())
 }
 
-const MAX_TOKEN_SIZE: u8 = 5;
-
+// The transaction is split into multiple APDU commands
+// The first APDU command contains the path and token metadata
+// The subsequent APDU commands contain the transaction data
+// The transaction data is processed in chunks
 fn handle_sign_tx(
     apdu_header: &ApduHeader,
     data: &[u8],
@@ -132,23 +150,27 @@ fn handle_sign_tx(
     tx_reviewer: &mut TxReviewer,
 ) -> Result<(), ErrorCode> {
     match apdu_header.p1 {
-        0 if data.len() < 21 => Err(ErrorCode::BadLen), // 20 bytes path + 1 byte token size
+        0 if data.len() < FIRST_FRAME_PREFIX_LENGTH => Err(ErrorCode::BadLen),
         0 => {
-            sign_tx_context.init(data)?;
-            let token_size = data[20];
+            // handle the path
+            sign_tx_context.init(&data[..PATH_LENGTH])?;
+
+            // handle the token metadata
+            let token_size = data[FIRST_FRAME_PREFIX_LENGTH - 1];
             if token_size > MAX_TOKEN_SIZE {
                 return Err(ErrorCode::InvalidTokenSize);
             }
-            let tx_data_index: usize = 21 + TOKEN_METADATA_SIZE * (token_size as usize);
-            if data.len() < tx_data_index + 3 {
+            let tx_data_index: usize =
+                FIRST_FRAME_PREFIX_LENGTH + TOKEN_METADATA_SIZE * (token_size as usize);
+            if data.len() < tx_data_index + SCRIPT_OFFSET {
                 return Err(ErrorCode::BadLen);
             }
             let tx_data = &data[tx_data_index..];
-            let is_tx_execute_script = tx_data[2] == 0x01;
+            let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
                 check_blind_signing()?;
             }
-            let token_metadata = &data[21..tx_data_index];
+            let token_metadata = &data[FIRST_FRAME_PREFIX_LENGTH..tx_data_index];
             check_token_metadata(token_size, token_metadata)?;
             tx_reviewer.init(is_tx_execute_script, token_metadata)?;
             sign_tx_context.handle_data(apdu_header, tx_data, tx_reviewer)
@@ -158,6 +180,8 @@ fn handle_sign_tx(
     }
 }
 
+// Check the token metadata version
+// The token metadata version should be 0 for now
 fn check_token_metadata(token_size: u8, token_metadata: &[u8]) -> Result<(), ErrorCode> {
     for i in 0..token_size {
         let version_index = (i as usize) * TOKEN_METADATA_SIZE;

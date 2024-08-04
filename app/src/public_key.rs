@@ -5,26 +5,17 @@ use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
 use utils::base58::base58_encode_inputs;
-use utils::{djb_hash, xor_bytes};
+use utils::{check_group, djb_hash, xor_bytes};
 
-pub const TOTAL_NUMBER_OF_GROUPS: u8 = 4;
-
-fn check_group(group_num: u8, target_group: u8) -> Result<(), Reply> {
-    if group_num == 0 && target_group == 0 {
-        return Ok(());
-    }
-    if target_group >= group_num || group_num != TOTAL_NUMBER_OF_GROUPS {
-        return Err(ErrorCode::BadP1P2.into());
-    }
-    Ok(())
-}
+const RAW_PUBKEY_SIZE: usize = 65;
+const COMPRESSED_PUBKEY_SIZE: usize = 33;
 
 pub fn derive_pub_key(
     path: &mut [u32],
     group_num: u8,
     target_group: u8,
 ) -> Result<(ECPublicKey<65, 'W'>, u32), Reply> {
-    check_group(group_num, target_group)?;
+    check_group::<Reply>(group_num, target_group, ErrorCode::BadP1P2.into())?;
     if group_num == 0 {
         let pub_key = derive_pub_key_by_path(path)?;
         Ok((pub_key, path[path.len() - 1]))
@@ -40,6 +31,8 @@ pub fn derive_pub_key_by_path(path: &[u32]) -> Result<ECPublicKey<65, 'W'>, Repl
     Ok(pk)
 }
 
+// Derive a public key for a specific group from a path
+// The path is incremented until the target group is found
 fn derive_pub_key_for_group(
     path: &mut [u32],
     group_num: u8,
@@ -55,9 +48,9 @@ fn derive_pub_key_for_group(
 }
 
 pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
-    assert!(pub_key.len() == 65);
-    let mut compressed = [0_u8; 33];
-    compressed[1..33].copy_from_slice(&pub_key[1..33]);
+    assert!(pub_key.len() == RAW_PUBKEY_SIZE);
+    let mut compressed = [0_u8; COMPRESSED_PUBKEY_SIZE];
+    compressed[1..COMPRESSED_PUBKEY_SIZE].copy_from_slice(&pub_key[1..COMPRESSED_PUBKEY_SIZE]);
     if pub_key.last().unwrap() % 2 == 0 {
         compressed[0] = 0x02
     } else {

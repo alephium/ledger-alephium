@@ -2,21 +2,25 @@ use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 use crate::types::compact_integer::*;
 
+const ENCODED_SIZE: usize = 33;
+
 #[cfg_attr(test, derive(Debug))]
 #[derive(Clone)]
 pub struct BigInt {
-    pub bytes: [u8; 33],
+    pub bytes: [u8; ENCODED_SIZE],
 }
 
 impl Reset for BigInt {
     fn reset(&mut self) {
-        self.bytes = [0; 33];
+        self.bytes = [0; ENCODED_SIZE];
     }
 }
 
 impl Default for BigInt {
     fn default() -> Self {
-        BigInt { bytes: [0; 33] }
+        BigInt {
+            bytes: [0; ENCODED_SIZE],
+        }
     }
 }
 
@@ -29,8 +33,8 @@ impl PartialEq for BigInt {
 impl BigInt {
     #[cfg(test)]
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() == 33);
-        let mut bs = [0u8; 33];
+        assert!(bytes.len() == ENCODED_SIZE);
+        let mut bs = [0u8; ENCODED_SIZE];
         bs.copy_from_slice(bytes);
         Self { bytes: bs }
     }

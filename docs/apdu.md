@@ -4,7 +4,7 @@ This document aims to provide a description of the APDU protocol supported by th
 
 ## General Structure
 
-The general structure of a reqeuest and response is as followed:
+The general structure of a request and response is as followed:
 
 ### Request / Command
 

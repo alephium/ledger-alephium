@@ -43,6 +43,7 @@ pub fn to_hex_fixed<const N: usize, const M: usize>(m: &[u8; N]) -> [u8; M] {
     hex
 }
 
+// This is a non-critical hash function and collision is totally fine
 pub fn djb_hash(data: &[u8]) -> i32 {
     let mut hash = Wrapping(5381_i32);
     data.iter().for_each(|&byte| {
@@ -56,18 +57,33 @@ pub fn xor_bytes(data: i32) -> u8 {
     bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3]
 }
 
-pub fn deserialize_path(data: &[u8], path: &mut [u32; 5]) -> bool {
+pub const PATH_LENGTH: usize = 5;
+
+// Deserialize a path from a byte array
+pub fn deserialize_path<T>(data: &[u8], path: &mut [u32; 5], t: T) -> Result<(), T> {
     // The path has to be 5 nodes
-    if data.len() != 4 * 5 {
-        return false;
+    if data.len() != 4 * PATH_LENGTH {
+        return Err(t);
     }
 
-    for i in 0..5 {
+    for i in 0..PATH_LENGTH {
         let offset = 4 * i;
         path[i] = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap());
     }
 
-    true
+    Ok(())
+}
+
+// If the group number is 0, the target group must also be 0, meaning all groups are allowed
+// If the group number is not 0, the target group must be less than the group number
+pub fn check_group<T>(group_num: u8, target_group: u8, t: T) -> Result<(), T> {
+    if group_num == 0 && target_group == 0 {
+        return Ok(());
+    }
+    if target_group >= group_num {
+        return Err(t);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -135,5 +151,33 @@ mod tests {
         assert_eq!(xor_bytes(2147483647), 128);
         assert_eq!(xor_bytes(-2146081904), 102);
         assert_eq!(xor_bytes(1226685873), 88);
+    }
+
+    #[test]
+    fn test_deserialize_path() {
+        assert_eq!(deserialize_path(&[], &mut [0; 5], ()), Err(()));
+        assert_eq!(deserialize_path(&[0; 19], &mut [0; 5], ()), Err(()));
+        assert_eq!(deserialize_path(&[0; 20], &mut [0; 5], ()), Ok(()));
+        assert_eq!(deserialize_path(&[0; 21], &mut [0; 5], ()), Err(()));
+
+        let mut path = [0; 5];
+        let _ = deserialize_path(&[1; 20], &mut path, ());
+        assert_eq!(&path, &[0x01010101; 5]);
+    }
+
+    #[test]
+    fn test_check_group() {
+        // When group_num is 0, target_group must be 0
+        assert_eq!(check_group(0, 0, ()), Ok(()));
+        assert_eq!(check_group(0, 1, ()), Err(()));
+
+        // When group_num is not 0, target_group must be less than group_num
+        assert_eq!(check_group(1, 0, ()), Ok(()));
+        assert_eq!(check_group(1, 1, ()), Err(()));
+        assert_eq!(check_group(1, 2, ()), Err(()));
+        assert_eq!(check_group(2, 0, ()), Ok(()));
+        assert_eq!(check_group(2, 1, ()), Ok(()));
+        assert_eq!(check_group(2, 2, ()), Err(()));
+        assert_eq!(check_group(2, 3, ()), Err(()));
     }
 }

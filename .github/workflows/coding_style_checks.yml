@@ -1,0 +1,22 @@
+name: Run coding style check
+
+# This workflow will run linting checks to ensure a level of code quality among all Ledger applications.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+  
+jobs:
+  job_lint:
+    name: Lint check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Lint check for Rust app
+        run: make check

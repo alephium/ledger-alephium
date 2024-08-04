@@ -18,7 +18,7 @@ impl Reset for I32 {
     }
 }
 
-fn trim(dest: &mut [u8], is_negative: bool) -> &[u8] {
+fn trim_unsafe(dest: &mut [u8], is_negative: bool) -> &[u8] {
     let mut index = 0;
     while index < dest.len() {
         if dest[index] == b'0' {
@@ -27,7 +27,10 @@ fn trim(dest: &mut [u8], is_negative: bool) -> &[u8] {
             break;
         }
     }
+    assert!(index < dest.len()); // dest should be non-empty
+
     let from_index = if is_negative {
+        assert!(index > 0); // The first byte of dest should be '0' for negative numbers
         dest[index - 1] = b'-';
         index - 1
     } else {
@@ -101,7 +104,7 @@ impl I32 {
             raw_number /= 10;
             length += 1;
         }
-        Some(trim(output, self.inner < 0))
+        Some(trim_unsafe(output, self.inner < 0))
     }
 
     fn decode_fixed_size<W: Writable>(
@@ -294,5 +297,28 @@ pub mod tests {
             let expected = from_utf8(result.unwrap()).unwrap();
             assert_eq!(*str, *expected);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_trim_unsafe_zero_value() {
+        trim_unsafe(&mut [b'0', b'0'], false);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_trim_unsafe_negative_value_with_nonzero_leading() {
+        trim_unsafe(&mut [b'1', b'0'], true);
+    }
+
+    #[test]
+    fn test_trim_unsafe() {
+        // Positive numbers
+        assert_eq!(trim_unsafe(&mut [b'0', b'1'], false), &[b'1']);
+        assert_eq!(trim_unsafe(&mut [b'1', b'0'], false), &[b'1', b'0']);
+        assert_eq!(trim_unsafe(&mut [b'1', b'1'], false), &[b'1', b'1']);
+
+        // Negative numbers
+        assert_eq!(trim_unsafe(&mut [b'0', b'1'], true), &[b'-', b'1']);
     }
 }

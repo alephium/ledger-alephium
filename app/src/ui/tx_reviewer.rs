@@ -34,6 +34,9 @@ pub const TOKEN_METADATA_SIZE: usize = 46;
 const MAX_TOKEN_SYMBOL_LENGTH: usize = 12;
 type TokenSymbol = [u8; MAX_TOKEN_SYMBOL_LENGTH];
 
+// The TxReviewer is used to review the transaction details
+// It keeps track of the transaction details and the current state
+// It also keeps track of the token metadata
 pub struct TxReviewer {
     buffer: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
     has_external_inputs: bool,
@@ -76,18 +79,21 @@ impl TxReviewer {
         Ok(())
     }
 
+    // Write the amount in alph format
     fn write_alph_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 33];
         let amount_str = u256.to_alph(&mut amount_output).unwrap();
         self.buffer.write(amount_str)
     }
 
+    // Write the amount in raw format
     fn write_token_raw_amount(&mut self, u256: &U256) -> Result<usize, ErrorCode> {
         let mut amount_output = [0u8; 78]; // u256 max
         let amount_str = u256.to_str(&mut amount_output).unwrap();
         self.buffer.write(amount_str)
     }
 
+    // Write the amount in token format
     fn write_token_amount(
         &mut self,
         u256: &U256,
@@ -107,11 +113,13 @@ impl TxReviewer {
         self.buffer.write(&amount_output[..total_length])
     }
 
+    // Write the token id in hex format
     fn write_token_id(&mut self, token_id: &Byte32) -> Result<usize, ErrorCode> {
         let hex_str: [u8; 64] = utils::to_hex(&token_id.0).unwrap();
         self.buffer.write(&hex_str)
     }
 
+    // Update the buffer with the carry
     fn update_with_carry(
         &mut self,
         from: usize,
@@ -135,6 +143,7 @@ impl TxReviewer {
         Ok(new_carry)
     }
 
+    // Finalize the multi-sig address
     fn finalize_multi_sig(&mut self, from: usize, to: usize) -> Result<(), ErrorCode> {
         let mut temp0 = [0u8; 64];
         let mut temp1 = [0u8; 64];
@@ -204,6 +213,7 @@ impl TxReviewer {
         Ok(to_index)
     }
 
+    // Write the output index with a prefix
     fn write_index_with_prefix(&mut self, index: usize, prefix: &[u8]) -> Result<usize, ErrorCode> {
         let mut output = [0u8; 13];
         assert!(prefix.len() + 3 <= 13);
@@ -216,6 +226,7 @@ impl TxReviewer {
         self.buffer.write(&output[..total_size])
     }
 
+    // Write the address
     pub fn write_address(&mut self, prefix: u8, hash: &[u8; 32]) -> Result<usize, ErrorCode> {
         let mut output = [0u8; 46];
         let str_bytes = to_base58_address(prefix, hash, &mut output)?;
@@ -241,6 +252,7 @@ impl TxReviewer {
         None
     }
 
+    // Prepare the output for review
     fn prepare_output(
         &mut self,
         output: &AssetOutput,
@@ -288,6 +300,7 @@ impl TxReviewer {
         }))
     }
 
+    // Prepare the token for review
     fn prepare_token(&mut self, token: &Token) -> Result<TokenIndexes, ErrorCode> {
         let token_id_from_index = self.buffer.get_index();
         let token_id_to_index = self.write_token_id(&token.id)?;
@@ -319,6 +332,7 @@ impl TxReviewer {
         bytes_to_string(bytes)
     }
 
+    // Review the input for the transaction
     pub fn review_input(
         &mut self,
         input: &TxInput,
@@ -348,6 +362,7 @@ impl TxReviewer {
         Ok(())
     }
 
+    // Review the output for the transaction
     pub fn review_output(
         &mut self,
         output: &AssetOutput,
@@ -417,6 +432,7 @@ impl TxReviewer {
         review(&fields, review_message)
     }
 
+    // Review the transaction details
     pub fn review_tx_details(
         &mut self,
         unsigned_tx: &UnsignedTx,
@@ -459,6 +475,7 @@ impl TxReviewer {
         }
     }
 
+    // Review transfer that sends to self
     fn review_self_transfer(&self, fee_field: &Field) -> Result<(), ErrorCode> {
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
@@ -528,6 +545,7 @@ impl TxReviewer {
         }
     }
 
+    // Review the rest transaction details and approve it
     pub fn approve_tx(&self) -> Result<(), ErrorCode> {
         assert!(self.tx_fee.is_some());
         let mut amount_output = [0u8; 33];
@@ -576,6 +594,10 @@ impl TxReviewer {
     }
 }
 
+// Output indexes for review
+// The indexes are used to get the values from the buffer
+// The values are then used to display the transaction details
+// The transaction details are then reviewed by the user
 pub struct OutputIndexes {
     pub review_message: (usize, usize),
     pub alph_amount: (usize, usize),
@@ -583,6 +605,10 @@ pub struct OutputIndexes {
     pub token: Option<TokenIndexes>,
 }
 
+// Token indexes for review
+// The indexes are used to get the values from the buffer
+// The values are then used to display the token details
+// The token details are then reviewed by the user
 pub struct TokenIndexes {
     pub has_token_metadata: bool,
     pub token_id: (usize, usize),
@@ -635,6 +661,7 @@ fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), Error
     }
 }
 
+// Review the warning for external inputs, i.e. inputs that are not from the device address
 fn warning_external_inputs() -> Result<(), ErrorCode> {
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
     {

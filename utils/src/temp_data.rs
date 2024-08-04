@@ -23,12 +23,12 @@ impl TempData {
 
     #[inline]
     pub fn is_overflow(&self) -> bool {
-        self.size == Self::MAX_SIZE
+        self.size >= Self::MAX_SIZE
     }
 
     #[inline]
     pub fn write_byte(&mut self, byte: u8) {
-        if self.size == TempData::MAX_SIZE {
+        if self.is_overflow() {
             panic!();
         }
         self.data[self.size] = byte;

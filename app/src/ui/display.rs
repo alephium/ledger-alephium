@@ -7,7 +7,7 @@ use ledger_device_sdk::ui::{
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 
 use crate::{
-    settings::{is_blind_signing_enabled, update_blind_signing},
+    settings::{is_blind_signing_enabled, toggle_blind_signing_setting},
     Ins,
 };
 
@@ -123,7 +123,7 @@ impl MainPages {
                 }
                 io::Event::Button(ButtonEvent::BothButtonsRelease) => {
                     if self.ui_index == 2 {
-                        update_blind_signing();
+                        toggle_blind_signing_setting();
                         show_ui_blind_signing();
                     } else if self.ui_index == 3 {
                         ledger_device_sdk::exit_app(0);

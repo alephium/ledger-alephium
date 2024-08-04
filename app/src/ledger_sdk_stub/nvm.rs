@@ -4,6 +4,9 @@ use crate::error_code::ErrorCode;
 
 pub const NVM_DATA_SIZE: usize = 2048;
 
+// The following code is from ledger-rust-sdk
+// We've made modifications here to add the `get_mut` functions to `NVMData`
+
 #[allow(clippy::upper_case_acronyms)]
 #[repr(align(64))]
 pub struct NVM<const N: usize>(pub [u8; N]);

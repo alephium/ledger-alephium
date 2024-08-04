@@ -4,6 +4,7 @@ use ledger_secure_sdk_sys::*;
 pub const BLAKE2B_HASH_SIZE: usize = 32;
 pub struct Blake2bHasher(cx_blake2b_s);
 
+// A wrapper around the Ledger SDK's blake2b implementation
 impl Blake2bHasher {
     pub fn new() -> Self {
         let mut v = cx_blake2b_t::default();
