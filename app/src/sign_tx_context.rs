@@ -1,5 +1,7 @@
 use ledger_device_sdk::io::ApduHeader;
-use utils::{buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx};
+use utils::{
+    buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx, PATH_LENGTH,
+};
 
 use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
@@ -12,6 +14,7 @@ use crate::{
     error_code::ErrorCode,
 };
 
+// The NVM data is used for SwappingBuffer to store temporary data in case RAM is not enough
 #[link_section = ".nvm_data"]
 static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
@@ -22,6 +25,9 @@ enum DecodeStep {
     Complete,
 }
 
+// The context for signing a transaction
+// It keeps track of the current step, the transaction decoder, the path, and the device address
+// A streaming decoder is used to decode the transaction in chunks so that it can handle large transactions
 pub struct SignTxContext {
     pub path: [u32; 5],
     tx_decoder: StreamingDecoder<UnsignedTx>,
@@ -34,7 +40,7 @@ pub struct SignTxContext {
 impl SignTxContext {
     pub fn new() -> Self {
         SignTxContext {
-            path: [0; 5],
+            path: [0; PATH_LENGTH],
             tx_decoder: StreamingDecoder::default(),
             current_step: DecodeStep::Init,
             hasher: Blake2bHasher::new(),
@@ -43,6 +49,7 @@ impl SignTxContext {
         }
     }
 
+    // Initialize the context with the path
     pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         deserialize_path(data, &mut self.path, ErrorCode::HDPathDecodingFailed)?;
 
@@ -58,11 +65,13 @@ impl SignTxContext {
         self.current_step == DecodeStep::Complete
     }
 
+    // Get the transaction ID by finalizing the hash
     pub fn get_tx_id(&mut self) -> Result<[u8; BLAKE2B_HASH_SIZE], ErrorCode> {
         assert!(self.is_complete());
         self.hasher.finalize()
     }
 
+    // Sign the transaction by signing the transaction ID
     pub fn sign_tx(&mut self) -> Result<([u8; 72], u32, u32), ErrorCode> {
         let tx_id = self.get_tx_id()?;
         sign_hash(&self.path, &tx_id)
@@ -75,6 +84,7 @@ impl SignTxContext {
     ) -> Result<(), ErrorCode> {
         while !buffer.is_empty() {
             match self.tx_decoder.step(buffer) {
+                // New transaction details are available
                 Ok(true) => {
                     tx_reviewer.review_tx_details(
                         &self.tx_decoder.inner,
@@ -90,6 +100,7 @@ impl SignTxContext {
                         self.tx_decoder.reset_stage();
                     }
                 }
+                // No new transaction details are available
                 Ok(false) => return Ok(()),
                 Err(_) => return Err(ErrorCode::TxDecodingFailed),
             }
@@ -97,35 +108,43 @@ impl SignTxContext {
         Ok(())
     }
 
-    fn decode_tx(&mut self, data: &[u8], tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
-        if data.len() > (u8::MAX as usize) {
+    // Decode a transaction chunk
+    fn decode_tx(
+        &mut self,
+        tx_chunk: &[u8],
+        tx_reviewer: &mut TxReviewer,
+    ) -> Result<(), ErrorCode> {
+        if tx_chunk.len() > (u8::MAX as usize) {
             return Err(ErrorCode::BadLen);
         }
-        let mut buffer = Buffer::new(data, &mut self.temp_data);
+        let mut buffer = Buffer::new(tx_chunk, &mut self.temp_data);
         let result = self._decode_tx(&mut buffer, tx_reviewer);
-        self.hasher.update(data)?;
+        self.hasher.update(tx_chunk)?;
         result
     }
 
+    // Handle a transaction data chunk
     pub fn handle_data(
         &mut self,
         apdu_header: &ApduHeader,
-        tx_data: &[u8],
+        tx_data_chunk: &[u8],
         tx_reviewer: &mut TxReviewer,
     ) -> Result<(), ErrorCode> {
         match self.current_step {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
+                // The first chunk of the transaction
                 if apdu_header.p1 == 0 {
                     self.current_step = DecodeStep::DecodingTx;
-                    self.decode_tx(tx_data, tx_reviewer)
+                    self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)
                 }
             }
             DecodeStep::DecodingTx => {
+                // The subsequent chunks of the transaction
                 if apdu_header.p1 == 1 {
-                    self.decode_tx(tx_data, tx_reviewer)
+                    self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)
                 }

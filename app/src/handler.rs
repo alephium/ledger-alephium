@@ -57,6 +57,7 @@ pub fn handle_apdu(
         return Err(ErrorCode::BadCla.into());
     }
 
+    // Common instructions
     match ins {
         Ins::GetVersion => {
             let version_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u8>().unwrap();
@@ -79,8 +80,8 @@ pub fn handle_apdu(
 
             println("raw path");
             println_slice::<PATH_HEX_LENGTH>(raw_path);
-            let p1 = apdu_header.p1;
-            let p2 = apdu_header.p2;
+            let p1 = apdu_header.p1; // Group number: 0 for all groups
+            let p2 = apdu_header.p2; // Target group
             let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
 
             let need_to_display = data[PATH_LENGTH] != 0;
@@ -115,6 +116,8 @@ pub fn handle_apdu(
                     return Ok(());
                 }
                 Ok(()) => {
+                    // The transaction is signed when all the data is processed
+                    // The signature is returned in the response
                     let sign_result = tx_reviewer
                         .approve_tx()
                         .and_then(|_| sign_tx_context.sign_tx());
@@ -136,6 +139,10 @@ pub fn handle_apdu(
     Ok(())
 }
 
+// The transaction is split into multiple APDU commands
+// The first APDU command contains the path and token metadata
+// The subsequent APDU commands contain the transaction data
+// The transaction data is processed in chunks
 fn handle_sign_tx(
     apdu_header: &ApduHeader,
     data: &[u8],
@@ -145,7 +152,10 @@ fn handle_sign_tx(
     match apdu_header.p1 {
         0 if data.len() < FIRST_FRAME_PREFIX_LENGTH => Err(ErrorCode::BadLen),
         0 => {
+            // handle the path
             sign_tx_context.init(&data[..PATH_LENGTH])?;
+
+            // handle the token metadata
             let token_size = data[FIRST_FRAME_PREFIX_LENGTH - 1];
             if token_size > MAX_TOKEN_SIZE {
                 return Err(ErrorCode::InvalidTokenSize);
@@ -170,6 +180,8 @@ fn handle_sign_tx(
     }
 }
 
+// Check the token metadata version
+// The token metadata version should be 0 for now
 fn check_token_metadata(token_size: u8, token_metadata: &[u8]) -> Result<(), ErrorCode> {
     for i in 0..token_size {
         let version_index = (i as usize) * TOKEN_METADATA_SIZE;

@@ -24,10 +24,12 @@ mod ui;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);
 
+// This function is the app entry point
 #[no_mangle]
 extern "C" fn sample_main() {
     let mut comm = io::Comm::new();
 
+    // Initialize the sign tx context and tx reviewer
     let mut sign_tx_context: SignTxContext = SignTxContext::new();
     let mut tx_reviewer: TxReviewer = TxReviewer::new();
 
