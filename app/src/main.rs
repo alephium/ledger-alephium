@@ -22,6 +22,7 @@ mod ledger_sdk_stub;
 mod public_key;
 mod settings;
 mod sign_tx_context;
+mod token_verifier;
 mod ui;
 
 ledger_device_sdk::set_panic!(ledger_device_sdk::exiting_panic);

@@ -2,6 +2,7 @@ use crate::error_code::ErrorCode;
 use ledger_secure_sdk_sys::*;
 
 pub const BLAKE2B_HASH_SIZE: usize = 32;
+pub type Blake2bHash = [u8; BLAKE2B_HASH_SIZE];
 pub struct Blake2bHasher(cx_blake2b_s);
 
 // A wrapper around the Ledger SDK's blake2b implementation
@@ -12,7 +13,7 @@ impl Blake2bHasher {
         Self(v)
     }
 
-    pub fn hash(input: &[u8]) -> Result<[u8; BLAKE2B_HASH_SIZE], ErrorCode> {
+    pub fn hash(input: &[u8]) -> Result<Blake2bHash, ErrorCode> {
         let mut hasher = Blake2bHasher::new();
         hasher.update(input)?;
         hasher.finalize()
@@ -37,7 +38,7 @@ impl Blake2bHasher {
         }
     }
 
-    pub fn finalize(&mut self) -> Result<[u8; BLAKE2B_HASH_SIZE], ErrorCode> {
+    pub fn finalize(&mut self) -> Result<Blake2bHash, ErrorCode> {
         let mut result = [0u8; BLAKE2B_HASH_SIZE];
         let rc = unsafe {
             cx_hash_final(

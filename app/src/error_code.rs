@@ -18,6 +18,7 @@ pub enum ErrorCode {
     DerivingPublicKeyFailed = 0xE005,
     InvalidTokenSize = 0xE006,
     InvalidMetadataVersion = 0xE007,
+    InvalidTokenProofSize = 0xE008,
     InternalError = 0xEF00,
 }
 
