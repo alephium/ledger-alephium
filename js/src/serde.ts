@@ -1,5 +1,5 @@
-import { isHexString } from "@alephium/web3"
-import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TOKEN_METADATA_SIZE, TokenMetadata } from "./types"
+import { isHexString } from '@alephium/web3'
+import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TOKEN_METADATA_SIZE, TokenMetadata } from './types'
 
 export const TRUE = 0x10
 export const FALSE = 0x00
@@ -60,21 +60,22 @@ function check(tokens: TokenMetadata[]) {
   }
 }
 
+export function serializeSingleTokenMetadata(metadata: TokenMetadata): Buffer {
+  const symbolBytes = symbolToBytes(metadata.symbol)
+  const buffer = Buffer.concat([
+    Buffer.from([metadata.version]),
+    Buffer.from(metadata.tokenId, 'hex'),
+    symbolBytes,
+    Buffer.from([metadata.decimals]),
+  ])
+  if (buffer.length !== TOKEN_METADATA_SIZE) {
+    throw new Error(`Invalid token metadata: ${metadata}`)
+  }
+  return buffer
+}
+
 export function serializeTokenMetadata(tokens: TokenMetadata[]): Buffer {
   check(tokens)
-  const array = tokens
-    .map((metadata) => {
-      const symbolBytes = symbolToBytes(metadata.symbol)
-      const buffer = Buffer.concat([
-        Buffer.from([metadata.version]),
-        Buffer.from(metadata.tokenId, 'hex'),
-        symbolBytes,
-        Buffer.from([metadata.decimals])
-      ])
-      if (buffer.length !== TOKEN_METADATA_SIZE) {
-        throw new Error(`Invalid token metadata: ${metadata}`)
-      }
-      return buffer
-    })
+  const array = tokens.map((metadata) => serializeSingleTokenMetadata(metadata))
   return Buffer.concat([Buffer.from([array.length]), ...array])
 }
