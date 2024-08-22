@@ -40,7 +40,7 @@ function symbolToBytes(symbol: string): Buffer {
   return buffer
 }
 
-function check(tokens: TokenMetadata[]) {
+export function checkTokenMetadata(tokens: TokenMetadata[]) {
   const hasDuplicate = tokens.some((token, index) => index !== tokens.findIndex((t) => t.tokenId === token.tokenId))
   if (hasDuplicate) {
     throw new Error(`There are duplicate tokens`)
@@ -75,7 +75,7 @@ export function serializeSingleTokenMetadata(metadata: TokenMetadata): Buffer {
 }
 
 export function serializeTokenMetadata(tokens: TokenMetadata[]): Buffer {
-  check(tokens)
+  checkTokenMetadata(tokens)
   const array = tokens.map((metadata) => serializeSingleTokenMetadata(metadata))
   return Buffer.concat([Buffer.from([array.length]), ...array])
 }
