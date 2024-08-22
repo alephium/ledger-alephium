@@ -27,6 +27,8 @@ function getModel(): string {
 export enum OutputType {
   Base,
   Multisig,
+  Nanos10,
+  Nanos11,
   Token,
   BaseAndToken,
   MultisigAndToken
@@ -35,6 +37,8 @@ export enum OutputType {
 const NanosClickTable = new Map([
   [OutputType.Base, 5],
   [OutputType.Multisig, 10],
+  [OutputType.Nanos10, 10],
+  [OutputType.Nanos11, 11],
   [OutputType.Token, 11],
   [OutputType.BaseAndToken, 12],
   [OutputType.MultisigAndToken, 16],
@@ -139,6 +143,7 @@ async function touch(outputs: OutputType[], hasExternalInputs: boolean) {
 
 export async function approveTx(outputs: OutputType[], hasExternalInputs: boolean = false) {
   if (!needToAutoApprove()) return
+  await sleep(2000)
   const isSelfTransfer = outputs.length === 0 && !hasExternalInputs
   if (isSelfTransfer) {
     if (isStaxOrFlex()) {
@@ -182,6 +187,10 @@ export async function approveAddress() {
 
 function isStaxOrFlex(): boolean {
   return !getModel().startsWith('nano')
+}
+
+export function isNanos(): boolean {
+  return getModel() === 'nanos'
 }
 
 export function skipBlindSigningWarning() {
