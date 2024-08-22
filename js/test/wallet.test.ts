@@ -321,7 +321,7 @@ describe('ledger wallet', () => {
     await app.close()
   }, 120000)
 
-  it('should display raw amount if the proof is invalid', async () => {
+  it('should reject tx if the token proof is invalid', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
@@ -349,17 +349,10 @@ describe('ledger wallet', () => {
     }
     const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
 
-    if (isNanos()) {
-      approveTx([OutputType.Nanos11])
-    } else {
-      approveTx([OutputType.BaseAndToken])
-    }
     const originalProof = tokenMerkleProofs[selectedToken.tokenId]
     const invalidProof = originalProof.slice(0, originalProof.length - 64)
     tokenMerkleProofs[selectedToken.tokenId] = invalidProof
-    const signature = await app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx), [selectedToken])
-    const txId = blake.blake2b(encodedUnsignedTx, undefined, 32)
-    expect(transactionVerifySignature(binToHex(txId), testAccount.publicKey, signature)).toBe(true)
+    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx), [selectedToken])).rejects.toThrow()
     tokenMerkleProofs[selectedToken.tokenId] = originalProof
 
     await app.close()

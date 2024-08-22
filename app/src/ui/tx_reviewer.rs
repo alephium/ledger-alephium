@@ -33,7 +33,6 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 const FIRST_OUTPUT_INDEX: u16 = 1;
 const MAX_TOKEN_SYMBOL_LENGTH: usize = 12;
-const VALIDATED_TOKEN_METADATA_SIZE: usize = TOKEN_METADATA_SIZE + 1;
 type TokenSymbol = [u8; MAX_TOKEN_SYMBOL_LENGTH];
 
 // The TxReviewer is used to review the transaction details
@@ -74,7 +73,7 @@ impl TxReviewer {
         self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
         self.is_tx_execute_script = false;
-        self.token_metadata_length = (token_size as usize) * VALIDATED_TOKEN_METADATA_SIZE;
+        self.token_metadata_length = (token_size as usize) * TOKEN_METADATA_SIZE;
         self.token_verifier = None;
         Ok(())
     }
@@ -93,34 +92,31 @@ impl TxReviewer {
             self.token_verifier = Some(token_verifier);
             return Ok(());
         }
-        self.write_token_validation_result(token_verifier.is_token_valid())
+        if token_verifier.is_token_valid() {
+            Ok(())
+        } else {
+            Err(ErrorCode::InvalidTokenMetadata)
+        }
     }
 
     pub fn handle_token_proof(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         assert!(self.token_verifier.is_some());
         let token_verifier = self.token_verifier.as_mut().unwrap();
         token_verifier.on_proof(data)?;
-        if token_verifier.is_complete() {
-            let is_token_valid = token_verifier.is_token_valid();
-            self.write_token_validation_result(is_token_valid)?;
-            self.token_verifier = None;
+        if !token_verifier.is_complete() {
+            return Ok(());
         }
-        Ok(())
+        let result = if token_verifier.is_token_valid() {
+            Ok(())
+        } else {
+            Err(ErrorCode::InvalidTokenMetadata)
+        };
+        self.token_verifier = None;
+        result
     }
 
     fn write_token_metadata(&mut self, token_metadata: &[u8]) -> Result<(), ErrorCode> {
         let size = self.buffer.write(token_metadata)?;
-        self.check_metadata_size(size)
-    }
-
-    fn write_token_validation_result(&mut self, is_token_valid: bool) -> Result<(), ErrorCode> {
-        let byte: u8 = if is_token_valid { 1 } else { 0 };
-        let size = self.buffer.write(&[byte])?;
-        self.check_metadata_size(size)
-    }
-
-    #[inline]
-    fn check_metadata_size(&self, size: usize) -> Result<(), ErrorCode> {
         if size > self.token_metadata_length {
             Err(ErrorCode::InvalidTokenSize)
         } else {
@@ -288,21 +284,16 @@ impl TxReviewer {
     }
 
     fn get_token_metadata(&self, token_id: &Hash) -> Option<(TokenSymbol, u8)> {
-        let token_size = self.token_metadata_length / VALIDATED_TOKEN_METADATA_SIZE;
+        let token_size = self.token_metadata_length / TOKEN_METADATA_SIZE;
         if token_size == 0 {
             return None;
         }
         for i in 0..token_size {
-            let from_index = i * VALIDATED_TOKEN_METADATA_SIZE;
-            let to_index = from_index + VALIDATED_TOKEN_METADATA_SIZE;
+            let from_index = i * TOKEN_METADATA_SIZE;
+            let to_index = from_index + TOKEN_METADATA_SIZE;
             let token_metadata_bytes = self.buffer.read(from_index, to_index);
             if token_metadata_bytes[1..33] == token_id.0 {
-                let flag_index = VALIDATED_TOKEN_METADATA_SIZE - 1;
-                if token_metadata_bytes[flag_index] == 0 {
-                    // the token metadata is invalid
-                    return None;
-                }
-                let last_index = flag_index - 1; // the last index of the encoded token metadata
+                let last_index = TOKEN_METADATA_SIZE - 1; // the last index of the encoded token metadata
                 let token_symbol = token_metadata_bytes[33..last_index].try_into().unwrap();
                 let token_decimals = token_metadata_bytes[last_index];
                 return Some((token_symbol, token_decimals));

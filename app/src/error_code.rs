@@ -19,6 +19,7 @@ pub enum ErrorCode {
     InvalidTokenSize = 0xE006,
     InvalidMetadataVersion = 0xE007,
     InvalidTokenProofSize = 0xE008,
+    InvalidTokenMetadata = 0xE009,
     InternalError = 0xEF00,
 }
 
