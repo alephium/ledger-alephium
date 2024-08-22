@@ -3,6 +3,7 @@ name = "alephium"
 version = "0.4.0"
 authors = ["alephium devs"]
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 ledger_device_sdk = "=1.12.0"

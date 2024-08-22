@@ -28,7 +28,9 @@ check:
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
 			cargo +nightly-2023-11-10 clippy --target=nanos && \
-			cargo +nightly-2023-11-10 clippy --target=stax \
+			cargo +nightly-2023-11-10 clippy --target=stax && \
+			cargo install cargo-audit && cargo audit && \
+			cargo install --locked cargo-deny && cargo +nightly-2023-11-10 deny check \
 		"
 
 _run-speculos:
