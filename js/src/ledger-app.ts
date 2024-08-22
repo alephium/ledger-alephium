@@ -2,7 +2,7 @@ import { Account, KeyType, addressFromPublicKey, encodeHexSignature, groupOfAddr
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
 import { ec as EC } from 'elliptic'
-import { MAX_PAYLOAD_SIZE, TokenMetadata } from './types'
+import { TokenMetadata } from './types'
 import { encodeTokenMetadata, encodeUnsignedTx } from './tx-encoder'
 
 const ec = new EC('secp256k1')

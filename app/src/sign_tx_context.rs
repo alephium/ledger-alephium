@@ -137,7 +137,7 @@ impl SignTxContext {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
                 // The first chunk of the transaction
-                if apdu_header.p1 == 2 && apdu_header.p2 == 0 {
+                if apdu_header.p1 == 1 && apdu_header.p2 == 0 {
                     self.current_step = DecodeStep::DecodingTx;
                     self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
@@ -146,7 +146,7 @@ impl SignTxContext {
             }
             DecodeStep::DecodingTx => {
                 // The subsequent chunks of the transaction
-                if apdu_header.p1 == 2 && apdu_header.p2 == 1 {
+                if apdu_header.p1 == 1 && apdu_header.p2 == 1 {
                     self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)

@@ -17,9 +17,9 @@ export function encodeTokenMetadata(tokenMetadata: TokenMetadata[]): Frame[] {
 
     assert(buffers.every((buffer) => buffer.length <= MAX_PAYLOAD_SIZE), 'Invalid token frame size')
     const frames: Frame[] = []
-    const firstFrameP1 = isFirstToken ? 0 : 1
-    frames.push({ p1: firstFrameP1, p2: 0, data: buffers[0] })
-    buffers.slice(1).forEach((data) => frames.push({ p1: 1, p2: 1, data }))
+    const firstFrameP2 = isFirstToken ? 0 : 1
+    frames.push({ p1: 0, p2: firstFrameP2, data: buffers[0] })
+    buffers.slice(1).forEach((data) => frames.push({ p1: 0, p2: 2, data }))
     return frames
   })
   if (frames.length === 0) {
@@ -70,16 +70,16 @@ export function encodeUnsignedTx(path: string, unsignedTx: Buffer): Frame[] {
   const encodedPath = serializePath(path)
   const firstFrameTxLength = MAX_PAYLOAD_SIZE - 20;
   if (firstFrameTxLength >= unsignedTx.length) {
-    return [{ p1: 2, p2: 0, data: Buffer.concat([encodedPath, unsignedTx]) }]
+    return [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx]) }]
   }
 
   const firstFrameTxData = unsignedTx.slice(0, firstFrameTxLength)
-  const frames: Frame[] = [{ p1: 2, p2: 0, data: Buffer.concat([encodedPath, firstFrameTxData]) }]
+  const frames: Frame[] = [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, firstFrameTxData]) }]
   let fromIndex = firstFrameTxLength
   while (fromIndex < unsignedTx.length) {
     const remain = unsignedTx.length - fromIndex
     const frameTxLength = Math.min(MAX_PAYLOAD_SIZE, remain)
-    frames.push({ p1: 2, p2: 1, data: unsignedTx.slice(fromIndex, fromIndex + frameTxLength) })
+    frames.push({ p1: 1, p2: 1, data: unsignedTx.slice(fromIndex, fromIndex + frameTxLength) })
     fromIndex += frameTxLength
   }
   return frames

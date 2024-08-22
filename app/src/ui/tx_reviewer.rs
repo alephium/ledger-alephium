@@ -33,6 +33,7 @@ static mut DATA: NVMData<NVM<NVM_DATA_SIZE>> = NVMData::new(NVM::zeroed());
 
 const FIRST_OUTPUT_INDEX: u16 = 1;
 const MAX_TOKEN_SYMBOL_LENGTH: usize = 12;
+const TOKEN_METADATA_VERSION: u8 = 0;
 type TokenSymbol = [u8; MAX_TOKEN_SYMBOL_LENGTH];
 
 // The TxReviewer is used to review the transaction details
@@ -83,7 +84,7 @@ impl TxReviewer {
         let token_verifier = TokenVerifier::new(data)?;
         // we have checked the data size
         let token_metadata = &data[..TOKEN_METADATA_SIZE];
-        if token_metadata[0] != 0 {
+        if token_metadata[0] != TOKEN_METADATA_VERSION {
             // the first byte is the metadata version
             return Err(ErrorCode::InvalidMetadataVersion);
         }

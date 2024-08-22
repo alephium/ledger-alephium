@@ -139,10 +139,10 @@ pub fn handle_apdu(
 // The transaction is split into multiple APDU commands, consisting of token metadata APDU and tx APDU commands
 // We use `p1` and `p2` to distinguish between APDUs:
 // * `p1` = 0 and `p2` = 0 indicates the first token metadata APDU frame
-// * `p1` = 1 and `p2` = 1 indicates a token metadata proof APDU frame
-// * `p1` = 1 and `p2` = 0 indicates a new token metadata APDU frame
-// * `p1` = 2 and `p2` = 0 indicates the first tx APDU frame
-// * `p1` = 2 and `p2` = 1 indicates subsequent tx APDU frames
+// * `p1` = 0 and `p2` = 1 indicates a new token metadata APDU frame
+// * `p1` = 0 and `p2` = 2 indicates the remaining token proof APDU frame
+// * `p1` = 1 and `p2` = 0 indicates the first tx APDU frame
+// * `p1` = 1 and `p2` = 1 indicates subsequent tx APDU frames
 fn handle_sign_tx(
     apdu_header: &ApduHeader,
     data: &[u8],
@@ -168,9 +168,9 @@ fn handle_sign_tx(
             }
             tx_reviewer.handle_token_metadata(&data[1..])
         }
-        (1, 0) => tx_reviewer.handle_token_metadata(data), // token metadata and proof frame
-        (1, 1) => tx_reviewer.handle_token_proof(data),    // the following token proof frame
-        (2, 0) => {
+        (0, 1) => tx_reviewer.handle_token_metadata(data), // token metadata and proof frame
+        (0, 2) => tx_reviewer.handle_token_proof(data),    // the following token proof frame
+        (1, 0) => {
             // the first unsigned tx frame
             if data.len() < PATH_LENGTH + SCRIPT_OFFSET {
                 return Err(ErrorCode::BadLen);
@@ -185,7 +185,7 @@ fn handle_sign_tx(
             sign_tx_context.init(&data[..PATH_LENGTH])?;
             sign_tx_context.handle_tx_data(apdu_header, tx_data, tx_reviewer)
         }
-        (2, 1) => sign_tx_context.handle_tx_data(apdu_header, data, tx_reviewer), // the following unsigned tx frame
+        (1, 1) => sign_tx_context.handle_tx_data(apdu_header, data, tx_reviewer), // the following unsigned tx frame
         _ => Err(ErrorCode::BadP1P2),
     }
 }

@@ -42,6 +42,7 @@ The general structure of a request and response is as followed:
 | 0xE006      | Invalid token size        |
 | 0xE007      | Invalid metadata version  |
 | 0xE008      | Invalid token proof size  |
+| 0xE009      | Invalid token metadata    |
 | 0xEF00      | Internal error            |
 
 ## Commands definitions
@@ -132,17 +133,17 @@ This command returns a signature of the passed transaction
 |-------|----------|-----------------------------|-------------------|
 | CLA   | byte (1) | Application Identifier      | 0x80              |
 | INS   | byte (1) | Instruction ID              | 0x03              |
-| P1    | byte (1) | Payload desc                | 0x00, 0x01, 0x02  |
-| P2    | byte (1) | ignored                     | 0x00, 0x01        |
+| P1    | byte (1) | Payload desc                | 0x00, 0x01        |
+| P2    | byte (1) | ignored                     | 0x00, 0x01, 0x02  |
 | L     | byte (1) | Bytes in payload            | (depends)         |
 
 We use `P1` and `P2` to distinguish between different data frames:
 
 * `P1` = 0 and `P2` = 0 indicates the first token metadata data frame
-* `P1` = 1 and `P2` = 1 indicates a token proof data frame
-* `P1` = 1 and `P2` = 0 indicates subsequent metadata data frames
-* `P1` = 2 and `P2` = 0 indicates the first tx data frame
-* `P1` = 2 and `P2` = 1 indicates subsequent tx data frames
+* `P1` = 0 and `P2` = 1 indicates a new token metadata data frame
+* `P1` = 0 and `P2` = 2 indicates subsequent token proof data frames
+* `P1` = 1 and `P2` = 0 indicates the first tx data frame
+* `P1` = 1 and `P2` = 1 indicates subsequent tx data frames
 
 Input data (first token metadata frame):
 

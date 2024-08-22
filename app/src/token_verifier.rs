@@ -15,18 +15,19 @@ const PROOF_PREFIX_LENGTH: usize = 2;
 // After receiving all the proof data, it compares the hash with the `TOKEN_MERKLE_ROOT` to verify if the token is valid
 #[derive(Default, Copy, Clone)]
 pub struct TokenVerifier {
-    proof_size: usize,
+    remaining_proof_size: usize,
     hash: Blake2bHash,
 }
 
-pub fn hash_pair(a: &Blake2bHash, b: &Blake2bHash) -> Result<Blake2bHash, ErrorCode> {
+pub fn hash_pair(a: &[u8], b: &[u8]) -> Result<Blake2bHash, ErrorCode> {
+    assert!(a.len() == BLAKE2B_HASH_SIZE && b.len() == BLAKE2B_HASH_SIZE);
     let mut hasher = Blake2bHasher::new();
     if a < b {
-        hasher.update(&a[..])?;
-        hasher.update(&b[..])?;
+        hasher.update(a)?;
+        hasher.update(b)?;
     } else {
-        hasher.update(&b[..])?;
-        hasher.update(&a[..])?;
+        hasher.update(b)?;
+        hasher.update(a)?;
     }
     hasher.finalize()
 }
@@ -47,7 +48,7 @@ impl TokenVerifier {
         check_proof_size(proof.len())?;
 
         let mut verifier = TokenVerifier {
-            proof_size,
+            remaining_proof_size: proof_size,
             hash: Blake2bHasher::hash(encoded_token)?,
         };
         verifier.update(proof)?;
@@ -61,24 +62,22 @@ impl TokenVerifier {
     }
 
     fn update(&mut self, proof: &[u8]) -> Result<(), ErrorCode> {
-        if self.proof_size < proof.len() {
+        if self.remaining_proof_size < proof.len() {
             return Err(ErrorCode::InvalidTokenProofSize);
         }
 
         let mut index: usize = 0;
         while index < proof.len() {
-            let sibling: Blake2bHash = proof[index..(index + BLAKE2B_HASH_SIZE)]
-                .try_into()
-                .unwrap();
-            self.hash = hash_pair(&self.hash, &sibling)?;
+            let sibling = &proof[index..(index + BLAKE2B_HASH_SIZE)];
+            self.hash = hash_pair(&self.hash, sibling)?;
             index += BLAKE2B_HASH_SIZE
         }
-        self.proof_size -= proof.len();
+        self.remaining_proof_size -= proof.len();
         Ok(())
     }
 
     pub fn is_complete(&self) -> bool {
-        self.proof_size == 0
+        self.remaining_proof_size == 0
     }
 
     #[inline]

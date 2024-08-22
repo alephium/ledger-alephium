@@ -1,7 +1,8 @@
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
-import { assert, encodeProofLength, encodeTokenMetadata } from '../src/tx-encoder'
-import { MAX_TOKEN_SIZE, TOKEN_METADATA_SIZE } from '../src'
-import { serializeSingleTokenMetadata } from '../src/serde';
+import { assert, encodeProofLength, encodeTokenMetadata, encodeUnsignedTx } from '../src/tx-encoder'
+import { MAX_PAYLOAD_SIZE, MAX_TOKEN_SIZE, TOKEN_METADATA_SIZE } from '../src'
+import { serializePath, serializeSingleTokenMetadata } from '../src/serde';
+import { randomBytes } from 'crypto';
 
 describe('TxEncoder', () => {
 
@@ -47,12 +48,12 @@ describe('TxEncoder', () => {
       const isFirstToken = index === 0
       const prefixLength = isFirstToken ? 1 + TOKEN_METADATA_SIZE + 2 : TOKEN_METADATA_SIZE + 2
       const tokenFrames = frames.slice(frameIndex, frameIndex + getFrameSize(proof.length))
-      const firstFrameP1 = isFirstToken ? 0 : 1
-      expect(tokenFrames[0].p1).toEqual(firstFrameP1)
-      expect(tokenFrames[0].p2).toEqual(0)
+      const firstFrameP2 = isFirstToken ? 0 : 1
+      expect(tokenFrames[0].p1).toEqual(0)
+      expect(tokenFrames[0].p2).toEqual(firstFrameP2)
       tokenFrames.slice(1).forEach((frame) => {
-        expect(frame.p1).toEqual(1)
-        expect(frame.p2).toEqual(1)
+        expect(frame.p1).toEqual(0)
+        expect(frame.p2).toEqual(2)
       })
 
       const expectedProof = Buffer.concat([tokenFrames[0].data.slice(prefixLength), ...tokenFrames.slice(1).map((f) => f.data)])
@@ -60,5 +61,20 @@ describe('TxEncoder', () => {
 
       frameIndex += tokenFrames.length
     })
+  })
+
+  it('should encode tx', () => {
+    const path = `m/44'/1234'/0'/0/0`
+    const encodedPath = serializePath(path)
+    const unsignedTx0 = randomBytes(200)
+    const frames0 = encodeUnsignedTx(path, unsignedTx0)
+    expect(frames0).toEqual([{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx0]) }])
+
+    const unsignedTx1 = randomBytes(250)
+    const frames1 = encodeUnsignedTx(path, unsignedTx1)
+    expect(frames1).toEqual([
+      { p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx1.slice(0, MAX_PAYLOAD_SIZE - 20)]) },
+      { p1: 1, p2: 1, data: unsignedTx1.slice( MAX_PAYLOAD_SIZE - 20) },
+    ])
   })
 })
