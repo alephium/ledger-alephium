@@ -44,24 +44,18 @@ impl TokenVerifier {
             ((data[TOKEN_METADATA_SIZE] as usize) << 8) | (data[TOKEN_METADATA_SIZE + 1] as usize);
         check_proof_size(proof_size)?;
 
-        let proof = &data[prefix_length..];
-        check_proof_size(proof.len())?;
-
         let mut verifier = TokenVerifier {
             remaining_proof_size: proof_size,
             hash: Blake2bHasher::hash(encoded_token)?,
         };
-        verifier.update(proof)?;
+        let proof = &data[prefix_length..];
+        verifier.on_proof(proof)?;
         Ok(verifier)
     }
 
     // update the hash when receiving token proof data
     pub fn on_proof(&mut self, proof: &[u8]) -> Result<(), ErrorCode> {
         check_proof_size(proof.len())?;
-        self.update(proof)
-    }
-
-    fn update(&mut self, proof: &[u8]) -> Result<(), ErrorCode> {
         if self.remaining_proof_size < proof.len() {
             return Err(ErrorCode::InvalidTokenProofSize);
         }
