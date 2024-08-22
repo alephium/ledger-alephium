@@ -27,4 +27,4 @@ jobs:
         builtin: clear,rare
         check_filenames: true
         ignore_words_list: crate,Crate,alph,ALPH
-        exclude_file: js/package-lock.json
+        exclude_file: js/package-lock.json,js/merkle-tree/token.json
