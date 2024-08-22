@@ -1,9 +1,10 @@
-import { Account, KeyType, addressFromPublicKey, encodeHexSignature, groupOfAddress } from '@alephium/web3'
+import { Account, KeyType, addressFromPublicKey, binToHex, codec, encodeHexSignature, groupOfAddress } from '@alephium/web3'
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
 import { ec as EC } from 'elliptic'
-import { TokenMetadata } from './types'
+import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TokenMetadata } from './types'
 import { encodeTokenMetadata, encodeUnsignedTx } from './tx-encoder'
+import { merkleTokens } from './merkle'
 
 const ec = new EC('secp256k1')
 
@@ -69,12 +70,9 @@ export class AlephiumApp {
     return decodeSignature(response)
   }
 
-  async signUnsignedTx(
-    path: string,
-    unsignedTx: Buffer,
-    tokenMetadata: TokenMetadata[] = []
-  ): Promise<string> {
+  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
     console.log(`unsigned tx size: ${unsignedTx.length}`)
+    const tokenMetadata = getTokenMetadata(unsignedTx)
     serde.checkTokenMetadata(tokenMetadata)
     const tokenMetadataFrames = encodeTokenMetadata(tokenMetadata)
     const txFrames = encodeUnsignedTx(path, unsignedTx)
@@ -86,6 +84,29 @@ export class AlephiumApp {
     }
     return decodeSignature(response!)
   }
+}
+
+function getTokenMetadata(unsignedTx: Buffer): TokenMetadata[] {
+  const result: TokenMetadata[] = []
+  const outputs = codec.unsignedTxCodec.decode(unsignedTx).fixedOutputs
+  outputs.forEach((output) => {
+    output.tokens.forEach((t) => {
+      const tokenIdHex = binToHex(t.tokenId)
+      if (result.find((t) => isTokenIdEqual(t.tokenId, tokenIdHex)) !== undefined) {
+        return
+      }
+      const metadata = merkleTokens.find((t) => isTokenIdEqual(t.tokenId, tokenIdHex))
+      if (metadata !== undefined && metadata.symbol.length <= MAX_TOKEN_SYMBOL_LENGTH) {
+        result.push(metadata)
+      }
+    })
+  })
+  const size = Math.min(result.length, MAX_TOKEN_SIZE)
+  return result.slice(0, size)
+}
+
+function isTokenIdEqual(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase()
 }
 
 function decodeSignature(response: Buffer): string {

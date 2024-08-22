@@ -4,8 +4,8 @@ import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
 import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
-import { MAX_TOKEN_SIZE, TokenMetadata } from '../src/types'
-import { randomBytes, randomInt } from 'crypto'
+import { TokenMetadata } from '../src/types'
+import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
 
 describe('ledger wallet', () => {
@@ -314,7 +314,7 @@ describe('ledger wallet', () => {
     } else {
       approveTx(Array(5).fill(OutputType.BaseAndToken))
     }
-    const signature = await app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx), selectedTokens)
+    const signature = await app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))
     const txId = blake.blake2b(encodedUnsignedTx, undefined, 32)
     expect(transactionVerifySignature(binToHex(txId), testAccount.publicKey, signature)).toBe(true)
 
@@ -352,7 +352,7 @@ describe('ledger wallet', () => {
     const originalProof = tokenMerkleProofs[selectedToken.tokenId]
     const invalidProof = originalProof.slice(0, originalProof.length - 64)
     tokenMerkleProofs[selectedToken.tokenId] = invalidProof
-    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx), [selectedToken])).rejects.toThrow()
+    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))).rejects.toThrow()
     tokenMerkleProofs[selectedToken.tokenId] = originalProof
 
     await app.close()
@@ -365,7 +365,8 @@ describe('ledger wallet', () => {
     await transferToAddress(testAccount.address)
 
     const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7'
-    const selectedToken = merkleTokens[6] // the decimals is 18
+    const tokenIndex = 6
+    const selectedToken = merkleTokens[tokenIndex]
     const output: node.FixedAssetOutput = {
       hint: 0,
       key: '',
@@ -385,8 +386,9 @@ describe('ledger wallet', () => {
       fixedOutputs: [output]
     }
     const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
-    const invalidTokens = [{ ...selectedToken, version: 1 }]
-    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx), invalidTokens)).rejects.toThrow()
+    merkleTokens[tokenIndex] = { ...selectedToken, version: 1 }
+    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))).rejects.toThrow()
+    merkleTokens[tokenIndex] = selectedToken
 
     await app.close()
   }, 120000)
