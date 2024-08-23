@@ -95,10 +95,13 @@ pub fn review_address(pub_key: &ECPublicKey<65, 'W'>) -> Result<(), ErrorCode> {
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        use ledger_device_sdk::nbgl::NbglAddressReview;
+        use include_gif::include_gif;
+        use ledger_device_sdk::nbgl::{NbglAddressReview, NbglGlyph};
 
+        const APP_ICON: NbglGlyph = NbglGlyph::from_include(include_gif!("alph_64x64.gif", NBGL));
         let result = NbglAddressReview::new()
-            .verify_str("Confirm address")
+            .glyph(&APP_ICON)
+            .verify_str("Verify Alephium address")
             .show(address_str);
         if result {
             Ok(())
