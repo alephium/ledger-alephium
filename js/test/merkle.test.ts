@@ -1,9 +1,15 @@
-import { hashPair, merkleTokens, tokenMerkleProofs, tokenMerkleRoot } from '../src/merkle'
+import { generateProofs, hashPair, merkleTokens, tokenMerkleProofs, tokenMerkleRoot } from '../src/merkle'
 import { serializeSingleTokenMetadata } from '../src/serde'
 import { blake2b } from 'blakejs'
 import { binToHex } from '@alephium/web3'
 
 describe('Merkle', () => {
+  it('should generate the correct proofs', () => {
+    const { proofs, root } = generateProofs()
+    expect(JSON.stringify(proofs)).toBe(JSON.stringify(tokenMerkleProofs))
+    expect(root).toBe(binToHex(tokenMerkleRoot))
+  })
+
   it('should verify proofs', () => {
     for (const token of merkleTokens) {
       const proof = tokenMerkleProofs[token.tokenId]
