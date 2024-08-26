@@ -176,11 +176,11 @@ fn handle_sign_tx(
                 return Err(ErrorCode::BadLen);
             }
             let tx_data = &data[PATH_LENGTH..];
-            let is_tx_ececute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
-            if is_tx_ececute_script {
+            let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
+            if is_tx_execute_script {
                 check_blind_signing()?;
             }
-            tx_reviewer.set_tx_execute_script(is_tx_ececute_script);
+            tx_reviewer.set_tx_execute_script(is_tx_execute_script);
 
             sign_tx_context.init(&data[..PATH_LENGTH])?;
             sign_tx_context.handle_tx_data(apdu_header, tx_data, tx_reviewer)
