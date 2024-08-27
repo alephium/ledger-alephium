@@ -107,7 +107,13 @@ pub fn handle_apdu(
             }
         }
         Ins::SignTx => {
-            let data = comm.get_data()?;
+            let data = match comm.get_data() {
+                Ok(data) => data,
+                Err(code) => {
+                    reset(sign_tx_context, tx_reviewer);
+                    return Err(code.into());
+                }
+            };
             match handle_sign_tx(apdu_header, data, sign_tx_context, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
                     return Ok(());
@@ -125,9 +131,11 @@ pub fn handle_apdu(
                         }
                         Err(code) => Err(code.into()),
                     };
+                    reset(sign_tx_context, tx_reviewer);
                     return result;
                 }
                 Err(code) => {
+                    reset(sign_tx_context, tx_reviewer);
                     return Err(code.into());
                 }
             }
@@ -158,11 +166,6 @@ fn handle_sign_tx(
             let token_size = data[0]; // the first byte is the token size
             check_token_size(token_size)?;
             tx_reviewer.init(token_size)?;
-
-            // we check whether the tx is completed after processing each data frame
-            // so we need to call `reset` to reset the status of the previous tx
-            // we will initialize the `sign_tx_context` upon receiving the first tx data frame
-            sign_tx_context.reset();
             if token_size == 0 {
                 return Ok(());
             }
@@ -197,4 +200,10 @@ fn check_token_size(size: u8) -> Result<(), ErrorCode> {
     } else {
         Ok(())
     }
+}
+
+#[inline]
+fn reset(sign_tx_context: &mut SignTxContext, tx_reviewer: &mut TxReviewer) {
+    sign_tx_context.reset();
+    tx_reviewer.reset();
 }

@@ -61,7 +61,12 @@ impl SignTxContext {
     }
 
     pub fn reset(&mut self) {
+        self.path = [0; PATH_LENGTH];
+        self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
+        self.hasher.reset();
+        self.temp_data.reset(0);
+        self.device_address = None;
     }
 
     pub fn is_complete(&self) -> bool {

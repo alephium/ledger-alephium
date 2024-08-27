@@ -79,6 +79,16 @@ impl TxReviewer {
         Ok(())
     }
 
+    pub fn reset(&mut self) {
+        self.reset_buffer(0);
+        self.has_external_inputs = false;
+        self.next_output_index = FIRST_OUTPUT_INDEX;
+        self.tx_fee = None;
+        self.is_tx_execute_script = false;
+        self.token_metadata_length = 0;
+        self.token_verifier = None;
+    }
+
     pub fn handle_token_metadata(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         assert!(self.token_verifier.is_none());
         let token_verifier = TokenVerifier::new(data)?;
