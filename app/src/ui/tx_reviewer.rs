@@ -82,7 +82,7 @@ impl TxReviewer {
     pub fn handle_token_metadata(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         assert!(self.token_verifier.is_none());
         let token_verifier = TokenVerifier::new(data)?;
-        // we have checked the data size
+        // we have checked the data size in `TokenVerifier::new(data)`
         let token_metadata = &data[..TOKEN_METADATA_SIZE];
         if token_metadata[0] != TOKEN_METADATA_VERSION {
             // the first byte is the metadata version
