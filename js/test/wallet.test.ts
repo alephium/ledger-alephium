@@ -3,9 +3,10 @@ import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, 
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
+import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
 import { TokenMetadata } from '../src/types'
-import { randomInt } from 'crypto'
+import { randomBytes } from 'crypto'
+import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
 
 describe('ledger wallet', () => {
   const nodeProvider = new NodeProvider("http://127.0.0.1:22973")
@@ -272,37 +273,87 @@ describe('ledger wallet', () => {
     return { tokens, destinations }
   }
 
-  it('should transfer token with metadata', async () => {
+  it('should transfer tokens with proof', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+    const newAccount = await getSigner()
+
+    const selectedTokens = [
+      merkleTokens[5], // decimals is 0
+      merkleTokens[6], // decimals is 18
+      merkleTokens[8], // decimals is 9
+      merkleTokens[11], // decimals is 8
+      merkleTokens[13], // decimals is 6
+    ]
+    const outputs: node.FixedAssetOutput[] = selectedTokens.map((token, index) => {
+      return {
+        hint:0,
+        key: '',
+        attoAlphAmount: DUST_AMOUNT.toString(),
+        address: newAccount.address,
+        tokens: [{ id: token.tokenId, amount: (BigInt(index + 1) * ONE_ALPH).toString() }],
+        lockTime: 0,
+        message: ''
+      }
+    })
+    const unsignedTx: node.UnsignedTx = {
+      txId: '',
+      version: 0,
+      networkId: 4,
+      gasAmount: 100000,
+      gasPrice: (ONE_ALPH / 10000000n).toString(),
+      inputs: [{ outputRef: { hint: 0, key: binToHex(randomBytes(32)) }, unlockScript: '00' + testAccount.publicKey }],
+      fixedOutputs: outputs
+    }
+    const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
+
+    if (isNanos()) {
+      approveTx([OutputType.Nanos11, OutputType.Nanos10, OutputType.Nanos10, OutputType.Nanos10, OutputType.Nanos11])
+    } else {
+      approveTx(Array(5).fill(OutputType.BaseAndToken))
+    }
+    const signature = await app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))
+    const txId = blake.blake2b(encodedUnsignedTx, undefined, 32)
+    expect(transactionVerifySignature(binToHex(txId), testAccount.publicKey, signature)).toBe(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should reject tx if the token proof is invalid', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
 
-    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
-    const transferAmount = 1234567890123456789012345n
-    const mintAmount = 2222222222222222222222222n
-    const { tokens, destinations } = await genTokensAndDestinations(testAccount.address, toAddress, mintAmount, transferAmount)
+    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7'
+    const selectedToken = merkleTokens[6] // the decimals is 18
+    const output: node.FixedAssetOutput = {
+      hint: 0,
+      key: '',
+      attoAlphAmount: DUST_AMOUNT.toString(),
+      address: toAddress,
+      tokens: [{ id: selectedToken.tokenId, amount: ONE_ALPH.toString() }],
+      lockTime: 0,
+      message: ''
+    }
+    const unsignedTx: node.UnsignedTx = {
+      txId: '',
+      version: 0,
+      networkId: 4,
+      gasAmount: 100000,
+      gasPrice: (ONE_ALPH / 10000000n).toString(),
+      inputs: [{ outputRef: { hint: 0, key: binToHex(randomBytes(32)) }, unlockScript: '00' + testAccount.publicKey }],
+      fixedOutputs: [output]
+    }
+    const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
 
-    const randomOrderTokens = tokens.sort((a, b) => b.tokenId.localeCompare(a.tokenId))
-    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
-      fromPublicKey: testAccount.publicKey,
-      destinations: destinations
-    })
-
-    approveTx(Array(5).fill(OutputType.BaseAndToken))
-    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), randomOrderTokens)
-    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
-
-    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
-      unsignedTx: buildTxResult.unsignedTx,
-      signature: signature
-    })
-    await waitForTxConfirmation(submitResult.txId, 1, 1000)
-    const balances = await nodeProvider.addresses.getAddressesAddressBalance(toAddress)
-    tokens.forEach((metadata) => {
-      const tokenBalance = balances.tokenBalances!.find((t) => t.id === metadata.tokenId)!
-      expect(BigInt(tokenBalance.amount)).toEqual(transferAmount)
-    })
+    const originalProof = tokenMerkleProofs[selectedToken.tokenId]
+    const invalidProof = originalProof.slice(0, originalProof.length - 64)
+    tokenMerkleProofs[selectedToken.tokenId] = invalidProof
+    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))).rejects.toThrow()
+    tokenMerkleProofs[selectedToken.tokenId] = originalProof
 
     await app.close()
   }, 120000)
@@ -313,19 +364,31 @@ describe('ledger wallet', () => {
     const [testAccount] = await app.getAccount(path)
     await transferToAddress(testAccount.address)
 
-    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7';
-    const transferAmount = 1234567890123456789012345n
-    const mintAmount = 2222222222222222222222222n
-    const { tokens, destinations } = await genTokensAndDestinations(testAccount.address, toAddress, mintAmount, transferAmount)
-
-    const invalidTokenIndex = randomInt(5)
-    tokens[invalidTokenIndex] = { ...tokens[invalidTokenIndex], version: 1 }
-    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
-      fromPublicKey: testAccount.publicKey,
-      destinations: destinations
-    })
-
-    await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), tokens)).rejects.toThrow()
+    const toAddress = '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7'
+    const tokenIndex = 6
+    const selectedToken = merkleTokens[tokenIndex]
+    const output: node.FixedAssetOutput = {
+      hint: 0,
+      key: '',
+      attoAlphAmount: DUST_AMOUNT.toString(),
+      address: toAddress,
+      tokens: [{ id: selectedToken.tokenId, amount: ONE_ALPH.toString() }],
+      lockTime: 0,
+      message: ''
+    }
+    const unsignedTx: node.UnsignedTx = {
+      txId: '',
+      version: 0,
+      networkId: 4,
+      gasAmount: 100000,
+      gasPrice: (ONE_ALPH / 10000000n).toString(),
+      inputs: [{ outputRef: { hint: 0, key: binToHex(randomBytes(32)) }, unlockScript: '00' + testAccount.publicKey }],
+      fixedOutputs: [output]
+    }
+    const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
+    merkleTokens[tokenIndex] = { ...selectedToken, version: 1 }
+    await expect(app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))).rejects.toThrow()
+    merkleTokens[tokenIndex] = selectedToken
 
     await app.close()
   }, 120000)

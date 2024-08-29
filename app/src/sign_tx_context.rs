@@ -29,7 +29,7 @@ enum DecodeStep {
 // It keeps track of the current step, the transaction decoder, the path, and the device address
 // A streaming decoder is used to decode the transaction in chunks so that it can handle large transactions
 pub struct SignTxContext {
-    pub path: [u32; 5],
+    pub path: [u32; PATH_LENGTH],
     tx_decoder: StreamingDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
@@ -49,16 +49,24 @@ impl SignTxContext {
         }
     }
 
-    // Initialize the context with the path
+    // Initialize the context
     pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
         deserialize_path(data, &mut self.path, ErrorCode::HDPathDecodingFailed)?;
-
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
         self.temp_data.reset(0);
         self.device_address = Some(Address::from_path(&self.path)?);
         Ok(())
+    }
+
+    pub fn reset(&mut self) {
+        self.path = [0; PATH_LENGTH];
+        self.tx_decoder.reset();
+        self.current_step = DecodeStep::Init;
+        self.hasher.reset();
+        self.temp_data.reset(0);
+        self.device_address = None;
     }
 
     pub fn is_complete(&self) -> bool {
@@ -124,7 +132,7 @@ impl SignTxContext {
     }
 
     // Handle a transaction data chunk
-    pub fn handle_data(
+    pub fn handle_tx_data(
         &mut self,
         apdu_header: &ApduHeader,
         tx_data_chunk: &[u8],
@@ -134,7 +142,7 @@ impl SignTxContext {
             DecodeStep::Complete => Err(ErrorCode::InternalError),
             DecodeStep::Init => {
                 // The first chunk of the transaction
-                if apdu_header.p1 == 0 {
+                if apdu_header.p1 == 1 && apdu_header.p2 == 0 {
                     self.current_step = DecodeStep::DecodingTx;
                     self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
@@ -143,7 +151,7 @@ impl SignTxContext {
             }
             DecodeStep::DecodingTx => {
                 // The subsequent chunks of the transaction
-                if apdu_header.p1 == 1 {
+                if apdu_header.p1 == 1 && apdu_header.p2 == 1 {
                     self.decode_tx(tx_data_chunk, tx_reviewer)
                 } else {
                     Err(ErrorCode::BadP1P2)

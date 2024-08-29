@@ -1,8 +1,10 @@
-import { Account, KeyType, addressFromPublicKey, encodeHexSignature, groupOfAddress } from '@alephium/web3'
+import { Account, KeyType, addressFromPublicKey, binToHex, codec, encodeHexSignature, groupOfAddress } from '@alephium/web3'
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
 import { ec as EC } from 'elliptic'
-import { TokenMetadata } from './types'
+import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TokenMetadata } from './types'
+import { encodeTokenMetadata, encodeUnsignedTx } from './tx-encoder'
+import { merkleTokens } from './merkle'
 
 const ec = new EC('secp256k1')
 
@@ -16,9 +18,6 @@ export enum INS {
 
 export const GROUP_NUM = 4
 export const HASH_LEN = 32
-
-// The maximum payload size is 255: https://github.com/LedgerHQ/ledger-live/blob/develop/libs/ledgerjs/packages/hw-transport/src/Transport.ts#L261
-const MAX_PAYLOAD_SIZE = 255
 
 export class AlephiumApp {
   readonly transport: Transport
@@ -71,34 +70,43 @@ export class AlephiumApp {
     return decodeSignature(response)
   }
 
-  async signUnsignedTx(
-    path: string,
-    unsignedTx: Buffer,
-    tokenMetadata: TokenMetadata[] = []
-  ): Promise<string> {
+  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
     console.log(`unsigned tx size: ${unsignedTx.length}`)
-    const encodedPath = serde.serializePath(path)
-    const encodedTokenMetadata = serde.serializeTokenMetadata(tokenMetadata)
-    const firstFrameTxLength = MAX_PAYLOAD_SIZE - 20 - encodedTokenMetadata.length;
-    const txData = unsignedTx.slice(0, unsignedTx.length > firstFrameTxLength ? firstFrameTxLength : unsignedTx.length)
-    const data = Buffer.concat([encodedPath, encodedTokenMetadata, txData])
-    let response = await this.transport.send(CLA, INS.SIGN_TX, 0x00, 0x00, data, [StatusCodes.OK])
-    if (unsignedTx.length <= firstFrameTxLength) {
-      return decodeSignature(response)
-    }
+    const tokenMetadata = getTokenMetadata(unsignedTx)
+    serde.checkTokenMetadata(tokenMetadata)
+    const tokenMetadataFrames = encodeTokenMetadata(tokenMetadata)
+    const txFrames = encodeUnsignedTx(path, unsignedTx)
+    const allFrames = [...tokenMetadataFrames, ...txFrames]
 
-    const frameLength = MAX_PAYLOAD_SIZE
-    let fromIndex = firstFrameTxLength
-    while (fromIndex < unsignedTx.length) {
-      const remain = unsignedTx.length - fromIndex
-      const toIndex = remain > frameLength ? (fromIndex + frameLength) : unsignedTx.length
-      const data = unsignedTx.slice(fromIndex, toIndex)
-      response = await this.transport.send(CLA, INS.SIGN_TX, 0x01, 0x00, data, [StatusCodes.OK])
-      fromIndex = toIndex
+    let response: Buffer | undefined = undefined
+    for (const frame of allFrames) {
+      response = await this.transport.send(CLA, INS.SIGN_TX, frame.p1, frame.p2, frame.data, [StatusCodes.OK])
     }
-
-    return decodeSignature(response)
+    return decodeSignature(response!)
   }
+}
+
+function getTokenMetadata(unsignedTx: Buffer): TokenMetadata[] {
+  const result: TokenMetadata[] = []
+  const outputs = codec.unsignedTxCodec.decode(unsignedTx).fixedOutputs
+  outputs.forEach((output) => {
+    output.tokens.forEach((t) => {
+      const tokenIdHex = binToHex(t.tokenId)
+      if (result.find((t) => isTokenIdEqual(t.tokenId, tokenIdHex)) !== undefined) {
+        return
+      }
+      const metadata = merkleTokens.find((t) => isTokenIdEqual(t.tokenId, tokenIdHex))
+      if (metadata !== undefined && metadata.symbol.length <= MAX_TOKEN_SYMBOL_LENGTH) {
+        result.push(metadata)
+      }
+    })
+  })
+  const size = Math.min(result.length, MAX_TOKEN_SIZE)
+  return result.slice(0, size)
+}
+
+function isTokenIdEqual(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase()
 }
 
 function decodeSignature(response: Buffer): string {

@@ -6,19 +6,16 @@ use crate::{
     error_code::ErrorCode,
     public_key::derive_pub_key,
     sign_tx_context::{check_blind_signing, SignTxContext},
-    ui::{
-        review_address, sign_hash_ui,
-        tx_reviewer::{TxReviewer, TOKEN_METADATA_SIZE},
-    },
+    ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer},
 };
 
 const MAX_TOKEN_SIZE: u8 = 5;
 const PATH_LENGTH: usize = 20;
 const HASH_LENGTH: usize = 32;
 const PATH_HEX_LENGTH: usize = PATH_LENGTH * 2;
-const FIRST_FRAME_PREFIX_LENGTH: usize = PATH_LENGTH + 1; // path + 1 byte token size
 const CALL_CONTRACT_FLAG: u8 = 0x01;
 const SCRIPT_OFFSET: usize = 3; // the encoded script offset in the tx
+pub const TOKEN_METADATA_SIZE: usize = 46;
 
 #[repr(u8)]
 pub enum Ins {
@@ -110,7 +107,13 @@ pub fn handle_apdu(
             }
         }
         Ins::SignTx => {
-            let data = comm.get_data()?;
+            let data = match comm.get_data() {
+                Ok(data) => data,
+                Err(code) => {
+                    reset(sign_tx_context, tx_reviewer);
+                    return Err(code.into());
+                }
+            };
             match handle_sign_tx(apdu_header, data, sign_tx_context, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
                     return Ok(());
@@ -128,9 +131,11 @@ pub fn handle_apdu(
                         }
                         Err(code) => Err(code.into()),
                     };
+                    reset(sign_tx_context, tx_reviewer);
                     return result;
                 }
                 Err(code) => {
+                    reset(sign_tx_context, tx_reviewer);
                     return Err(code.into());
                 }
             }
@@ -139,55 +144,66 @@ pub fn handle_apdu(
     Ok(())
 }
 
-// The transaction is split into multiple APDU commands
-// The first APDU command contains the path and token metadata
-// The subsequent APDU commands contain the transaction data
-// The transaction data is processed in chunks
+// The transaction is split into multiple APDU commands, consisting of token metadata APDU and tx APDU commands
+// We use `p1` and `p2` to distinguish between APDUs:
+// * `p1` = 0 and `p2` = 0 indicates the first token metadata APDU frame
+// * `p1` = 0 and `p2` = 1 indicates a new token metadata APDU frame
+// * `p1` = 0 and `p2` = 2 indicates the remaining token proof APDU frame
+// * `p1` = 1 and `p2` = 0 indicates the first tx APDU frame
+// * `p1` = 1 and `p2` = 1 indicates subsequent tx APDU frames
 fn handle_sign_tx(
     apdu_header: &ApduHeader,
     data: &[u8],
     sign_tx_context: &mut SignTxContext,
     tx_reviewer: &mut TxReviewer,
 ) -> Result<(), ErrorCode> {
-    match apdu_header.p1 {
-        0 if data.len() < FIRST_FRAME_PREFIX_LENGTH => Err(ErrorCode::BadLen),
-        0 => {
-            // handle the path
-            sign_tx_context.init(&data[..PATH_LENGTH])?;
-
-            // handle the token metadata
-            let token_size = data[FIRST_FRAME_PREFIX_LENGTH - 1];
-            if token_size > MAX_TOKEN_SIZE {
-                return Err(ErrorCode::InvalidTokenSize);
-            }
-            let tx_data_index: usize =
-                FIRST_FRAME_PREFIX_LENGTH + TOKEN_METADATA_SIZE * (token_size as usize);
-            if data.len() < tx_data_index + SCRIPT_OFFSET {
+    match (apdu_header.p1, apdu_header.p2) {
+        (0, 0) => {
+            // the first frame
+            if data.is_empty() {
                 return Err(ErrorCode::BadLen);
             }
-            let tx_data = &data[tx_data_index..];
+            let token_size = data[0]; // the first byte is the token size
+            check_token_size(token_size)?;
+            tx_reviewer.init(token_size)?;
+            if token_size == 0 {
+                return Ok(());
+            }
+            tx_reviewer.handle_token_metadata(&data[1..])
+        }
+        (0, 1) => tx_reviewer.handle_token_metadata(data), // token metadata and proof frame
+        (0, 2) => tx_reviewer.handle_token_proof(data),    // the following token proof frame
+        (1, 0) => {
+            // the first unsigned tx frame
+            if data.len() < PATH_LENGTH + SCRIPT_OFFSET {
+                return Err(ErrorCode::BadLen);
+            }
+            let tx_data = &data[PATH_LENGTH..];
             let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
                 check_blind_signing()?;
             }
-            let token_metadata = &data[FIRST_FRAME_PREFIX_LENGTH..tx_data_index];
-            check_token_metadata(token_size, token_metadata)?;
-            tx_reviewer.init(is_tx_execute_script, token_metadata)?;
-            sign_tx_context.handle_data(apdu_header, tx_data, tx_reviewer)
+            tx_reviewer.set_tx_execute_script(is_tx_execute_script);
+
+            sign_tx_context.init(&data[..PATH_LENGTH])?;
+            sign_tx_context.handle_tx_data(apdu_header, tx_data, tx_reviewer)
         }
-        1 => sign_tx_context.handle_data(apdu_header, data, tx_reviewer),
+        (1, 1) => sign_tx_context.handle_tx_data(apdu_header, data, tx_reviewer), // the following unsigned tx frame
         _ => Err(ErrorCode::BadP1P2),
     }
 }
 
-// Check the token metadata version
-// The token metadata version should be 0 for now
-fn check_token_metadata(token_size: u8, token_metadata: &[u8]) -> Result<(), ErrorCode> {
-    for i in 0..token_size {
-        let version_index = (i as usize) * TOKEN_METADATA_SIZE;
-        if token_metadata[version_index] != 0 {
-            return Err(ErrorCode::InvalidMetadataVersion);
-        }
+#[inline]
+fn check_token_size(size: u8) -> Result<(), ErrorCode> {
+    if size > MAX_TOKEN_SIZE {
+        Err(ErrorCode::InvalidTokenSize)
+    } else {
+        Ok(())
     }
-    Ok(())
+}
+
+#[inline]
+fn reset(sign_tx_context: &mut SignTxContext, tx_reviewer: &mut TxReviewer) {
+    sign_tx_context.reset();
+    tx_reviewer.reset();
 }
