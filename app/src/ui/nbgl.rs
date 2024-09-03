@@ -1,93 +1,101 @@
-extern crate alloc;
-use alloc::{vec, vec::Vec};
+use crate::error_code::ErrorCode;
+use crate::ledger_sdk_stub::nbgl_review::NbglStreamingReview;
+use include_gif::include_gif;
+use ledger_device_sdk::nbgl::{Field, NbglChoice, NbglGlyph, NbglReviewStatus, TransactionType};
 
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use alloc::ffi::CString;
-use core::ffi::c_char;
-use ledger_device_sdk::nbgl::*;
-use ledger_secure_sdk_sys::*;
+pub static APP_ICON: NbglGlyph = NbglGlyph::from_include(include_gif!("alph_64x64.gif", NBGL));
 
-pub enum ReviewType {
-    Transaction,
-    Hash,
-}
-
-pub fn nbgl_review_fields(title: &str, subtitle: &str, fields: &TagValueList) -> bool {
-    unsafe {
-        let title = CString::new(title).unwrap();
-        let subtitle = CString::new(subtitle).unwrap();
-        let finish = CString::new("Click to continue").unwrap();
-        let icon = nbgl_icon_details_t::default();
-        let sync_ret = ux_sync_reviewLight(
-            TYPE_TRANSACTION.into(),
-            &fields.into() as *const nbgl_contentTagValueList_t,
-            &icon as *const nbgl_icon_details_t,
-            title.as_ptr() as *const c_char,
-            subtitle.as_ptr() as *const c_char,
-            finish.as_ptr() as *const c_char,
-        );
-        matches!(sync_ret, UX_SYNC_RET_APPROVED)
+fn new_nbgl_review(tx_type: TransactionType, blind: bool) -> NbglStreamingReview {
+    let reviewer = NbglStreamingReview::new().tx_type(tx_type).glyph(&APP_ICON);
+    if blind {
+        reviewer.blind()
+    } else {
+        reviewer
     }
 }
 
-pub fn nbgl_sync_review_status(tpe: ReviewType) {
-    unsafe {
-        let status_type = match tpe {
-            ReviewType::Transaction => STATUS_TYPE_TRANSACTION_SIGNED,
-            ReviewType::Hash => STATUS_TYPE_OPERATION_SIGNED, // there is no `STATUS_TYPE_HASH` in ledger sdk
-        };
-        let _ = ux_sync_reviewStatus(status_type);
+pub struct NbglReviewer {
+    pub review_started: bool,
+    reviewer: Option<NbglStreamingReview>,
+}
+
+impl NbglReviewer {
+    pub fn new() -> NbglReviewer {
+        NbglReviewer {
+            review_started: false,
+            reviewer: None,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.review_started = false;
+        self.reviewer = None;
+    }
+
+    #[inline]
+    fn get_reviewer(&self) -> &NbglStreamingReview {
+        assert!(self.reviewer.is_some());
+        self.reviewer.as_ref().unwrap()
+    }
+
+    pub fn set_reviewer(&mut self, blind: bool) {
+        assert!(self.reviewer.is_none());
+        self.reviewer = Some(new_nbgl_review(TransactionType::Transaction, blind));
+    }
+
+    pub fn start_review(&mut self, message: &str) -> Result<(), ErrorCode> {
+        if self.get_reviewer().start(message, "") {
+            self.review_started = true;
+            Ok(())
+        } else {
+            NbglReviewStatus::new().show(false);
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    pub fn continue_review<'a>(&self, fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
+        if self.get_reviewer().continue_review(fields) {
+            Ok(())
+        } else {
+            NbglReviewStatus::new().show(false);
+            Err(ErrorCode::UserCancelled)
+        }
+    }
+
+    pub fn finish_review(&self, message: &str) -> Result<(), ErrorCode> {
+        if self.get_reviewer().finish(message) {
+            NbglReviewStatus::new().show(true);
+            Ok(())
+        } else {
+            NbglReviewStatus::new().show(false);
+            Err(ErrorCode::UserCancelled)
+        }
     }
 }
 
-fn nbgl_generic_review(content: &NbglPageContent, button_str: &str) -> bool {
-    unsafe {
-        let (c_struct, content_type, action_callback) = content.into();
-        let c_content_list: Vec<nbgl_content_t> = vec![nbgl_content_t {
-            content: c_struct,
-            contentActionCallback: action_callback,
-            type_: content_type,
-        }];
-
-        let content_struct = nbgl_genericContents_t {
-            callbackCallNeeded: false,
-            __bindgen_anon_1: nbgl_genericContents_t__bindgen_ty_1 {
-                contentsList: c_content_list.as_ptr(),
-            },
-            nbContents: 1,
-        };
-
-        let button_cstring = CString::new(button_str).unwrap();
-
-        let sync_ret = ux_sync_genericReview(
-            &content_struct as *const nbgl_genericContents_t,
-            button_cstring.as_ptr() as *const c_char,
-        );
-
-        // Return true if the user approved the transaction, false otherwise.
-        matches!(sync_ret, ledger_secure_sdk_sys::UX_SYNC_RET_APPROVED)
+pub fn nbgl_review_hash(hash: &str) -> bool {
+    let reviewer = new_nbgl_review(TransactionType::Operation, false);
+    if !reviewer.start("Review Hash", "") {
+        return false;
     }
+    let fields = [Field {
+        name: "Hash",
+        value: hash,
+    }];
+    if !reviewer.continue_review(&fields) {
+        return false;
+    }
+    reviewer.finish("Sign Hash")
 }
 
-pub fn nbgl_review_warning(message: &str) -> bool {
-    let content = NbglPageContent::InfoButton(InfoButton::new(
-        message,
-        None,
-        "Continue",
-        TuneIndex::TapCasual,
-    ));
-    nbgl_generic_review(&content, "Reject")
-}
-
-pub fn nbgl_review_info(message: &str) {
-    let content = NbglPageContent::CenteredInfo(CenteredInfo::new(
-        message,
-        "",
-        "",
-        None,
-        false,
-        CenteredInfoStyle::NormalInfo,
-        0,
-    ));
-    let _ = nbgl_generic_review(&content, "Tap to continue");
+pub fn nbgl_review_warning(
+    message: &str,
+    sub_message: &str,
+    confirm_text: &str,
+    cancel_text: &str,
+) -> bool {
+    const WARNING: NbglGlyph = NbglGlyph::from_include(include_gif!("Warning_64px.gif", NBGL));
+    NbglChoice::new()
+        .glyph(&WARNING)
+        .show(message, sub_message, confirm_text, cancel_text)
 }

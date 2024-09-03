@@ -5,11 +5,9 @@
 use crate::ui::display::MainPages;
 use crate::ui::tx_reviewer::TxReviewer;
 use handler::{handle_apdu, Ins};
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use include_gif::include_gif;
 use ledger_device_sdk::io;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{init_comm, NbglGlyph, NbglHomeAndSettings};
+use ledger_device_sdk::nbgl::{init_comm, NbglHomeAndSettings};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use settings::SETTINGS_DATA;
 use sign_tx_context::SignTxContext;
@@ -54,19 +52,25 @@ extern "C" fn sample_main() {
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
+        use crate::ui::nbgl::APP_ICON;
         init_comm(&mut comm);
         let settings_strings = [["Blind signing", "Enable blind signing"]];
-        const APP_ICON: NbglGlyph = NbglGlyph::from_include(include_gif!("alph_64x64.gif", NBGL));
+
+        let mut home_and_settings = NbglHomeAndSettings::new()
+            .glyph(&APP_ICON)
+            .settings(unsafe { SETTINGS_DATA.get_mut() }, &settings_strings)
+            .infos(
+                "Alephium",
+                env!("CARGO_PKG_VERSION"),
+                env!("CARGO_PKG_AUTHORS"),
+            );
+
         loop {
-            let event = NbglHomeAndSettings::new()
-                .glyph(&APP_ICON)
-                .settings(unsafe { SETTINGS_DATA.get_mut() }, &settings_strings)
-                .infos(
-                    "Alephium",
-                    env!("CARGO_PKG_VERSION"),
-                    env!("CARGO_PKG_AUTHORS"),
-                )
-                .show::<Ins>();
+            let event = if !tx_reviewer.nbgl_reviewer.review_started {
+                home_and_settings.show::<Ins>()
+            } else {
+                comm.next_event()
+            };
             if let io::Event::Command(ins) = event {
                 match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
                     Ok(_) => comm.reply_ok(),

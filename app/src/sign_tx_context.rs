@@ -30,7 +30,7 @@ enum DecodeStep {
 // A streaming decoder is used to decode the transaction in chunks so that it can handle large transactions
 pub struct SignTxContext {
     pub path: [u32; PATH_LENGTH],
-    tx_decoder: StreamingDecoder<UnsignedTx>,
+    pub tx_decoder: StreamingDecoder<UnsignedTx>,
     current_step: DecodeStep,
     hasher: Blake2bHasher,
     temp_data: SwappingBuffer<'static, RAM_SIZE, NVM_DATA_SIZE>,
@@ -194,11 +194,16 @@ pub fn check_blind_signing() -> Result<(), ErrorCode> {
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 pub fn check_blind_signing() -> Result<(), ErrorCode> {
-    use crate::ui::nbgl::nbgl_review_info;
+    use crate::ui::nbgl::nbgl_review_warning;
 
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    nbgl_review_info("Blind signing must be enabled in Settings");
+    let _ = nbgl_review_warning(
+        "This transaction cannot be clear-signed",
+        "Enable blind signing in the settings to sign this transaction.",
+        "Go to home", // The ledger rust sdk does not support going to settings.
+        "Reject transaction",
+    );
     Err(ErrorCode::BlindSigningDisabled)
 }

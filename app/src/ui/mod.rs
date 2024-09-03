@@ -45,19 +45,14 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        use crate::ui::nbgl::{nbgl_review_fields, nbgl_sync_review_status, ReviewType};
-        use ledger_device_sdk::nbgl::{Field, TagValueList};
+        use crate::ui::nbgl::nbgl_review_hash;
+        use ledger_device_sdk::nbgl::NbglReviewStatus;
 
-        let fields = [Field {
-            name: "Hash",
-            value: hex_str,
-        }];
-        let values = TagValueList::new(&fields, 0, false, false);
-        let approved = nbgl_review_fields("Review", "Hash", &values);
-        if approved {
-            nbgl_sync_review_status(ReviewType::Hash);
+        if nbgl_review_hash(hex_str) {
+            NbglReviewStatus::new().show(true);
             sign_hash(path, message)
         } else {
+            NbglReviewStatus::new().show(false);
             Err(ErrorCode::UserCancelled)
         }
     }

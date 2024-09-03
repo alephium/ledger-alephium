@@ -1,9 +1,7 @@
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::ui::nbgl::{
-    nbgl_review_fields, nbgl_review_warning, nbgl_sync_review_status, ReviewType,
-};
+use crate::ui::nbgl::{nbgl_review_warning, NbglReviewer};
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
@@ -17,7 +15,7 @@ use crate::{
 };
 use core::str::from_utf8;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{Field, TagValueList};
+use ledger_device_sdk::nbgl::Field;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE, WARNING};
 use utils::{
@@ -47,6 +45,8 @@ pub struct TxReviewer {
     is_tx_execute_script: bool,
     token_metadata_length: usize,
     token_verifier: Option<TokenVerifier>,
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    pub nbgl_reviewer: NbglReviewer,
 }
 
 impl TxReviewer {
@@ -59,6 +59,8 @@ impl TxReviewer {
             is_tx_execute_script: false,
             token_metadata_length: 0,
             token_verifier: None,
+            #[cfg(any(target_os = "stax", target_os = "flex"))]
+            nbgl_reviewer: NbglReviewer::new(),
         }
     }
 
@@ -76,6 +78,10 @@ impl TxReviewer {
         self.is_tx_execute_script = false;
         self.token_metadata_length = (token_size as usize) * TOKEN_METADATA_SIZE;
         self.token_verifier = None;
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            self.nbgl_reviewer = NbglReviewer::new();
+        }
         Ok(())
     }
 
@@ -87,6 +93,10 @@ impl TxReviewer {
         self.is_tx_execute_script = false;
         self.token_metadata_length = 0;
         self.token_verifier = None;
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            self.nbgl_reviewer.reset();
+        }
     }
 
     pub fn handle_token_metadata(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
@@ -137,7 +147,11 @@ impl TxReviewer {
 
     #[inline]
     pub fn set_tx_execute_script(&mut self, is_tx_execute_script: bool) {
-        self.is_tx_execute_script = is_tx_execute_script
+        self.is_tx_execute_script = is_tx_execute_script;
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            self.nbgl_reviewer.set_reviewer(is_tx_execute_script);
+        }
     }
 
     // Write the amount in alph format
@@ -423,6 +437,27 @@ impl TxReviewer {
         Ok(())
     }
 
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    fn start_review(&mut self) -> Result<(), ErrorCode> {
+        let message = if self.is_tx_execute_script {
+            "Review transaction"
+        } else {
+            "Review transaction to send assets"
+        };
+        self.nbgl_reviewer.start_review(message)
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    fn finish_review<'a>(&self, fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
+        self.review(fields, "Fees")?;
+        let message = if self.is_tx_execute_script {
+            "Accept risk and sign transaction"
+        } else {
+            "Sign transaction to send assets"
+        };
+        self.nbgl_reviewer.finish_review(message)
+    }
+
     // Review the output for the transaction
     pub fn review_output(
         &mut self,
@@ -451,9 +486,18 @@ impl TxReviewer {
             name: "Amount",
             value: alph_amount,
         };
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        let output_index_field = Field {
+            name: "Transaction output",
+            value: review_message,
+        };
         if token.is_none() {
+            #[cfg(not(any(target_os = "stax", target_os = "flex")))]
             let fields = [alph_amount_field, address_field];
-            return review(&fields, review_message);
+
+            #[cfg(any(target_os = "stax", target_os = "flex"))]
+            let fields = [output_index_field, alph_amount_field, address_field];
+            return self.review(&fields, review_message);
         }
 
         let TokenIndexes {
@@ -463,34 +507,36 @@ impl TxReviewer {
         } = token.unwrap();
         let token_id = self.get_str_from_range(token_id)?;
         let token_amount = self.get_str_from_range(token_amount)?;
-        let fields = if has_token_metadata {
-            [
-                Field {
-                    name: "Token ID",
-                    value: token_id,
-                },
-                Field {
-                    name: "Token Amount",
-                    value: token_amount,
-                },
-                alph_amount_field,
-                address_field,
-            ]
+        let amount_name = if has_token_metadata {
+            "Token Amount"
         } else {
-            [
-                Field {
-                    name: "Token ID",
-                    value: token_id,
-                },
-                Field {
-                    name: "Raw Amount",
-                    value: token_amount,
-                },
-                alph_amount_field,
-                address_field,
-            ]
+            "Raw Amount"
         };
-        review(&fields, review_message)
+        let token_id_field = Field {
+            name: "Token ID",
+            value: token_id,
+        };
+        let token_amount_field = Field {
+            name: amount_name,
+            value: token_amount,
+        };
+        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+        let fields = [
+            token_id_field,
+            token_amount_field,
+            alph_amount_field,
+            address_field,
+        ];
+
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        let fields = [
+            output_index_field,
+            token_id_field,
+            token_amount_field,
+            alph_amount_field,
+            address_field,
+        ];
+        self.review(&fields, review_message)
     }
 
     // Review the transaction details
@@ -524,6 +570,10 @@ impl TxReviewer {
             }
             UnsignedTx::FixedOutputs(outputs) => {
                 if let Some(current_output) = outputs.get_current_item() {
+                    #[cfg(any(target_os = "stax", target_os = "flex"))]
+                    if outputs.current_index == 0 {
+                        self.start_review()?;
+                    }
                     let result =
                         self.review_output(current_output, device_address, temp_data.read_all());
                     self.reset_buffer(self.token_metadata_length);
@@ -574,35 +624,48 @@ impl TxReviewer {
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
-            let result = if self.is_tx_execute_script {
-                if nbgl_review_warning("Blind Signing") {
-                    review(
-                        &[Field {
-                            name: fee_field.name,
-                            value: fee_field.value,
-                        }],
-                        "Fees",
-                    )
-                } else {
-                    Err(ErrorCode::UserCancelled)
-                }
+            let fee_field = Field {
+                name: fee_field.name,
+                value: fee_field.value,
+            };
+            if self.is_tx_execute_script {
+                self.finish_review(&[fee_field])
             } else {
                 let fields = &[
                     Field {
                         name: "Amount",
                         value: "Self-transfer",
                     },
-                    Field {
-                        name: fee_field.name,
-                        value: fee_field.value,
-                    },
+                    fee_field,
                 ];
-                review(fields, "Fees")
-            };
-            if result.is_ok() {
-                nbgl_sync_review_status(ReviewType::Transaction);
+                self.finish_review(fields)
             }
-            result
+        }
+    }
+
+    fn review<'a>(&self, fields: &'a [Field<'a>], _review_message: &str) -> Result<(), ErrorCode> {
+        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
+        {
+            let review_messages = ["Review ", _review_message];
+            let review = MultiFieldReview::new(
+                fields,
+                &review_messages,
+                Some(&EYE),
+                "Continue",
+                Some(&CHECKMARK),
+                "Reject",
+                Some(&CROSS),
+            );
+            if review.show() {
+                Ok(())
+            } else {
+                Err(ErrorCode::UserCancelled)
+            }
+        }
+
+        #[cfg(any(target_os = "stax", target_os = "flex"))]
+        {
+            self.nbgl_reviewer.continue_review(fields)
         }
     }
 
@@ -646,11 +709,7 @@ impl TxReviewer {
 
         #[cfg(any(target_os = "stax", target_os = "flex"))]
         {
-            let result = review(fields, "Fees");
-            if result.is_ok() {
-                nbgl_sync_review_status(ReviewType::Transaction);
-            }
-            result
+            self.finish_review(fields)
         }
     }
 }
@@ -690,38 +749,6 @@ fn get_token_symbol_bytes(bytes: &[u8]) -> &[u8] {
     &bytes[..index]
 }
 
-fn review<'a>(fields: &'a [Field<'a>], review_message: &str) -> Result<(), ErrorCode> {
-    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-    {
-        let review_messages = ["Review ", review_message];
-        let review = MultiFieldReview::new(
-            fields,
-            &review_messages,
-            Some(&EYE),
-            "Continue",
-            Some(&CHECKMARK),
-            "Reject",
-            Some(&CROSS),
-        );
-        if review.show() {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    {
-        let values = TagValueList::new(fields, 0, false, false);
-        let approved = nbgl_review_fields("Review", review_message, &values);
-        if approved {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-}
-
 // Review the warning for external inputs, i.e. inputs that are not from the device address
 fn warning_external_inputs() -> Result<(), ErrorCode> {
     #[cfg(not(any(target_os = "stax", target_os = "flex")))]
@@ -745,7 +772,13 @@ fn warning_external_inputs() -> Result<(), ErrorCode> {
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        if nbgl_review_warning("There are external inputs") {
+        let approved = nbgl_review_warning(
+            "External inputs",
+            "This transaction has inputs from addresses not associated with this device.",
+            "Continue",
+            "Reject",
+        );
+        if approved {
             Ok(())
         } else {
             Err(ErrorCode::UserCancelled)
