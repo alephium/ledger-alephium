@@ -1,4 +1,4 @@
-use ledger_device_sdk::io;
+use ledger_device_sdk::io::{self, ApduHeader, Reply};
 use ledger_device_sdk::ui::{
     bagls, gadgets,
     layout::{self, Draw, StringPlace},
@@ -6,10 +6,7 @@ use ledger_device_sdk::ui::{
 };
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 
-use crate::{
-    settings::{is_blind_signing_enabled, toggle_blind_signing_setting},
-    Ins,
-};
+use crate::settings::{is_blind_signing_enabled, toggle_blind_signing_setting};
 
 const UI_PAGE_NUM: u8 = 4;
 
@@ -106,7 +103,11 @@ impl MainPages {
         show_ui(self.ui_index);
     }
 
-    pub fn show(&mut self, comm: &mut io::Comm) -> io::Event<Ins> {
+    pub fn show<T>(&mut self, comm: &mut io::Comm) -> io::Event<T>
+    where
+        T: TryFrom<ApduHeader>,
+        Reply: From<<T as TryFrom<ApduHeader>>::Error>,
+    {
         loop {
             match comm.next_event() {
                 io::Event::Button(ButtonEvent::LeftButtonPress) => {

@@ -1,7 +1,6 @@
+use super::TxReviewerInner;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use crate::ui::nbgl::{nbgl_review_warning, NbglReviewer};
+use crate::ledger_sdk_stub::multi_field_review::Field;
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
@@ -12,12 +11,10 @@ use crate::{
     },
     public_key::{to_base58_address, Address},
     token_verifier::TokenVerifier,
+    ui::bytes_to_string,
 };
-use core::str::from_utf8;
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::Field;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE, WARNING};
 use utils::{
     base58::ALPHABET,
     types::{
@@ -42,11 +39,9 @@ pub struct TxReviewer {
     has_external_inputs: bool,
     next_output_index: u16,
     tx_fee: Option<U256>,
-    is_tx_execute_script: bool,
     token_metadata_length: usize,
     token_verifier: Option<TokenVerifier>,
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    pub nbgl_reviewer: NbglReviewer,
+    pub inner: TxReviewerInner,
 }
 
 impl TxReviewer {
@@ -56,11 +51,9 @@ impl TxReviewer {
             has_external_inputs: false,
             next_output_index: FIRST_OUTPUT_INDEX, // display output from index 1, similar to BTC
             tx_fee: None,
-            is_tx_execute_script: false,
             token_metadata_length: 0,
             token_verifier: None,
-            #[cfg(any(target_os = "stax", target_os = "flex"))]
-            nbgl_reviewer: NbglReviewer::new(),
+            inner: TxReviewerInner::new(),
         }
     }
 
@@ -75,13 +68,9 @@ impl TxReviewer {
         self.has_external_inputs = false;
         self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
-        self.is_tx_execute_script = false;
         self.token_metadata_length = (token_size as usize) * TOKEN_METADATA_SIZE;
         self.token_verifier = None;
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            self.nbgl_reviewer = NbglReviewer::new();
-        }
+        self.inner = TxReviewerInner::new();
         Ok(())
     }
 
@@ -90,13 +79,9 @@ impl TxReviewer {
         self.has_external_inputs = false;
         self.next_output_index = FIRST_OUTPUT_INDEX;
         self.tx_fee = None;
-        self.is_tx_execute_script = false;
         self.token_metadata_length = 0;
         self.token_verifier = None;
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            self.nbgl_reviewer.reset();
-        }
+        self.inner.reset();
     }
 
     pub fn handle_token_metadata(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
@@ -147,11 +132,7 @@ impl TxReviewer {
 
     #[inline]
     pub fn set_tx_execute_script(&mut self, is_tx_execute_script: bool) {
-        self.is_tx_execute_script = is_tx_execute_script;
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            self.nbgl_reviewer.set_reviewer(is_tx_execute_script);
-        }
+        self.inner.set_tx_execute_script(is_tx_execute_script);
     }
 
     // Write the amount in alph format
@@ -432,30 +413,9 @@ impl TxReviewer {
         };
 
         if (current_index == input_size - 1) && self.has_external_inputs {
-            warning_external_inputs()?;
+            self.inner.warning_external_inputs()?;
         }
         Ok(())
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    fn start_review(&mut self) -> Result<(), ErrorCode> {
-        let message = if self.is_tx_execute_script {
-            "Review transaction"
-        } else {
-            "Review transaction to send assets"
-        };
-        self.nbgl_reviewer.start_review(message)
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    fn finish_review<'a>(&mut self, fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
-        self.review(fields, "Fees")?;
-        let message = if self.is_tx_execute_script {
-            "Accept risk and sign transaction"
-        } else {
-            "Sign transaction to send assets"
-        };
-        self.nbgl_reviewer.finish_review(message)
     }
 
     // Review the output for the transaction
@@ -486,18 +446,18 @@ impl TxReviewer {
             name: "Amount",
             value: alph_amount,
         };
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
         let output_index_field = Field {
             name: "Transaction output",
             value: review_message,
         };
         if token.is_none() {
-            #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-            let fields = [alph_amount_field, address_field];
-
-            #[cfg(any(target_os = "stax", target_os = "flex"))]
-            let fields = [output_index_field, alph_amount_field, address_field];
-            return self.review(&fields, review_message);
+            let all_fields = &[output_index_field, alph_amount_field, address_field];
+            let fields = if self.inner.output_index_as_field() {
+                all_fields
+            } else {
+                &all_fields[1..]
+            };
+            return self.inner.review_fields(fields, review_message);
         }
 
         let TokenIndexes {
@@ -520,23 +480,19 @@ impl TxReviewer {
             name: amount_name,
             value: token_amount,
         };
-        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-        let fields = [
-            token_id_field,
-            token_amount_field,
-            alph_amount_field,
-            address_field,
-        ];
-
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        let fields = [
+        let all_fields = &[
             output_index_field,
             token_id_field,
             token_amount_field,
             alph_amount_field,
             address_field,
         ];
-        self.review(&fields, review_message)
+        let fields: &[Field] = if self.inner.output_index_as_field() {
+            all_fields
+        } else {
+            &all_fields[1..]
+        };
+        self.inner.review_fields(fields, review_message)
     }
 
     // Review the transaction details
@@ -570,9 +526,8 @@ impl TxReviewer {
             }
             UnsignedTx::FixedOutputs(outputs) => {
                 if let Some(current_output) = outputs.get_current_item() {
-                    #[cfg(any(target_os = "stax", target_os = "flex"))]
                     if outputs.current_index == 0 {
-                        self.start_review()?;
+                        self.inner.start_review()?;
                     }
                     let result =
                         self.review_output(current_output, device_address, temp_data.read_all());
@@ -583,89 +538,6 @@ impl TxReviewer {
                 }
             }
             _ => Ok(()),
-        }
-    }
-
-    // Review transfer that sends to self
-    fn review_self_transfer(&mut self, fee_field: &Field) -> Result<(), ErrorCode> {
-        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-        {
-            let fields = &[Field {
-                name: fee_field.name,
-                value: fee_field.value,
-            }];
-            let review = if self.is_tx_execute_script {
-                MultiFieldReview::new(
-                    fields,
-                    &["Blind Signing"],
-                    Some(&WARNING),
-                    "Sign transaction",
-                    Some(&CHECKMARK),
-                    "Reject",
-                    Some(&CROSS),
-                )
-            } else {
-                MultiFieldReview::new(
-                    fields,
-                    &["Confirm ", "Self-transfer"],
-                    Some(&EYE),
-                    "Sign transaction",
-                    Some(&CHECKMARK),
-                    "Reject",
-                    Some(&CROSS),
-                )
-            };
-            if review.show() {
-                Ok(())
-            } else {
-                Err(ErrorCode::UserCancelled)
-            }
-        }
-
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            let fee_field = Field {
-                name: fee_field.name,
-                value: fee_field.value,
-            };
-            if self.is_tx_execute_script {
-                self.finish_review(&[fee_field])
-            } else {
-                let fields = &[
-                    Field {
-                        name: "Amount",
-                        value: "Self-transfer",
-                    },
-                    fee_field,
-                ];
-                self.finish_review(fields)
-            }
-        }
-    }
-
-    fn review<'a>(&self, fields: &'a [Field<'a>], _review_message: &str) -> Result<(), ErrorCode> {
-        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-        {
-            let review_messages = ["Review ", _review_message];
-            let review = MultiFieldReview::new(
-                fields,
-                &review_messages,
-                Some(&EYE),
-                "Continue",
-                Some(&CHECKMARK),
-                "Reject",
-                Some(&CROSS),
-            );
-            if review.show() {
-                Ok(())
-            } else {
-                Err(ErrorCode::UserCancelled)
-            }
-        }
-
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            self.nbgl_reviewer.continue_review(fields)
         }
     }
 
@@ -685,32 +557,11 @@ impl TxReviewer {
             value,
         };
         if self.next_output_index == FIRST_OUTPUT_INDEX {
-            return self.review_self_transfer(&fee_field);
+            return self.inner.review_self_transfer(&fee_field);
         }
 
         let fields = &[fee_field];
-        #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-        {
-            let review = MultiFieldReview::new(
-                fields,
-                &[],
-                None,
-                "Sign transaction",
-                Some(&CHECKMARK),
-                "Reject",
-                Some(&CROSS),
-            );
-            if review.show() {
-                Ok(())
-            } else {
-                Err(ErrorCode::UserCancelled)
-            }
-        }
-
-        #[cfg(any(target_os = "stax", target_os = "flex"))]
-        {
-            self.finish_review(fields)
-        }
+        self.inner.finish_review(fields)
     }
 }
 
@@ -736,52 +587,10 @@ pub struct TokenIndexes {
 }
 
 #[inline]
-fn bytes_to_string(bytes: &[u8]) -> Result<&str, ErrorCode> {
-    from_utf8(bytes).map_err(|_| ErrorCode::InternalError)
-}
-
-#[inline]
 fn get_token_symbol_bytes(bytes: &[u8]) -> &[u8] {
     let mut index = 0;
     while index < bytes.len() && bytes[index] != 0 {
         index += 1;
     }
     &bytes[..index]
-}
-
-// Review the warning for external inputs, i.e. inputs that are not from the device address
-fn warning_external_inputs() -> Result<(), ErrorCode> {
-    #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-    {
-        let review_messages = ["There are ", "external inputs"];
-        let review = MultiFieldReview::new(
-            &[],
-            &review_messages,
-            Some(&WARNING),
-            "Continue",
-            Some(&CHECKMARK),
-            "Reject",
-            Some(&CROSS),
-        );
-        if review.show() {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    {
-        let approved = nbgl_review_warning(
-            "External inputs",
-            "This transaction has inputs from addresses not associated with this device.",
-            "Continue",
-            "Reject",
-        );
-        if approved {
-            Ok(())
-        } else {
-            Err(ErrorCode::UserCancelled)
-        }
-    }
 }

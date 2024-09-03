@@ -4,9 +4,11 @@ use utils::deserialize_path;
 use crate::{
     debug::print::{println, println_slice},
     error_code::ErrorCode,
-    public_key::derive_pub_key,
-    sign_tx_context::{check_blind_signing, SignTxContext},
-    ui::{review_address, sign_hash_ui, tx_reviewer::TxReviewer},
+    public_key::{derive_pub_key, Address},
+    sign_tx_context::SignTxContext,
+    ui::{
+        bytes_to_string, check_blind_signing, review_address, sign_hash_ui, tx_reviewer::TxReviewer,
+    },
 };
 
 const MAX_TOKEN_SIZE: u8 = 5;
@@ -83,7 +85,9 @@ pub fn handle_apdu(
 
             let need_to_display = data[PATH_LENGTH] != 0;
             if need_to_display {
-                review_address(&pk)?;
+                let address = Address::from_pub_key(&pk)?;
+                let address_str = bytes_to_string(address.get_address_bytes())?;
+                review_address(address_str)?;
             }
 
             comm.append(pk.as_ref());
@@ -181,7 +185,7 @@ fn handle_sign_tx(
             let tx_data = &data[PATH_LENGTH..];
             let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
-                check_blind_signing(tx_reviewer)?;
+                check_blind_signing(&mut tx_reviewer.inner)?;
             }
             tx_reviewer.set_tx_execute_script(is_tx_execute_script);
 

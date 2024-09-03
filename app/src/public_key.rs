@@ -1,6 +1,5 @@
 use crate::blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE};
 use crate::error_code::ErrorCode;
-use core::str::from_utf8;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
@@ -97,8 +96,8 @@ impl Address {
         Ok(Self { bytes, length })
     }
 
-    pub fn get_address_str(&self) -> Result<&str, ErrorCode> {
-        from_utf8(&self.bytes[..self.length]).map_err(|_| ErrorCode::InternalError)
+    pub fn get_address_bytes(&self) -> &[u8] {
+        &self.bytes[..self.length]
     }
 
     pub fn eq(&self, addr: &[u8]) -> bool {

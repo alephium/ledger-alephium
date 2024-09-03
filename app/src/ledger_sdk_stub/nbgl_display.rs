@@ -138,5 +138,5 @@ unsafe extern "C" fn settings_callback(token: c_int, _index: u8, _page: c_int) {
 }
 
 unsafe extern "C" fn app_exit() {
-    os_sched_exit(1);
+    os_sched_exit(0);
 }

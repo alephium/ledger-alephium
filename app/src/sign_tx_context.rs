@@ -7,7 +7,6 @@ use crate::ledger_sdk_stub::nvm::{NVMData, NVM, NVM_DATA_SIZE};
 use crate::ledger_sdk_stub::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::public_key::sign_hash;
 use crate::public_key::Address;
-use crate::settings::is_blind_signing_enabled;
 use crate::ui::tx_reviewer::TxReviewer;
 use crate::{
     blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE},
@@ -159,54 +158,4 @@ impl SignTxContext {
             }
         }
     }
-}
-
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-pub fn check_blind_signing(_tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
-    use ledger_device_sdk::{
-        buttons::{ButtonEvent, ButtonsState},
-        ui::{
-            bitmaps::CROSSMARK,
-            gadgets::{clear_screen, get_event, Page, PageStyle},
-            screen_util::screen_update,
-        },
-    };
-
-    if is_blind_signing_enabled() {
-        return Ok(());
-    }
-    let page = Page::new(
-        PageStyle::PictureNormal,
-        ["Blind signing", "must be enabled"],
-        Some(&CROSSMARK),
-    );
-    clear_screen();
-    page.place();
-    screen_update();
-    let mut buttons = ButtonsState::new();
-
-    loop {
-        if let Some(ButtonEvent::BothButtonsRelease) = get_event(&mut buttons) {
-            return Err(ErrorCode::BlindSigningDisabled);
-        }
-    }
-}
-
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-pub fn check_blind_signing(tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
-    use crate::ui::nbgl::nbgl_review_warning;
-
-    if is_blind_signing_enabled() {
-        return Ok(());
-    }
-    let go_to_settings = nbgl_review_warning(
-        "This transaction cannot be clear-signed",
-        "Enable blind signing in the settings to sign this transaction.",
-        "Go to settings",
-        "Reject transaction",
-    );
-    if go_to_settings {
-        tx_reviewer.nbgl_reviewer.set_display_settings(true);
-    }
-    Err(ErrorCode::BlindSigningDisabled)
 }
