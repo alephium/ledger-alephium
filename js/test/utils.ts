@@ -53,11 +53,19 @@ const NanospClickTable = new Map([
 ])
 
 const StaxClickTable = new Map([
-  [OutputType.Base, 2],
-  [OutputType.Multisig, 3],
-  [OutputType.Token, 3],
-  [OutputType.BaseAndToken, 3],
-  [OutputType.MultisigAndToken, 4],
+  [OutputType.Base, 1],
+  [OutputType.Multisig, 2],
+  [OutputType.Token, 2],
+  [OutputType.BaseAndToken, 2],
+  [OutputType.MultisigAndToken, 2],
+])
+
+const FlexClickTable = new Map([
+  [OutputType.Base, 1],
+  [OutputType.Multisig, 2],
+  [OutputType.Token, 2],
+  [OutputType.BaseAndToken, 2],
+  [OutputType.MultisigAndToken, 3],
 ])
 
 function getOutputClickSize(outputType: OutputType) {
@@ -66,8 +74,8 @@ function getOutputClickSize(outputType: OutputType) {
     case 'nanos': return NanosClickTable.get(outputType)!
     case 'nanosp':
     case 'nanox': return NanospClickTable.get(outputType)!
-    case 'stax':
-    case 'flex': return StaxClickTable.get(outputType)!
+    case 'stax': return StaxClickTable.get(outputType)!
+    case 'flex': return FlexClickTable.get(outputType)!
     default: throw new Error(`Unknown model ${model}`)
   }
 }
@@ -95,12 +103,16 @@ const STAX_APPROVE_POSITION = { x: 200, y: 515 }
 const STAX_REJECT_POSITION = { x: 36, y: 606 }
 const STAX_SETTINGS_POSITION = { x: 342, y: 55 }
 const STAX_BLIND_SETTING_POSITION = { x: 342, y: 90 }
+const STAX_GO_TO_SETTINGS = { x: 36, y: 606 }
+const STAX_ACCEPT_RISK_POSITION = { x: 36, y: 606 }
 
 const FLEX_CONTINUE_POSITION = { x: 430, y: 550 }
 const FLEX_APPROVE_POSITION = { x: 240, y: 435 }
 const FLEX_REJECT_POSITION = { x: 55, y: 530 }
 const FLEX_SETTINGS_POSITION = { x: 405, y: 75 }
 const FLEX_BLIND_SETTING_POSITION = { x: 405, y: 96 }
+const FLEX_GO_TO_SETTINGS = { x: 55, y: 530 }
+const FLEX_ACCEPT_RISK_POSITION = { x: 55, y: 530 }
 
 async function touchPosition(pos: Position) {
   await sleep(1000)
@@ -110,14 +122,24 @@ async function touchPosition(pos: Position) {
   })
 }
 
-async function _touch(times: number) {
+async function longPress(pos: Position) {
+  await sleep(1000)
+  return fetch(`http://localhost:25000/finger`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'press-and-release', x: pos.x, y: pos.y, delay: 3 })
+  })
+}
+
+async function _touch(times: number, approve: boolean = false) {
   const model = getModel()
   const continuePos = model === 'stax' ? STAX_CONTINUE_POSITION : FLEX_CONTINUE_POSITION
   for (let i = 0; i < times; i += 1) {
     await touchPosition(continuePos)
   }
-  const approvePos = model === 'stax' ? STAX_APPROVE_POSITION : FLEX_APPROVE_POSITION
-  await touchPosition(approvePos)
+  if (approve) {
+    const approvePos = model === 'stax' ? STAX_APPROVE_POSITION : FLEX_APPROVE_POSITION
+    await longPress(approvePos)
+  }
 }
 
 export async function staxFlexApproveOnce() {
@@ -129,16 +151,19 @@ export async function staxFlexApproveOnce() {
 }
 
 async function touch(outputs: OutputType[], hasExternalInputs: boolean) {
-  await sleep(1000);
+  await sleep(3000);
   if (hasExternalInputs) {
     await staxFlexApproveOnce()
   }
+
+  _touch(1) // the first review page
+  await sleep(1000)
 
   for (let index = 0; index < outputs.length; index += 1) {
     await _touch(getOutputClickSize(outputs[index]))
   }
 
-  await _touch(2) // fees
+  await _touch(1, true) // fees
 }
 
 export async function approveTx(outputs: OutputType[], hasExternalInputs: boolean = false) {
@@ -147,7 +172,7 @@ export async function approveTx(outputs: OutputType[], hasExternalInputs: boolea
   const isSelfTransfer = outputs.length === 0 && !hasExternalInputs
   if (isSelfTransfer) {
     if (isStaxOrFlex()) {
-      await _touch(2)
+      await _touch(2, true)
     } else {
       await clickAndApprove(2)
     }
@@ -164,7 +189,7 @@ export async function approveTx(outputs: OutputType[], hasExternalInputs: boolea
 export async function approveHash() {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
-    return await _touch(3)
+    return await _touch(2, true)
   }
   if (getModel() === 'nanos') {
     await clickAndApprove(5)
@@ -176,7 +201,9 @@ export async function approveHash() {
 export async function approveAddress() {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
-    return await _touch(2)
+    await _touch(1)
+    await staxFlexApproveOnce()
+    return
   }
   if (getModel() === 'nanos') {
     await clickAndApprove(4)
@@ -185,7 +212,7 @@ export async function approveAddress() {
   }
 }
 
-function isStaxOrFlex(): boolean {
+export function isStaxOrFlex(): boolean {
   return !getModel().startsWith('nano')
 }
 
@@ -193,13 +220,24 @@ export function isNanos(): boolean {
   return getModel() === 'nanos'
 }
 
-export function skipBlindSigningWarning() {
+export async function skipBlindSigningWarning() {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
-    const rejectPos = getModel() === 'stax' ? STAX_REJECT_POSITION : FLEX_REJECT_POSITION
-    touchPosition(rejectPos)
+    await sleep(3000)
+    const goToSettings = getModel() === 'stax' ? STAX_GO_TO_SETTINGS : FLEX_GO_TO_SETTINGS
+    await touchPosition(goToSettings)
   } else {
-    clickAndApprove(3)
+    await clickAndApprove(3)
+  }
+}
+
+export async function staxFlexAcceptRisk() {
+  if (!needToAutoApprove()) return
+  await sleep(3000)
+  if (getModel() === 'stax') {
+    await touchPosition(STAX_ACCEPT_RISK_POSITION)
+  } else {
+    await touchPosition(FLEX_ACCEPT_RISK_POSITION)
   }
 }
 
