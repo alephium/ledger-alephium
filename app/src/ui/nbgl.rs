@@ -16,6 +16,7 @@ fn new_nbgl_review(tx_type: TransactionType, blind: bool) -> NbglStreamingReview
 
 pub struct NbglReviewer {
     pub review_started: bool,
+    pub display_settings: bool,
     reviewer: Option<NbglStreamingReview>,
 }
 
@@ -23,11 +24,15 @@ impl NbglReviewer {
     pub fn new() -> NbglReviewer {
         NbglReviewer {
             review_started: false,
+            display_settings: false,
             reviewer: None,
         }
     }
 
     pub fn reset(&mut self) {
+        // Since `reset` is called when blind signing checks fails,
+        // we cannot reset the `display_settings` within the reset function.
+        // Instead, we will reset the `display_settings` in the `finish_review` function.
         self.review_started = false;
         self.reviewer = None;
     }
@@ -36,6 +41,10 @@ impl NbglReviewer {
     fn get_reviewer(&self) -> &NbglStreamingReview {
         assert!(self.reviewer.is_some());
         self.reviewer.as_ref().unwrap()
+    }
+
+    pub fn set_display_settings(&mut self, display_settings: bool) {
+        self.display_settings = display_settings;
     }
 
     pub fn set_reviewer(&mut self, blind: bool) {
@@ -62,7 +71,8 @@ impl NbglReviewer {
         }
     }
 
-    pub fn finish_review(&self, message: &str) -> Result<(), ErrorCode> {
+    pub fn finish_review(&mut self, message: &str) -> Result<(), ErrorCode> {
+        self.display_settings = false;
         if self.get_reviewer().finish(message) {
             NbglReviewStatus::new().show(true);
             Ok(())

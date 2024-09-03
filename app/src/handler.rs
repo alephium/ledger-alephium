@@ -181,7 +181,7 @@ fn handle_sign_tx(
             let tx_data = &data[PATH_LENGTH..];
             let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
-                check_blind_signing()?;
+                check_blind_signing(tx_reviewer)?;
             }
             tx_reviewer.set_tx_execute_script(is_tx_execute_script);
 

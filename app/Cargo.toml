@@ -12,6 +12,7 @@ utils= { path = "../utils" }
 numtoa = "=0.2.4"
 shlex = { version = "1.3.0", default-features = false } # patch for ledger_device_sdk dependency
 include_gif = "1.2.0"
+const-zero = "0.1.1"
 
 [features]
 default = ["device"]

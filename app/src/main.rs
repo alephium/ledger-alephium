@@ -6,10 +6,6 @@ use crate::ui::display::MainPages;
 use crate::ui::tx_reviewer::TxReviewer;
 use handler::{handle_apdu, Ins};
 use ledger_device_sdk::io;
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use ledger_device_sdk::nbgl::{init_comm, NbglHomeAndSettings};
-#[cfg(any(target_os = "stax", target_os = "flex"))]
-use settings::SETTINGS_DATA;
 use sign_tx_context::SignTxContext;
 
 mod blake2b_hasher;
@@ -52,22 +48,18 @@ extern "C" fn sample_main() {
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
-        use crate::ui::nbgl::APP_ICON;
-        init_comm(&mut comm);
-        let settings_strings = [["Blind signing", "Enable blind signing"]];
+        use crate::ledger_sdk_stub::nbgl_display::nbgl_display;
+        use ledger_device_sdk::nbgl::init_comm;
+        use ledger_secure_sdk_sys::INIT_HOME_PAGE;
 
-        let mut home_and_settings = NbglHomeAndSettings::new()
-            .glyph(&APP_ICON)
-            .settings(unsafe { SETTINGS_DATA.get_mut() }, &settings_strings)
-            .infos(
-                "Alephium",
-                env!("CARGO_PKG_VERSION"),
-                env!("CARGO_PKG_AUTHORS"),
-            );
+        init_comm(&mut comm);
+        let settings_strings = &[["Blind signing", "Enable blind signing"]];
 
         loop {
-            let event = if !tx_reviewer.nbgl_reviewer.review_started {
-                home_and_settings.show::<Ins>()
+            let event = if tx_reviewer.nbgl_reviewer.display_settings {
+                nbgl_display::<Ins>(&mut comm, settings_strings, 0)
+            } else if !tx_reviewer.nbgl_reviewer.review_started {
+                nbgl_display::<Ins>(&mut comm, settings_strings, INIT_HOME_PAGE as u8)
             } else {
                 comm.next_event()
             };

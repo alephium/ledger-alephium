@@ -162,7 +162,7 @@ impl SignTxContext {
 }
 
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
-pub fn check_blind_signing() -> Result<(), ErrorCode> {
+pub fn check_blind_signing(_tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
     use ledger_device_sdk::{
         buttons::{ButtonEvent, ButtonsState},
         ui::{
@@ -193,17 +193,20 @@ pub fn check_blind_signing() -> Result<(), ErrorCode> {
 }
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
-pub fn check_blind_signing() -> Result<(), ErrorCode> {
+pub fn check_blind_signing(tx_reviewer: &mut TxReviewer) -> Result<(), ErrorCode> {
     use crate::ui::nbgl::nbgl_review_warning;
 
     if is_blind_signing_enabled() {
         return Ok(());
     }
-    let _ = nbgl_review_warning(
+    let go_to_settings = nbgl_review_warning(
         "This transaction cannot be clear-signed",
         "Enable blind signing in the settings to sign this transaction.",
-        "Go to home", // The ledger rust sdk does not support going to settings.
+        "Go to settings",
         "Reject transaction",
     );
+    if go_to_settings {
+        tx_reviewer.nbgl_reviewer.set_display_settings(true);
+    }
     Err(ErrorCode::BlindSigningDisabled)
 }

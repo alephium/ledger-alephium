@@ -2,7 +2,7 @@ use ledger_device_sdk::nvm::{AtomicStorage, SingleStorage};
 use ledger_device_sdk::NVMData;
 
 // Keep the size consistent with the settings defined in the ledger sdk
-const SETTINGS_SIZE: usize = 10;
+pub const SETTINGS_SIZE: usize = 10;
 #[link_section = ".nvm_data"]
 pub static mut SETTINGS_DATA: NVMData<AtomicStorage<[u8; SETTINGS_SIZE]>> =
     NVMData::new(AtomicStorage::new(&[0u8; SETTINGS_SIZE]));

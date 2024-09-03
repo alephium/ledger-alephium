@@ -448,7 +448,7 @@ impl TxReviewer {
     }
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
-    fn finish_review<'a>(&self, fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
+    fn finish_review<'a>(&mut self, fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
         self.review(fields, "Fees")?;
         let message = if self.is_tx_execute_script {
             "Accept risk and sign transaction"
@@ -587,7 +587,7 @@ impl TxReviewer {
     }
 
     // Review transfer that sends to self
-    fn review_self_transfer(&self, fee_field: &Field) -> Result<(), ErrorCode> {
+    fn review_self_transfer(&mut self, fee_field: &Field) -> Result<(), ErrorCode> {
         #[cfg(not(any(target_os = "stax", target_os = "flex")))]
         {
             let fields = &[Field {
@@ -670,7 +670,7 @@ impl TxReviewer {
     }
 
     // Review the rest transaction details and approve it
-    pub fn approve_tx(&self) -> Result<(), ErrorCode> {
+    pub fn approve_tx(&mut self) -> Result<(), ErrorCode> {
         assert!(self.tx_fee.is_some());
         let mut amount_output = [0u8; 33];
         let amount_str = self
