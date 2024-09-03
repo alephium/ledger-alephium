@@ -20,6 +20,7 @@ use ledger_secure_sdk_sys::*;
 static mut NVM_REF: Option<&mut AtomicStorage<[u8; SETTINGS_SIZE]>> = None;
 static mut SWITCH_ARRAY: [nbgl_contentSwitch_t; SETTINGS_SIZE] =
     [unsafe { const_zero!(nbgl_contentSwitch_t) }; SETTINGS_SIZE];
+static mut SETTINGS_UPDATED: bool = false;
 
 /// Information fields name to display in the dedicated
 /// page of the home screen.
@@ -53,7 +54,8 @@ where
 
     const APP_ICON: NbglGlyph = NbglGlyph::from_include(include_gif!("alph_64x64.gif", NBGL));
     unsafe {
-        loop {
+        let mut page_index = page;
+        'outer: loop {
             let info_contents: Vec<*const c_char> =
                 info_contents.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
 
@@ -92,22 +94,26 @@ where
                 nbContents: if nb_settings > 0 { 1 } else { 0 },
             };
 
-            match ux_sync_homeAndSettings(
+            nbgl_useCaseHomeAndSettings(
                 info_contents[0],
                 &icon as *const nbgl_icon_details_t,
                 core::ptr::null(),
-                page,
+                page_index,
                 &generic_contents as *const nbgl_genericContents_t,
                 &info_list as *const nbgl_contentInfoList_t,
                 core::ptr::null(),
-            ) {
-                UX_SYNC_RET_APDU_RECEIVED => {
-                    if let Some(event) = comm.check_event() {
-                        return event;
+                Some(app_exit),
+            );
+            loop {
+                match comm.next_event() {
+                    Event::Command(t) => return Event::Command(t),
+                    _ => {
+                        if SETTINGS_UPDATED {
+                            SETTINGS_UPDATED = false;
+                            page_index = 0; // display the settings page
+                            continue 'outer;
+                        }
                     }
-                }
-                _ => {
-                    panic!("Unexpected return value from ux_sync_homeAndSettings");
                 }
             }
         }
@@ -127,5 +133,10 @@ unsafe extern "C" fn settings_callback(token: c_int, _index: u8, _page: c_int) {
         switch_values[setting_idx] = !switch_values[setting_idx];
         data.update(&switch_values);
         SWITCH_ARRAY[setting_idx].initState = switch_values[setting_idx] as nbgl_state_t;
+        SETTINGS_UPDATED = true;
     }
+}
+
+unsafe extern "C" fn app_exit() {
+    os_sched_exit(1);
 }
