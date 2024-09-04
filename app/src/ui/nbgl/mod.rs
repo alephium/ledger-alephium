@@ -66,7 +66,8 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 
 pub fn review_address(address: &str) -> Result<(), ErrorCode> {
     let result = NbglAddressReview::new()
-        .verify_str("Confirm address")
+        .glyph(&APP_ICON)
+        .verify_str("Verify Alephium address")
         .show(address);
     if result {
         Ok(())
