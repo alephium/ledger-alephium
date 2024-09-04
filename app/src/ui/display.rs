@@ -1,7 +1,10 @@
+use include_gif::include_gif;
 use ledger_device_sdk::io;
 use ledger_device_sdk::ui::{
-    bagls, gadgets,
-    layout::{self, Draw, StringPlace},
+    bagls,
+    bitmaps::{Glyph, DASHBOARD_X},
+    gadgets,
+    layout::Draw,
     screen_util,
 };
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
@@ -26,47 +29,32 @@ fn show_ui_common(draw: fn() -> ()) {
 
 fn show_ui_welcome() {
     show_ui_common(|| {
-        let mut lines = [
-            bagls::Label::from_const("Alephium"),
-            bagls::Label::from_const("ready"),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+        const APP_ICON: Glyph = Glyph::from_include(include_gif!("alph_14x14.gif"));
+        gadgets::Page::from((["Alephium ", "is ready"], &APP_ICON)).place();
     });
 }
 
 fn show_ui_blind_signing() {
     show_ui_common(|| {
-        let mut lines = [
-            bagls::Label::from_const("Blind Signing"),
-            bagls::Label::from_const(if is_blind_signing_enabled() {
-                "enabled"
-            } else {
-                "disabled"
-            }),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+        let label = if is_blind_signing_enabled() {
+            "enabled"
+        } else {
+            "disabled"
+        };
+        gadgets::Page::from((["Blind Signing", label], false)).place();
     });
 }
 
 fn show_ui_version() {
     show_ui_common(|| {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
-        let mut lines = [
-            bagls::Label::from_const("Version"),
-            bagls::Label::from_const(VERSION),
-        ];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+        gadgets::Page::from((["Version", VERSION], false)).place();
     });
 }
 
 fn show_ui_quit() {
     show_ui_common(|| {
-        let mut lines = [bagls::Label::from_const("Quit")];
-        lines[0].bold = true;
-        lines.place(layout::Location::Middle, layout::Layout::Centered, false);
+        gadgets::Page::from(("Quit", &DASHBOARD_X)).place();
     });
 }
 
