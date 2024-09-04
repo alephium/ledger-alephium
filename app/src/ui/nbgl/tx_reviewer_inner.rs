@@ -1,10 +1,14 @@
 use crate::{
     error_code::ErrorCode,
     ledger_sdk_stub::nbgl_review::NbglStreamingReview,
+    settings::is_blind_signing_enabled,
     ui::nbgl::{nbgl_review_warning, new_nbgl_review},
 };
 use ledger_device_sdk::nbgl::{Field, NbglReviewStatus, TransactionType};
 
+// Different Ledger devices use different UI libraries, so we've introduced the
+// `TxReviewInner` to facilitate the display of tx details across different devices.
+// The `TxReviewInner` here is for Ledger Stax/Flex.
 pub struct TxReviewerInner {
     pub review_started: bool,
     pub display_settings: bool,
@@ -26,10 +30,6 @@ impl TxReviewerInner {
     fn get_reviewer(&self) -> &NbglStreamingReview {
         assert!(self.reviewer.is_some());
         self.reviewer.as_ref().unwrap()
-    }
-
-    pub fn set_display_settings(&mut self, display_settings: bool) {
-        self.display_settings = display_settings;
     }
 
     pub fn set_tx_execute_script(&mut self, is_tx_execute_script: bool) {
@@ -71,11 +71,7 @@ impl TxReviewerInner {
     }
 
     // Review transfer that sends to self
-    pub fn review_self_transfer(&mut self, fee_field: &Field) -> Result<(), ErrorCode> {
-        let fee_field = Field {
-            name: fee_field.name,
-            value: fee_field.value,
-        };
+    pub fn review_self_transfer(&mut self, fee_field: Field) -> Result<(), ErrorCode> {
         if self.is_tx_execute_script {
             self.finish_review(&[fee_field])
         } else {
@@ -136,5 +132,21 @@ impl TxReviewerInner {
     #[inline]
     pub fn output_index_as_field(&self) -> bool {
         true
+    }
+
+    pub fn check_blind_signing(&mut self) -> Result<(), ErrorCode> {
+        if is_blind_signing_enabled() {
+            return Ok(());
+        }
+        let go_to_settings = nbgl_review_warning(
+            "This transaction cannot be clear-signed",
+            "Enable blind signing in the settings to sign this transaction.",
+            "Go to settings",
+            "Reject transaction",
+        );
+        if go_to_settings {
+            self.display_settings = true;
+        }
+        Err(ErrorCode::BlindSigningDisabled)
     }
 }

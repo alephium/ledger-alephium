@@ -6,9 +6,7 @@ use crate::{
     error_code::ErrorCode,
     public_key::{derive_pub_key, Address},
     sign_tx_context::SignTxContext,
-    ui::{
-        bytes_to_string, check_blind_signing, review_address, sign_hash_ui, tx_reviewer::TxReviewer,
-    },
+    ui::{bytes_to_string, review_address, sign_hash_ui, tx_reviewer::TxReviewer},
 };
 
 const MAX_TOKEN_SIZE: u8 = 5;
@@ -185,7 +183,7 @@ fn handle_sign_tx(
             let tx_data = &data[PATH_LENGTH..];
             let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
-                check_blind_signing(&mut tx_reviewer.inner)?;
+                tx_reviewer.check_blind_signing()?;
             }
             tx_reviewer.set_tx_execute_script(is_tx_execute_script);
 

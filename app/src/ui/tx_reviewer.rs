@@ -41,7 +41,7 @@ pub struct TxReviewer {
     tx_fee: Option<U256>,
     token_metadata_length: usize,
     token_verifier: Option<TokenVerifier>,
-    pub inner: TxReviewerInner,
+    inner: TxReviewerInner,
 }
 
 impl TxReviewer {
@@ -557,11 +557,27 @@ impl TxReviewer {
             value,
         };
         if self.next_output_index == FIRST_OUTPUT_INDEX {
-            return self.inner.review_self_transfer(&fee_field);
+            return self.inner.review_self_transfer(fee_field);
         }
 
         let fields = &[fee_field];
         self.inner.finish_review(fields)
+    }
+
+    pub fn check_blind_signing(&mut self) -> Result<(), ErrorCode> {
+        self.inner.check_blind_signing()
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    #[inline]
+    pub fn display_settings(&self) -> bool {
+        self.inner.display_settings
+    }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    #[inline]
+    pub fn review_started(&self) -> bool {
+        self.inner.review_started
     }
 }
 

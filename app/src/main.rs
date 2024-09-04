@@ -56,9 +56,9 @@ extern "C" fn sample_main() {
         let settings_strings = &[["Blind signing", "Enable blind signing"]];
 
         loop {
-            let event = if tx_reviewer.inner.display_settings {
+            let event = if tx_reviewer.display_settings() {
                 nbgl_display::<Ins>(&mut comm, settings_strings, 0)
-            } else if !tx_reviewer.inner.review_started {
+            } else if !tx_reviewer.review_started() {
                 nbgl_display::<Ins>(&mut comm, settings_strings, INIT_HOME_PAGE as u8)
             } else {
                 comm.next_event()

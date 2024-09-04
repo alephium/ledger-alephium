@@ -1,7 +1,16 @@
 use crate::error_code::ErrorCode;
 use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
-use ledger_device_sdk::ui::bitmaps::{CHECKMARK, CROSS, EYE, WARNING};
+use crate::settings::is_blind_signing_enabled;
+use ledger_device_sdk::{
+    buttons::{ButtonEvent, ButtonsState},
+    ui::bitmaps::{CHECKMARK, CROSS, CROSSMARK, EYE, WARNING},
+    ui::gadgets::{clear_screen, get_event, Page, PageStyle},
+    ui::screen_util::screen_update,
+};
 
+// Different Ledger devices use different UI libraries, so we've introduced the
+// `TxReviewInner` to facilitate the display of tx details across different devices.
+// The `TxReviewInner` here is for Ledger Nanos/Nanosp/Nanox.
 pub struct TxReviewerInner {
     is_tx_execute_script: bool,
 }
@@ -42,11 +51,8 @@ impl TxReviewerInner {
     }
 
     // Review transfer that sends to self
-    pub fn review_self_transfer(&self, fee_field: &Field) -> Result<(), ErrorCode> {
-        let fields = &[Field {
-            name: fee_field.name,
-            value: fee_field.value,
-        }];
+    pub fn review_self_transfer(&self, fee_field: Field) -> Result<(), ErrorCode> {
+        let fields = &[fee_field];
         let review = if self.is_tx_execute_script {
             MultiFieldReview::new(
                 fields,
@@ -124,5 +130,26 @@ impl TxReviewerInner {
     #[inline]
     pub fn output_index_as_field(&self) -> bool {
         false
+    }
+
+    pub fn check_blind_signing(&self) -> Result<(), ErrorCode> {
+        if is_blind_signing_enabled() {
+            return Ok(());
+        }
+        let page = Page::new(
+            PageStyle::PictureNormal,
+            ["Blind signing", "must be enabled"],
+            Some(&CROSSMARK),
+        );
+        clear_screen();
+        page.place();
+        screen_update();
+        let mut buttons = ButtonsState::new();
+
+        loop {
+            if let Some(ButtonEvent::BothButtonsRelease) = get_event(&mut buttons) {
+                return Err(ErrorCode::BlindSigningDisabled);
+            }
+        }
     }
 }

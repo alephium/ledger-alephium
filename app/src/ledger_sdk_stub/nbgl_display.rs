@@ -1,6 +1,8 @@
-// The purpose of this file is to address the issue of the ledger rust sdk not supporting
-// navigation to the settings page.
-// To maintain consistency with the ledger rust sdk code, we have ignored clipply warnings here.
+// This file is a modified version of the Ledger Rust SDK code.
+// The modifications were made to address the issue of the Ledger Rust SDK
+// not supporting navigation to the settings page.
+// To maintain consistency with the original Ledger Rust SDK code,
+// we have disabled Clippy warnings for this file.
 #![allow(clippy::all)]
 
 use crate::settings::{SETTINGS_DATA, SETTINGS_SIZE};
@@ -108,6 +110,10 @@ where
                 match comm.next_event() {
                     Event::Command(t) => return Event::Command(t),
                     _ => {
+                        // The Ledger Rust SDK does not refresh the UI after updating settings.
+                        // Here we refresh the UI manually upon detecting settings updates.
+                        // We have reported this issue to Ledger dev, and once the Rust SDK is fixed,
+                        // we can remove this workaround.
                         if SETTINGS_UPDATED {
                             SETTINGS_UPDATED = false;
                             page_index = 0; // display the settings page
@@ -138,5 +144,5 @@ unsafe extern "C" fn settings_callback(token: c_int, _index: u8, _page: c_int) {
 }
 
 unsafe extern "C" fn app_exit() {
-    os_sched_exit(0);
+    os_sched_exit(u8::MAX);
 }

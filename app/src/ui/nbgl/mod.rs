@@ -1,8 +1,7 @@
 pub mod tx_reviewer_inner;
 
 use crate::{
-    error_code::ErrorCode, ledger_sdk_stub::nbgl_review::NbglStreamingReview,
-    public_key::sign_hash, settings::is_blind_signing_enabled, ui::TxReviewerInner,
+    error_code::ErrorCode, ledger_sdk_stub::nbgl_review::NbglStreamingReview, public_key::sign_hash,
 };
 use core::str::from_utf8;
 use include_gif::include_gif;
@@ -74,20 +73,4 @@ pub fn review_address(address: &str) -> Result<(), ErrorCode> {
     } else {
         Err(ErrorCode::UserCancelled)
     }
-}
-
-pub fn check_blind_signing(tx_reviewer_inner: &mut TxReviewerInner) -> Result<(), ErrorCode> {
-    if is_blind_signing_enabled() {
-        return Ok(());
-    }
-    let go_to_settings = nbgl_review_warning(
-        "This transaction cannot be clear-signed",
-        "Enable blind signing in the settings to sign this transaction.",
-        "Go to settings",
-        "Reject transaction",
-    );
-    if go_to_settings {
-        tx_reviewer_inner.set_display_settings(true);
-    }
-    Err(ErrorCode::BlindSigningDisabled)
 }
