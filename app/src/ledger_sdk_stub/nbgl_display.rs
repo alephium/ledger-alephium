@@ -144,5 +144,7 @@ unsafe extern "C" fn settings_callback(token: c_int, _index: u8, _page: c_int) {
 }
 
 unsafe extern "C" fn app_exit() {
+    // The Ledger C app uses `-1`: https://github.com/LedgerHQ/ledger-secure-sdk/blob/master/lib_standard_app/main.c#L40,
+    // but the type is `uchar`, so we need to use `u8::MAX` in Rust
     os_sched_exit(u8::MAX);
 }
