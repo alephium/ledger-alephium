@@ -57,6 +57,7 @@ extern "C" fn sample_main() {
 
         loop {
             let event = if tx_reviewer.display_settings() {
+                tx_reviewer.reset_display_settings();
                 nbgl_display::<Ins>(&mut comm, settings_strings, 0)
             } else if !tx_reviewer.review_started() {
                 nbgl_display::<Ins>(&mut comm, settings_strings, INIT_HOME_PAGE as u8)

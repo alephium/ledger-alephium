@@ -579,6 +579,12 @@ impl TxReviewer {
     pub fn review_started(&self) -> bool {
         self.inner.review_started
     }
+
+    #[cfg(any(target_os = "stax", target_os = "flex"))]
+    #[inline]
+    pub fn reset_display_settings(&mut self) {
+        self.inner.reset_display_settings()
+    }
 }
 
 // Output indexes for review

@@ -103,7 +103,7 @@ impl TxReviewerInner {
 
     pub fn finish_review<'a>(&mut self, fee_fields: &'a [Field<'a>]) -> Result<(), ErrorCode> {
         assert!(!fee_fields.is_empty());
-        self.display_settings = false;
+        self.reset_display_settings();
         self.review_fields(fee_fields, "Fees")?;
         let message = if self.is_tx_execute_script {
             "Accept risk and sign transaction"
@@ -148,5 +148,10 @@ impl TxReviewerInner {
             self.display_settings = true;
         }
         Err(ErrorCode::BlindSigningDisabled)
+    }
+
+    #[inline]
+    pub fn reset_display_settings(&mut self) {
+        self.display_settings = false;
     }
 }
