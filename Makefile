@@ -1,4 +1,4 @@
-version := 3.30.0
+version := 3.34.0
 ledger_app_builder = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:$(version)
 ledger_app_dev_tools = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:$(version)
 
@@ -15,8 +15,8 @@ _release:
 			cd app && \
 			echo 'Building $(device) app' && \
 			RUST_BACKTRACE=1 cargo ledger build $(device) -- -Z unstable-options && \
-			cp ./target/$(device)/release/app.hex ../$(device).hex && \
-			mv ./app_$(device).json ../$(device).json && \
+			cp ./target/$(device)/release/alephium.hex ../$(device).hex && \
+			mv ./target/$(device)/release/app_$(device).json ../$(device).json && \
 			sed -i 's|target/$(device)/release/app.hex|$(device).hex|g;s|alph_16x16.gif|./app/alph_16x16.gif|g;s|alph_14x14.gif|./app/alph_14x14.gif|g;s|alph_32x32.gif|./app/alph_32x32.gif|g;s|alph_64x64.gif|./app/alph_64x64.gif|g' ../$(device).json \
 		"
 

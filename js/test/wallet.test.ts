@@ -3,7 +3,7 @@ import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, 
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexApproveOnce } from './utils'
+import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
 import { TokenMetadata } from '../src/types'
 import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
@@ -547,7 +547,11 @@ describe('ledger wallet', () => {
 
     await enableBlindSigning()
     if (needToAutoApprove()) {
-      staxFlexApproveOnce().then(() => approveTx([]))
+      if (isStaxOrFlex()) {
+        staxFlexAcceptRisk().then(() => approveTx([]))
+      } else {
+        approveTx([])
+      }
     } else {
       // waiting for blind signing setting to be enabled
       await sleep(20000)
