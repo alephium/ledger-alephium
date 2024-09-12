@@ -27,7 +27,7 @@ fn show_ui_common(draw: fn() -> ()) {
 fn show_ui_welcome() {
     show_ui_common(|| {
         const APP_ICON: Glyph = Glyph::from_include(include_gif!("alph_14x14.gif"));
-        gadgets::Page::from((["Alephium ", "is ready"], &APP_ICON)).place();
+        gadgets::Page::from((["Alephium", "is ready"], &APP_ICON)).place();
     });
 }
 

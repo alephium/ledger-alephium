@@ -33,7 +33,7 @@ impl TxReviewerInner {
         fields: &'a [Field<'a>],
         review_message: &str,
     ) -> Result<(), ErrorCode> {
-        let review_messages = ["Review ", review_message];
+        let review_messages = ["Review", review_message];
         let review = MultiFieldReview::simple(
             fields,
             &review_messages,
@@ -56,13 +56,13 @@ impl TxReviewerInner {
         if self.is_tx_execute_script {
             self.finish_review_inner(fields, &["Blind Signing"], Some(&WARNING))
         } else {
-            self.finish_review_inner(fields, &["Confirm ", "Self-transfer"], Some(&EYE))
+            self.finish_review_inner(fields, &["Confirm", "Self-transfer"], Some(&EYE))
         }
     }
 
     // Review the warning for external inputs, i.e. inputs that are not from the device address
     pub fn warning_external_inputs(&self) -> Result<(), ErrorCode> {
-        let review_messages = ["There are ", "external inputs"];
+        let review_messages = ["There are", "external inputs"];
         let review = MultiFieldReview::simple(
             &[],
             &review_messages,
