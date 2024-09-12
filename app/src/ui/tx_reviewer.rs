@@ -439,7 +439,7 @@ impl TxReviewer {
         let alph_amount = self.get_str_from_range(alph_amount)?;
         let address = self.get_str_from_range(address)?;
         let address_field = Field {
-            name: "Address",
+            name: "To",
             value: address,
         };
         let alph_amount_field = Field {
@@ -447,7 +447,7 @@ impl TxReviewer {
             value: alph_amount,
         };
         let output_index_field = Field {
-            name: "Transaction output",
+            name: "Transaction Output",
             value: review_message,
         };
         if token.is_none() {
@@ -470,7 +470,7 @@ impl TxReviewer {
         let amount_name = if has_token_metadata {
             "Token Amount"
         } else {
-            "Raw Amount"
+            "Raw Token Amount"
         };
         let token_id_field = Field {
             name: "Token ID",

@@ -16,7 +16,7 @@ pub struct MultiFieldReview<'a> {
     fields: &'a [Field<'a>],
     review_message: &'a [&'a str],
     review_glyph: Option<&'a Glyph<'a>>,
-    validation_message: &'a str,
+    validation_message: [&'a str; 2],
     validation_glyph: Option<&'a Glyph<'a>>,
     cancel_message: &'a str,
     cancel_glyph: Option<&'a Glyph<'a>>,
@@ -27,7 +27,7 @@ impl<'a> MultiFieldReview<'a> {
         fields: &'a [Field<'a>],
         review_message: &'a [&'a str],
         review_glyph: Option<&'a Glyph<'a>>,
-        validation_message: &'a str,
+        validation_message: [&'a str; 2],
         validation_glyph: Option<&'a Glyph<'a>>,
         cancel_message: &'a str,
         cancel_glyph: Option<&'a Glyph<'a>>,
@@ -41,6 +41,26 @@ impl<'a> MultiFieldReview<'a> {
             cancel_message,
             cancel_glyph,
         }
+    }
+
+    pub fn simple(
+        fields: &'a [Field<'a>],
+        review_message: &'a [&'a str],
+        review_glyph: Option<&'a Glyph<'a>>,
+        validation_message: &'a str,
+        validation_glyph: Option<&'a Glyph<'a>>,
+        cancel_message: &'a str,
+        cancel_glyph: Option<&'a Glyph<'a>>,
+    ) -> Self {
+        MultiFieldReview::new(
+            fields,
+            review_message,
+            review_glyph,
+            [validation_message, ""],
+            validation_glyph,
+            cancel_message,
+            cancel_glyph,
+        )
     }
 
     pub fn show(&self) -> bool {
@@ -60,9 +80,15 @@ impl<'a> MultiFieldReview<'a> {
 
         display_first_page(&first_page_opt);
 
+        let validation_page_style = if self.validation_message[1].is_empty() {
+            PageStyle::PictureBold
+        } else {
+            // Two lines of text cannot fit in the bold style due to size limitations
+            PageStyle::PictureNormal
+        };
         let validation_page = Page::new(
-            PageStyle::PictureBold,
-            [self.validation_message, ""],
+            validation_page_style,
+            self.validation_message,
             self.validation_glyph,
         );
         let cancel_page = Page::new(

@@ -18,7 +18,7 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
         name: "Hash",
         value: hex_str,
     }];
-    let review = MultiFieldReview::new(
+    let review = MultiFieldReview::simple(
         &fields,
         &review_messages,
         Some(&EYE),
@@ -40,7 +40,7 @@ pub fn review_address(address: &str) -> Result<(), ErrorCode> {
         name: "Address",
         value: address,
     }];
-    let review = MultiFieldReview::new(
+    let review = MultiFieldReview::simple(
         &fields,
         &review_messages,
         Some(&EYE),
