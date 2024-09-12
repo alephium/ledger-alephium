@@ -3,7 +3,7 @@ import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, 
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
+import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
 import { TokenMetadata } from '../src/types'
 import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
@@ -309,11 +309,7 @@ describe('ledger wallet', () => {
     }
     const encodedUnsignedTx = codec.unsignedTxCodec.encodeApiUnsignedTx(unsignedTx)
 
-    if (isNanos()) {
-      approveTx([OutputType.Nanos11, OutputType.Nanos10, OutputType.Nanos10, OutputType.Nanos10, OutputType.Nanos11])
-    } else {
-      approveTx(Array(5).fill(OutputType.BaseAndToken))
-    }
+    approveTx(Array(5).fill(OutputType.BaseAndToken))
     const signature = await app.signUnsignedTx(path, Buffer.from(encodedUnsignedTx))
     const txId = blake.blake2b(encodedUnsignedTx, undefined, 32)
     expect(transactionVerifySignature(binToHex(txId), testAccount.publicKey, signature)).toBe(true)

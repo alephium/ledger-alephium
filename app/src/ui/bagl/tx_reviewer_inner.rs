@@ -10,7 +10,7 @@ use ledger_device_sdk::{
 
 // Different Ledger devices use different UI libraries, so we've introduced the
 // `TxReviewInner` to facilitate the display of tx details across different devices.
-// The `TxReviewInner` here is for Ledger Nanos/Nanosp/Nanox.
+// The `TxReviewInner` here is for Ledger Nanosp/Nanox.
 pub struct TxReviewerInner {
     is_tx_execute_script: bool,
 }
@@ -89,10 +89,6 @@ impl TxReviewerInner {
         review_message: &'a [&'a str],
         review_glyph: Option<&'a Glyph<'a>>,
     ) -> Result<(), ErrorCode> {
-        #[cfg(target_os = "nanos")]
-        let validation_message = ["Sign transaction", ""];
-
-        #[cfg(not(target_os = "nanos"))]
         let validation_message = if !self.is_tx_execute_script {
             ["Sign transaction", ""]
         } else {

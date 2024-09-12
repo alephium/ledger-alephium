@@ -29,9 +29,6 @@ curve = ["secp256k1"]
 flags = "0"
 path = ["44'/1234'"]
 
-[package.metadata.ledger.nanos]
-icon = "alph_16x16.gif"
-
 [package.metadata.ledger.nanox]
 icon = "alph_14x14.gif"
 
