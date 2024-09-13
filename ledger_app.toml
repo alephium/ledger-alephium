@@ -1,4 +1,4 @@
 [app]
 build_directory = "./app"
 sdk = "Rust"
-devices = ["nanos", "nanox", "nanos+", "stax", "flex"]
+devices = ["nanox", "nanos+", "stax", "flex"]

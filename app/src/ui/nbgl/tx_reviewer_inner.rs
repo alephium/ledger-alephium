@@ -106,9 +106,9 @@ impl TxReviewerInner {
         self.reset_display_settings();
         self.review_fields(fee_fields, "Fees")?;
         let message = if self.is_tx_execute_script {
-            "Accept risk and sign transaction"
+            "Accept risk and sign transaction?"
         } else {
-            "Sign transaction to send assets"
+            "Sign transaction to send assets?"
         };
         if self.get_reviewer().finish(message) {
             NbglReviewStatus::new().show(true);

@@ -13,12 +13,12 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
     let hex: [u8; 64] = utils::to_hex(message).ok_or(ErrorCode::BadLen)?;
     let hex_str = from_utf8(&hex).map_err(|_| ErrorCode::InternalError)?;
 
-    let review_messages = ["Review ", "Hash "];
+    let review_messages = ["Review", "Hash"];
     let fields = [Field {
         name: "Hash",
         value: hex_str,
     }];
-    let review = MultiFieldReview::new(
+    let review = MultiFieldReview::simple(
         &fields,
         &review_messages,
         Some(&EYE),
@@ -35,12 +35,12 @@ pub fn sign_hash_ui(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32)
 }
 
 pub fn review_address(address: &str) -> Result<(), ErrorCode> {
-    let review_messages = ["Review ", "Address "];
+    let review_messages = ["Review", "Address"];
     let fields = [Field {
         name: "Address",
         value: address,
     }];
-    let review = MultiFieldReview::new(
+    let review = MultiFieldReview::simple(
         &fields,
         &review_messages,
         Some(&EYE),

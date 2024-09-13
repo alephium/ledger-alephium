@@ -1,7 +1,8 @@
 use ledger_device_sdk::ui::{
-    bagls::{self, Label},
+    bagls::{self, Icon, Label},
     bitmaps::Glyph,
-    gadgets::{clear_screen, get_event, Page, PageStyle},
+    fonts::OPEN_SANS,
+    gadgets::{clear_screen, get_event},
     layout::{self, Draw, Layout, Location, StringPlace},
     screen_util::screen_update,
 };
@@ -16,7 +17,7 @@ pub struct MultiFieldReview<'a> {
     fields: &'a [Field<'a>],
     review_message: &'a [&'a str],
     review_glyph: Option<&'a Glyph<'a>>,
-    validation_message: &'a str,
+    validation_message: [&'a str; 2],
     validation_glyph: Option<&'a Glyph<'a>>,
     cancel_message: &'a str,
     cancel_glyph: Option<&'a Glyph<'a>>,
@@ -27,7 +28,7 @@ impl<'a> MultiFieldReview<'a> {
         fields: &'a [Field<'a>],
         review_message: &'a [&'a str],
         review_glyph: Option<&'a Glyph<'a>>,
-        validation_message: &'a str,
+        validation_message: [&'a str; 2],
         validation_glyph: Option<&'a Glyph<'a>>,
         cancel_message: &'a str,
         cancel_glyph: Option<&'a Glyph<'a>>,
@@ -41,6 +42,26 @@ impl<'a> MultiFieldReview<'a> {
             cancel_message,
             cancel_glyph,
         }
+    }
+
+    pub fn simple(
+        fields: &'a [Field<'a>],
+        review_message: &'a [&'a str],
+        review_glyph: Option<&'a Glyph<'a>>,
+        validation_message: &'a str,
+        validation_glyph: Option<&'a Glyph<'a>>,
+        cancel_message: &'a str,
+        cancel_glyph: Option<&'a Glyph<'a>>,
+    ) -> Self {
+        MultiFieldReview::new(
+            fields,
+            review_message,
+            review_glyph,
+            [validation_message, ""],
+            validation_glyph,
+            cancel_message,
+            cancel_glyph,
+        )
     }
 
     pub fn show(&self) -> bool {
@@ -62,7 +83,7 @@ impl<'a> MultiFieldReview<'a> {
 
         let validation_page = Page::new(
             PageStyle::PictureBold,
-            [self.validation_message, ""],
+            self.validation_message,
             self.validation_glyph,
         );
         let cancel_page = Page::new(
@@ -267,6 +288,118 @@ fn concatenate(strings: &[&str], output: &mut [u8]) {
         } else {
             // If the output buffer is full, stop concatenating.
             break;
+        }
+    }
+}
+
+// This is a modified version of the Ledger Rust SDK code.
+// The modifications were made to address the issue of the Ledger Rust SDK
+// not supporting two lines of bold text.
+#[derive(Copy, Clone, PartialEq, Default)]
+pub enum PageStyle {
+    #[default]
+    PictureNormal, // Picture (should be 16x16) with two lines of text (page layout depends on device).
+    PictureBold, // Icon on top with one line of text on the bottom.
+    BoldNormal,  // One line of bold text and one line of normal text.
+    Normal,      // 2 lines of centered text.
+}
+
+#[derive(Copy, Clone, Default)]
+pub struct Page<'a> {
+    style: PageStyle,
+    label: [&'a str; 2],
+    glyph: Option<&'a Glyph<'a>>,
+}
+
+// new_picture_normal
+impl<'a> From<([&'a str; 2], &'a Glyph<'a>)> for Page<'a> {
+    fn from((label, glyph): ([&'a str; 2], &'a Glyph<'a>)) -> Page<'a> {
+        Page::new(PageStyle::PictureNormal, [label[0], label[1]], Some(glyph))
+    }
+}
+
+// new bold normal or new normal
+impl<'a> From<([&'a str; 2], bool)> for Page<'a> {
+    fn from((label, bold): ([&'a str; 2], bool)) -> Page<'a> {
+        if bold {
+            Page::new(PageStyle::BoldNormal, [label[0], label[1]], None)
+        } else {
+            Page::new(PageStyle::Normal, [label[0], label[1]], None)
+        }
+    }
+}
+
+// new picture bold
+impl<'a> From<(&'a str, &'a Glyph<'a>)> for Page<'a> {
+    fn from((label, glyph): (&'a str, &'a Glyph<'a>)) -> Page<'a> {
+        let label = [label, ""];
+        Page::new(PageStyle::PictureBold, label, Some(glyph))
+    }
+}
+
+impl<'a> Page<'a> {
+    pub const fn new(style: PageStyle, label: [&'a str; 2], glyph: Option<&'a Glyph<'a>>) -> Self {
+        Page {
+            style,
+            label,
+            glyph,
+        }
+    }
+
+    pub fn place(&self) {
+        match self.style {
+            PageStyle::Normal => {
+                self.label.place(Location::Middle, Layout::Centered, false);
+            }
+            PageStyle::PictureNormal => {
+                let icon_x = 57;
+                let icon_y = 10;
+                self.label
+                    .place(Location::Custom(28), Layout::Centered, false);
+                if let Some(glyph) = self.glyph {
+                    let icon = Icon::from(glyph);
+                    icon.set_x(icon_x).set_y(icon_y).display();
+                }
+            }
+            PageStyle::PictureBold => {
+                let icon_x = 57;
+                let icon_y = 10;
+                self.label[0].place(Location::Custom(28), Layout::Centered, true);
+                self.label[1].place(Location::Custom(42), Layout::Centered, true);
+                if let Some(glyph) = self.glyph {
+                    let icon = Icon::from(glyph);
+                    icon.set_x(icon_x).set_y(icon_y).display();
+                }
+            }
+            PageStyle::BoldNormal => {
+                let padding = 1;
+                let max_text_lines = 3;
+                let total_height = (OPEN_SANS[0].height * max_text_lines) as usize
+                    + OPEN_SANS[1].height as usize
+                    + 2 * padding as usize;
+                let mut cur_y = Location::Middle.get_y(total_height);
+
+                self.label[0].place(Location::Custom(cur_y), Layout::Centered, true);
+                cur_y += OPEN_SANS[0].height as usize + 2 * padding as usize;
+
+                // Display the second label as up to 3 lines of text
+                let mut indices = [(0, 0); 3];
+                let len = self.label[1].len();
+                for (i, indice) in indices.iter_mut().enumerate() {
+                    let start = (i * MAX_CHAR_PER_LINE).min(len);
+                    if start >= len {
+                        break; // Break if we reach the end of the string
+                    }
+                    let end = (start + MAX_CHAR_PER_LINE).min(len);
+                    *indice = (start, end);
+                    (&self.label[1][start..end]).place(
+                        Location::Custom(cur_y),
+                        Layout::Centered,
+                        false,
+                    );
+                    cur_y += OPEN_SANS[0].height as usize + 2 * padding as usize;
+                }
+            }
         }
     }
 }
