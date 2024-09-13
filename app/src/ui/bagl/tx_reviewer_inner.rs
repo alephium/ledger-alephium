@@ -90,9 +90,9 @@ impl TxReviewerInner {
         review_glyph: Option<&'a Glyph<'a>>,
     ) -> Result<(), ErrorCode> {
         let validation_message = if !self.is_tx_execute_script {
-            ["Sign transaction", ""]
+            ["Accept", "and sign"]
         } else {
-            ["Accept risk and", "sign transaction?"]
+            ["Accept risk", "and sign"]
         };
 
         let review = MultiFieldReview::new(
