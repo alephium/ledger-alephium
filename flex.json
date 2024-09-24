@@ -1,0 +1,18 @@
+{
+  "apiLevel": "21",
+  "binary": "alephium.hex",
+  "dataSize": 16384,
+  "derivationPath": {
+    "curves": [
+      "secp256k1"
+    ],
+    "paths": [
+      "44'/1234'"
+    ]
+  },
+  "flags": "0x200",
+  "icon": "alph_40x40.gif",
+  "name": "Alephium",
+  "targetId": "0x33300004",
+  "version": "0.4.0"
+}
