@@ -9,7 +9,6 @@ use ledger_device_sdk::nbgl::{Field, NbglReviewStatus, NbglStreamingReview, Tran
 // `TxReviewInner` to facilitate the display of tx details across different devices.
 // The `TxReviewInner` here is for Ledger Stax/Flex.
 pub struct TxReviewerInner {
-    pub review_started: bool,
     pub display_settings: bool,
     is_tx_execute_script: bool,
     reviewer: Option<NbglStreamingReview>,
@@ -18,7 +17,6 @@ pub struct TxReviewerInner {
 impl TxReviewerInner {
     pub fn new() -> TxReviewerInner {
         TxReviewerInner {
-            review_started: false,
             display_settings: false,
             is_tx_execute_script: false,
             reviewer: None,
@@ -48,7 +46,6 @@ impl TxReviewerInner {
             "Review transaction to send assets"
         };
         if self.get_reviewer().start(message, "") {
-            self.review_started = true;
             Ok(())
         } else {
             NbglReviewStatus::new().show(false);
@@ -123,7 +120,6 @@ impl TxReviewerInner {
         // Since `reset` is called when blind signing checks fails,
         // we cannot reset the `display_settings` within the reset function.
         // Instead, we will reset the `display_settings` in the `finish_review` function.
-        self.review_started = false;
         self.reviewer = None;
         self.is_tx_execute_script = false;
     }

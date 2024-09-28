@@ -1,11 +1,11 @@
-use ledger_device_sdk::NVMData;
 use ledger_device_sdk::io::ApduHeader;
+use ledger_device_sdk::NVMData;
 use utils::{
     buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx, PATH_LENGTH,
 };
 
-use crate::nvm::{NVM, NVM_DATA_SIZE};
 use crate::nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE};
+use crate::nvm::{NVM, NVM_DATA_SIZE};
 use crate::public_key::sign_hash;
 use crate::public_key::Address;
 use crate::ui::tx_reviewer::TxReviewer;

@@ -3,7 +3,7 @@ use utils::buffer::Writable;
 
 use crate::{
     error_code::ErrorCode,
-    nvm::{NVM, write_from},
+    nvm::{write_from, NVM},
 };
 use ledger_device_sdk::NVMData;
 
@@ -71,15 +71,15 @@ impl<'a, const RAM: usize, const FLASH: usize> SwappingBuffer<'a, RAM, FLASH> {
 
     #[inline]
     fn write_to_nvm(&mut self, data: &[u8], from: usize) -> Result<(), ErrorCode> {
-        write_from(&mut self.flash, from, data)?;
+        write_from(self.flash, from, data)?;
         self.state = BufferState::WritingToFlash(from + data.len());
         Ok(())
     }
 
     #[inline]
     fn switch_to_nvm(&mut self, ram_length: usize, data: &[u8]) -> Result<(), ErrorCode> {
-        write_from(&mut self.flash, 0, &self.ram[..ram_length])?;
-        write_from(&mut self.flash, ram_length, data)?;
+        write_from(self.flash, 0, &self.ram[..ram_length])?;
+        write_from(self.flash, ram_length, data)?;
         self.state = BufferState::WritingToFlash(ram_length + data.len());
         Ok(())
     }
@@ -127,7 +127,7 @@ impl<'a, const RAM: usize, const FLASH: usize> SwappingBuffer<'a, RAM, FLASH> {
             }
             BufferState::WritingToFlash(_) => {
                 assert!(from_index + size <= FLASH);
-                write_from(&mut self.flash, from_index, data).unwrap();
+                write_from(self.flash, from_index, data).unwrap();
             }
         }
     }
