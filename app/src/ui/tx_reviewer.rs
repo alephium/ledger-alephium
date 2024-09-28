@@ -5,16 +5,15 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     handler::TOKEN_METADATA_SIZE,
-    ledger_sdk_stub::{
-        nvm::{NVMData, NVM, NVM_DATA_SIZE},
-        swapping_buffer::{SwappingBuffer, RAM_SIZE},
-    },
+    nvm::{NVM, NVM_DATA_SIZE},
+    nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE},
     public_key::{to_base58_address, Address},
     token_verifier::TokenVerifier,
     ui::bytes_to_string,
 };
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::Field;
+use ledger_device_sdk::NVMData;
 use utils::{
     base58::ALPHABET,
     types::{
