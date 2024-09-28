@@ -5,8 +5,8 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     handler::TOKEN_METADATA_SIZE,
-    nvm::{NVM, NVM_DATA_SIZE},
     nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE},
+    nvm::{NVM, NVM_DATA_SIZE},
     public_key::{to_base58_address, Address},
     token_verifier::TokenVerifier,
     ui::bytes_to_string,
@@ -571,12 +571,6 @@ impl TxReviewer {
     #[inline]
     pub fn display_settings(&self) -> bool {
         self.inner.display_settings
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    #[inline]
-    pub fn review_started(&self) -> bool {
-        self.inner.review_started
     }
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]

@@ -51,13 +51,14 @@ extern "C" fn sample_main() {
     #[cfg(any(target_os = "stax", target_os = "flex"))]
     {
         use crate::settings::SETTINGS_DATA;
-        use ledger_device_sdk::nbgl::{NbglGlyph, NbglHomeAndSettings, PageIndex};
-        use ledger_device_sdk::nbgl::init_comm;
         use include_gif::include_gif;
+        use ledger_device_sdk::nbgl::init_comm;
+        use ledger_device_sdk::nbgl::{NbglGlyph, NbglHomeAndSettings, PageIndex};
 
         const APP_ICON: NbglGlyph = NbglGlyph::from_include(include_gif!("alph_64x64.gif", NBGL));
         let settings_strings: &[[&str; 2]] = &[["Blind signing", "Enable blind signing"]];
-        let mut home_and_settings = NbglHomeAndSettings::new().glyph(&APP_ICON)
+        let mut home_and_settings = NbglHomeAndSettings::new()
+            .glyph(&APP_ICON)
             .settings(unsafe { SETTINGS_DATA.get_mut() }, settings_strings)
             .infos(
                 "Alephium",
@@ -70,16 +71,17 @@ extern "C" fn sample_main() {
 
         loop {
             if let io::Event::Command(ins) = comm.next_event() {
-                let display_home = match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
-                    Ok(result) => {
-                        comm.reply_ok();
-                        result
-                    }
-                    Err(sw) => {
-                        comm.reply(sw);
-                        true
-                    }
-                };
+                let display_home =
+                    match handle_apdu(&mut comm, ins, &mut sign_tx_context, &mut tx_reviewer) {
+                        Ok(result) => {
+                            comm.reply_ok();
+                            result
+                        }
+                        Err(sw) => {
+                            comm.reply(sw);
+                            true
+                        }
+                    };
                 if tx_reviewer.display_settings() {
                     tx_reviewer.reset_display_settings();
                     home_and_settings = home_and_settings.set_page(PageIndex::Settings(0));
