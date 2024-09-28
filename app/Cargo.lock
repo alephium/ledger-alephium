@@ -28,7 +28,7 @@ name = "alephium"
 version = "0.4.0"
 dependencies = [
  "const-zero",
- "include_gif",
+ "include_gif 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ledger_device_sdk",
  "ledger_secure_sdk_sys",
  "numtoa",
@@ -323,6 +323,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "include_gif"
+version = "1.2.0"
+source = "git+https://github.com/Lbqds/ledger-device-rust-sdk?branch=minor-updates-3#492619d15efc720709cf3f225b7cce9dbd7f528a"
+dependencies = [
+ "flate2",
+ "image",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "jpeg-decoder"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,12 +361,11 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "ledger_device_sdk"
-version = "1.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff9990e68e73870cac570e9c45f1de618419d5b4c2b3923b51d23428cd7b9c8"
+version = "1.17.1"
+source = "git+https://github.com/Lbqds/ledger-device-rust-sdk?branch=minor-updates-3#492619d15efc720709cf3f225b7cce9dbd7f528a"
 dependencies = [
  "const-zero",
- "include_gif",
+ "include_gif 1.2.0 (git+https://github.com/Lbqds/ledger-device-rust-sdk?branch=minor-updates-3)",
  "ledger_secure_sdk_sys",
  "num-traits",
  "numtoa",
@@ -366,9 +375,8 @@ dependencies = [
 
 [[package]]
 name = "ledger_secure_sdk_sys"
-version = "1.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bc18740897f4e3b28025e97c31210dd36a69fe1114d66fe9372938d6f3673b6"
+version = "1.5.0"
+source = "git+https://github.com/Lbqds/ledger-device-rust-sdk?branch=minor-updates-3#492619d15efc720709cf3f225b7cce9dbd7f528a"
 dependencies = [
  "bindgen",
  "cc",

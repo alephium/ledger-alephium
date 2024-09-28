@@ -1,4 +1,4 @@
-version := 3.34.0
+version := 3.36.0
 ledger_app_builder = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:$(version)
 ledger_app_dev_tools = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:$(version)
 
