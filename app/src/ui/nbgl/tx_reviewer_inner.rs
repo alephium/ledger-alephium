@@ -1,10 +1,9 @@
 use crate::{
     error_code::ErrorCode,
-    ledger_sdk_stub::nbgl_review::NbglStreamingReview,
     settings::is_blind_signing_enabled,
     ui::nbgl::{nbgl_review_warning, new_nbgl_review},
 };
-use ledger_device_sdk::nbgl::{Field, NbglReviewStatus, TransactionType};
+use ledger_device_sdk::nbgl::{Field, NbglReviewStatus, NbglStreamingReview, TransactionType};
 
 // Different Ledger devices use different UI libraries, so we've introduced the
 // `TxReviewInner` to facilitate the display of tx details across different devices.
