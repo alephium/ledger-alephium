@@ -11,6 +11,7 @@ mod debug;
 mod error_code;
 mod handler;
 mod ledger_sdk_stub;
+mod nvm;
 mod public_key;
 mod settings;
 mod sign_tx_context;

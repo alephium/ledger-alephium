@@ -6,6 +6,3 @@ pub mod nbgl_display;
 
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 pub mod nbgl_review;
-
-pub mod nvm;
-pub mod swapping_buffer;
