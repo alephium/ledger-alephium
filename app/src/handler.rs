@@ -43,7 +43,7 @@ pub fn handle_apdu(
     ins: Ins,
     sign_tx_context: &mut SignTxContext,
     tx_reviewer: &mut TxReviewer,
-) -> Result<(), io::Reply> {
+) -> Result<bool, io::Reply> {
     if comm.rx == 0 {
         return Err(ErrorCode::BadLen.into());
     }
@@ -118,7 +118,7 @@ pub fn handle_apdu(
             };
             match handle_sign_tx(apdu_header, data, sign_tx_context, tx_reviewer) {
                 Ok(()) if !sign_tx_context.is_complete() => {
-                    return Ok(());
+                    return Ok(false);
                 }
                 Ok(()) => {
                     // The transaction is signed when all the data is processed
@@ -129,7 +129,7 @@ pub fn handle_apdu(
                     let result = match sign_result {
                         Ok((signature_buf, length, _)) => {
                             comm.append(&signature_buf[..length as usize]);
-                            Ok(())
+                            Ok(true)
                         }
                         Err(code) => Err(code.into()),
                     };
@@ -143,7 +143,7 @@ pub fn handle_apdu(
             }
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 // The transaction is split into multiple APDU commands, consisting of token metadata APDU and tx APDU commands
