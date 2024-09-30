@@ -1,6 +1,4 @@
 use super::TxReviewerInner;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use crate::ledger_sdk_stub::multi_field_review::Field;
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
@@ -13,6 +11,8 @@ use crate::{
 };
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::Field;
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+use ledger_device_sdk::ui::gadgets::Field;
 use ledger_device_sdk::NVMData;
 use utils::{
     base58::ALPHABET,
