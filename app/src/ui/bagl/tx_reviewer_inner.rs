@@ -1,10 +1,9 @@
 use crate::error_code::ErrorCode;
-use crate::ledger_sdk_stub::multi_field_review::{Field, MultiFieldReview};
 use crate::settings::is_blind_signing_enabled;
 use ledger_device_sdk::{
     buttons::{ButtonEvent, ButtonsState},
     ui::bitmaps::{Glyph, CHECKMARK, CROSS, CROSSMARK, EYE, WARNING},
-    ui::gadgets::{clear_screen, get_event, Page, PageStyle},
+    ui::gadgets::{clear_screen, get_event, Field, MultiFieldReview, Page, PageStyle},
     ui::screen_util::screen_update,
 };
 
@@ -34,7 +33,7 @@ impl TxReviewerInner {
         review_message: &str,
     ) -> Result<(), ErrorCode> {
         let review_messages = ["Review", review_message];
-        let review = MultiFieldReview::simple(
+        let review = MultiFieldReview::new(
             fields,
             &review_messages,
             Some(&EYE),
@@ -63,7 +62,7 @@ impl TxReviewerInner {
     // Review the warning for external inputs, i.e. inputs that are not from the device address
     pub fn warning_external_inputs(&self) -> Result<(), ErrorCode> {
         let review_messages = ["There are", "external inputs"];
-        let review = MultiFieldReview::simple(
+        let review = MultiFieldReview::new(
             &[],
             &review_messages,
             Some(&WARNING),
@@ -89,17 +88,17 @@ impl TxReviewerInner {
         review_message: &'a [&'a str],
         review_glyph: Option<&'a Glyph<'a>>,
     ) -> Result<(), ErrorCode> {
-        let validation_message = if !self.is_tx_execute_script {
+        let validation_messages = if !self.is_tx_execute_script {
             ["Accept", "and sign"]
         } else {
             ["Accept risk", "and sign"]
         };
 
-        let review = MultiFieldReview::new(
+        let review = MultiFieldReview::new_with_validation_messages(
             fields,
             review_message,
             review_glyph,
-            validation_message,
+            validation_messages,
             Some(&CHECKMARK),
             "Reject",
             Some(&CROSS),
