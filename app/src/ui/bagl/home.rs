@@ -9,6 +9,8 @@ use ledger_device_sdk::ui::{
 };
 use ledger_secure_sdk_sys::buttons::ButtonEvent;
 
+use ledger_device_sdk::testing::debug_print;
+
 use crate::settings::{is_blind_signing_enabled, toggle_blind_signing_setting};
 
 const UI_PAGE_NUM: u8 = 4;
@@ -81,7 +83,17 @@ impl MainPages {
 
     #[inline]
     fn right_page(&mut self) {
+        debug_print("right page\n");
         self.ui_index = (self.ui_index + 1) % UI_PAGE_NUM;
+        if self.ui_index == 0 {
+            debug_print("page 0\n");
+        } else if self.ui_index == 1 {
+            debug_print("page 1\n");
+        } else if self.ui_index == 2 {
+            debug_print("page 2\n");
+        } else {
+            debug_print("page 3\n");
+        }
         show_ui(self.ui_index);
     }
 
