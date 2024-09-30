@@ -11,3 +11,5 @@ stax.hex
 stax.json
 flex.hex
 flex.json
+ledger/
+app/build
