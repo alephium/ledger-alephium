@@ -13,49 +13,34 @@ use crate::settings::{is_blind_signing_enabled, toggle_blind_signing_setting};
 
 const UI_PAGE_NUM: u8 = 4;
 
-fn show_ui_common(draw: fn() -> ()) {
-    gadgets::clear_screen();
-
-    bagls::LEFT_ARROW.display();
-    bagls::RIGHT_ARROW.display();
-
-    draw();
-
-    screen_util::screen_update();
-}
-
 fn show_ui_welcome() {
-    show_ui_common(|| {
-        const APP_ICON: Glyph = Glyph::from_include(include_gif!("alph_14x14.gif"));
-        gadgets::Page::from((["Alephium", "is ready"], &APP_ICON)).place();
-    });
+    const APP_ICON: Glyph = Glyph::from_include(include_gif!("alph_14x14.gif"));
+    gadgets::Page::from((["Alephium", "is ready"], &APP_ICON)).place();
 }
 
 fn show_ui_blind_signing() {
-    show_ui_common(|| {
-        let label = if is_blind_signing_enabled() {
-            "enabled"
-        } else {
-            "disabled"
-        };
-        gadgets::Page::from((["Blind Signing", label], false)).place();
-    });
+    let label = if is_blind_signing_enabled() {
+        "enabled"
+    } else {
+        "disabled"
+    };
+    gadgets::Page::from((["Blind Signing", label], false)).place();
 }
 
 fn show_ui_version() {
-    show_ui_common(|| {
-        const VERSION: &str = env!("CARGO_PKG_VERSION");
-        gadgets::Page::from((["Version", VERSION], false)).place();
-    });
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    gadgets::Page::from((["Version", VERSION], false)).place();
 }
 
 fn show_ui_quit() {
-    show_ui_common(|| {
-        gadgets::Page::from(("Quit", &DASHBOARD_X)).place();
-    });
+    gadgets::Page::from(("Quit", &DASHBOARD_X)).place();
 }
 
 fn show_ui(index: u8) {
+    gadgets::clear_screen();
+    bagls::LEFT_ARROW.display();
+    bagls::RIGHT_ARROW.display();
+
     match index {
         0 => show_ui_welcome(),
         1 => show_ui_version(),
@@ -63,6 +48,8 @@ fn show_ui(index: u8) {
         3 => show_ui_quit(),
         _ => panic!("Invalid ui index"),
     }
+
+    screen_util::screen_update();
 }
 
 pub struct MainPages {

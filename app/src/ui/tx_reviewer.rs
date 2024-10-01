@@ -1,20 +1,19 @@
 use super::TxReviewerInner;
-#[cfg(not(any(target_os = "stax", target_os = "flex")))]
-use crate::ledger_sdk_stub::multi_field_review::Field;
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     handler::TOKEN_METADATA_SIZE,
-    ledger_sdk_stub::{
-        nvm::{NVMData, NVM, NVM_DATA_SIZE},
-        swapping_buffer::{SwappingBuffer, RAM_SIZE},
-    },
+    nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE},
+    nvm::{NVM, NVM_DATA_SIZE},
     public_key::{to_base58_address, Address},
     token_verifier::TokenVerifier,
     ui::bytes_to_string,
 };
 #[cfg(any(target_os = "stax", target_os = "flex"))]
 use ledger_device_sdk::nbgl::Field;
+#[cfg(not(any(target_os = "stax", target_os = "flex")))]
+use ledger_device_sdk::ui::gadgets::Field;
+use ledger_device_sdk::NVMData;
 use utils::{
     base58::ALPHABET,
     types::{
@@ -572,12 +571,6 @@ impl TxReviewer {
     #[inline]
     pub fn display_settings(&self) -> bool {
         self.inner.display_settings
-    }
-
-    #[cfg(any(target_os = "stax", target_os = "flex"))]
-    #[inline]
-    pub fn review_started(&self) -> bool {
-        self.inner.review_started
     }
 
     #[cfg(any(target_os = "stax", target_os = "flex"))]
