@@ -3,6 +3,7 @@ ledger_app_builder = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:$(ve
 ledger_app_dev_tools = ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:$(version)
 
 release:
+	@make _release device=nanos
 	@make _release device=nanox
 	@make _release device=nanosplus
 	@make _release device=stax
@@ -26,7 +27,7 @@ check:
 			echo 'Cargo fmt' && \
 			cargo fmt --all -- --check && \
 			echo 'Cargo clippy' && \
-			cargo +nightly-2023-11-10 clippy --target=nanox && \
+			cargo +nightly-2023-11-10 clippy --target=nanos && \
 			cargo +nightly-2023-11-10 clippy --target=stax && \
 			cargo install cargo-audit && cargo audit && \
 			cargo install --locked cargo-deny && cargo +nightly-2023-11-10 deny check \
@@ -38,7 +39,10 @@ _run-speculos:
 		speculos -m $(device) /app/app/target/$(path)/release/alephium
 
 run-speculos:
-	@make run-speculos-nanosplus
+	@make run-speculos-nanos
+
+run-speculos-nanos:
+	@make _run-speculos device=nanos path=nanos
 
 run-speculos-nanosplus:
 	@make _run-speculos device=nanosp path=nanosplus
@@ -68,6 +72,9 @@ run-github-ci:
 	cd js && sleep 3 && MODEL=$(device) npm run speculos-test && docker stop speculos && cd ..
 
 .PHONY: release clean
+
+install_nanos:
+	ledgerctl install -f nanos.json
 
 install_nanosplus:
 	ledgerctl install -f nanosplus.json

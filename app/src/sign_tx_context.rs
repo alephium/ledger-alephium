@@ -1,4 +1,7 @@
+#[cfg(target_os = "nanos")]
+use crate::nvm::nvm_data::NVMData;
 use ledger_device_sdk::io::ApduHeader;
+#[cfg(not(target_os = "nanos"))]
 use ledger_device_sdk::NVMData;
 use utils::{
     buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx, PATH_LENGTH,

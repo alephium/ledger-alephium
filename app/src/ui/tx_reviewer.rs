@@ -1,4 +1,6 @@
 use super::TxReviewerInner;
+#[cfg(target_os = "nanos")]
+use crate::nvm::nvm_data::NVMData;
 use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
@@ -13,6 +15,7 @@ use crate::{
 use ledger_device_sdk::nbgl::Field;
 #[cfg(not(any(target_os = "stax", target_os = "flex")))]
 use ledger_device_sdk::ui::gadgets::Field;
+#[cfg(not(target_os = "nanos"))]
 use ledger_device_sdk::NVMData;
 use utils::{
     base58::ALPHABET,

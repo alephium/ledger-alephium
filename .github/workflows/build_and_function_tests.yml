@@ -31,6 +31,7 @@ jobs:
           node-version: 16
       - run: make release
       - run: make set-github-action
+      - run: make run-github-ci device=nanos path=nanos
       - run: make run-github-ci device=nanosp path=nanosplus
       - run: make run-github-ci device=nanox path=nanox
       - run: make run-github-ci device=stax path=stax

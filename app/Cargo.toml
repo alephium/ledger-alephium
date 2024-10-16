@@ -6,8 +6,8 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-ledger_device_sdk = "1.17.1"
-ledger_secure_sdk_sys = "1.5.0"
+ledger_device_sdk = "1.17.4"
+ledger_secure_sdk_sys = "1.5.1"
 utils= { path = "../utils" }
 numtoa = "=0.2.4"
 shlex = { version = "1.3.0", default-features = false } # patch for ledger_device_sdk dependency
@@ -28,6 +28,9 @@ name = "Alephium"
 curve = ["secp256k1"]
 flags = "0"
 path = ["44'/1234'"]
+
+[package.metadata.ledger.nanos]
+icon = "alph_16x16.gif"
 
 [package.metadata.ledger.nanox]
 icon = "alph_14x14.gif"

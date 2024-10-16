@@ -1,8 +1,13 @@
+#[cfg(target_os = "nanos")]
+use crate::nvm::nvm_data::NVMData;
+#[cfg(not(target_os = "nanos"))]
 use ledger_device_sdk::NVMData;
 use ledger_secure_sdk_sys::nvm_write;
 
 use crate::error_code::ErrorCode;
 
+#[cfg(target_os = "nanos")]
+pub mod nvm_data;
 pub mod swapping_buffer;
 
 pub const NVM_DATA_SIZE: usize = 2048;
