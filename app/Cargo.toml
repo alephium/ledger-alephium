@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-ledger_device_sdk = "1.17.1"
+ledger_device_sdk = "1.17.4"
 ledger_secure_sdk_sys = "1.5.1"
 utils= { path = "../utils" }
 numtoa = "=0.2.4"
