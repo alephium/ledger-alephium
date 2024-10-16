@@ -1,10 +1,13 @@
 // This code is inspired by code from zondax: https://github.com/Zondax/ledger-rust/blob/main/bolos/src/swapping_buffer.rs
 use utils::buffer::Writable;
 
+#[cfg(target_os = "nanos")]
+use crate::nvm::nvm_data::NVMData;
 use crate::{
     error_code::ErrorCode,
     nvm::{write_from, NVM},
 };
+#[cfg(not(target_os = "nanos"))]
 use ledger_device_sdk::NVMData;
 
 pub const RAM_SIZE: usize = 512;

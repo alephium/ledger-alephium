@@ -15,7 +15,7 @@ const UI_PAGE_NUM: u8 = 4;
 
 fn show_ui_welcome() {
     const APP_ICON: Glyph = Glyph::from_include(include_gif!("alph_14x14.gif"));
-    gadgets::Page::from((["Alephium", "is ready"], &APP_ICON)).place();
+    gadgets::Page::from((["Alephium ", "is ready"], &APP_ICON)).place();
 }
 
 fn show_ui_blind_signing() {

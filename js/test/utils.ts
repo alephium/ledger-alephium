@@ -21,16 +21,28 @@ async function clickAndApprove(times: number) {
 
 function getModel(): string {
   const model = process.env.MODEL
-  return model ? model as string : 'nanosp'
+  return model ? model as string : 'nanos'
 }
 
 export enum OutputType {
   Base,
   Multisig,
+  Nanos10,
+  Nanos11,
   Token,
   BaseAndToken,
   MultisigAndToken
 }
+
+const NanosClickTable = new Map([
+  [OutputType.Base, 5],
+  [OutputType.Multisig, 10],
+  [OutputType.Nanos10, 10],
+  [OutputType.Nanos11, 11],
+  [OutputType.Token, 11],
+  [OutputType.BaseAndToken, 12],
+  [OutputType.MultisigAndToken, 16],
+])
 
 const NanospClickTable = new Map([
   [OutputType.Base, 3],
@@ -59,6 +71,7 @@ const FlexClickTable = new Map([
 function getOutputClickSize(outputType: OutputType) {
   const model = getModel()
   switch (model) {
+    case 'nanos': return NanosClickTable.get(outputType)!
     case 'nanosp':
     case 'nanox': return NanospClickTable.get(outputType)!
     case 'stax': return StaxClickTable.get(outputType)!
@@ -178,7 +191,11 @@ export async function approveHash() {
   if (isStaxOrFlex()) {
     return await _touch(2, true)
   }
-  await clickAndApprove(3)
+  if (getModel() === 'nanos') {
+    await clickAndApprove(5)
+  } else {
+    await clickAndApprove(3)
+  }
 }
 
 export async function approveAddress() {
@@ -188,11 +205,19 @@ export async function approveAddress() {
     await staxFlexApproveOnce()
     return
   }
-  await clickAndApprove(2)
+  if (getModel() === 'nanos') {
+    await clickAndApprove(4)
+  } else {
+    await clickAndApprove(2)
+  }
 }
 
 export function isStaxOrFlex(): boolean {
   return !getModel().startsWith('nano')
+}
+
+export function isNanos(): boolean {
+  return getModel() === 'nanos'
 }
 
 export async function skipBlindSigningWarning() {

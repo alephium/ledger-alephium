@@ -9,7 +9,7 @@ use ledger_device_sdk::{
 
 // Different Ledger devices use different UI libraries, so we've introduced the
 // `TxReviewInner` to facilitate the display of tx details across different devices.
-// The `TxReviewInner` here is for Ledger Nanosp/Nanox.
+// The `TxReviewInner` here is for Ledger Nanos/Nanosp/Nanox.
 pub struct TxReviewerInner {
     is_tx_execute_script: bool,
 }
@@ -32,7 +32,7 @@ impl TxReviewerInner {
         fields: &'a [Field<'a>],
         review_message: &str,
     ) -> Result<(), ErrorCode> {
-        let review_messages = ["Review", review_message];
+        let review_messages = ["Review ", review_message];
         let review = MultiFieldReview::new(
             fields,
             &review_messages,
@@ -55,13 +55,13 @@ impl TxReviewerInner {
         if self.is_tx_execute_script {
             self.finish_review_inner(fields, &["Blind Signing"], Some(&WARNING))
         } else {
-            self.finish_review_inner(fields, &["Confirm", "Self-transfer"], Some(&EYE))
+            self.finish_review_inner(fields, &["Confirm ", "Self-transfer"], Some(&EYE))
         }
     }
 
     // Review the warning for external inputs, i.e. inputs that are not from the device address
     pub fn warning_external_inputs(&self) -> Result<(), ErrorCode> {
-        let review_messages = ["There are", "external inputs"];
+        let review_messages = ["There are ", "external inputs"];
         let review = MultiFieldReview::new(
             &[],
             &review_messages,
@@ -88,6 +88,10 @@ impl TxReviewerInner {
         review_message: &'a [&'a str],
         review_glyph: Option<&'a Glyph<'a>>,
     ) -> Result<(), ErrorCode> {
+        #[cfg(target_os = "nanos")]
+        let validation_messages = ["Accept and sign", ""];
+
+        #[cfg(not(target_os = "nanos"))]
         let validation_messages = if !self.is_tx_execute_script {
             ["Accept", "and sign"]
         } else {
