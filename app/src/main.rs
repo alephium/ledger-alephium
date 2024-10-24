@@ -83,10 +83,10 @@ extern "C" fn sample_main() {
                     };
                 if tx_reviewer.display_settings() {
                     tx_reviewer.reset_display_settings();
-                    home_and_settings = home_and_settings.set_start_page(PageIndex::Settings(0));
+                    home_and_settings.set_start_page(PageIndex::Settings(0));
                     home_and_settings.show_and_return();
                 } else if display_home {
-                    home_and_settings = home_and_settings.set_start_page(PageIndex::Home);
+                    home_and_settings.set_start_page(PageIndex::Home);
                     home_and_settings.show_and_return();
                 }
             }
