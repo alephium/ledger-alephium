@@ -43,6 +43,7 @@ The general structure of a request and response is as followed:
 | 0xE007      | Invalid metadata version  |
 | 0xE008      | Invalid token proof size  |
 | 0xE009      | Invalid token metadata    |
+| 0xE010      | Invalid key type          |
 | 0xEF00      | Internal error            |
 
 ## Commands definitions
@@ -88,6 +89,7 @@ This command returns the public key corresponding to the secret key found at the
 | Path[2] | byte (4) | Derivation Path Data      | ?               |
 | Path[3] | byte (4) | Derivation Path Data      | ?               |
 | Path[4] | byte (4) | Derivation Path Data      | ?               |
+| Flag    | byte (1) | The key type              | 0 or 1: 0 indicates the default key type, and 1 indicates the groupless key type |
 | Flag    | byte (1) | Whether confirmation is needed | If not 0, display address and confirm before returning |
 
 #### Response
@@ -177,6 +179,7 @@ Input data (first transaction data frame):
 | Path[2]        | byte (4)               | Derivation Path Data | ?                 |
 | Path[3]        | byte (4)               | Derivation Path Data | ?                 |
 | Path[4]        | byte (4)               | Derivation Path Data | ?                 |
+| Flag           | byte (1)               | The key type         | 0 or 1: 0 indicates the default key type, and 1 indicates the groupless key type |
 | Payload        | byte (?)               | Transaction Payload  | ?                 |
 
 Input data (subsequent transaction data frame):
