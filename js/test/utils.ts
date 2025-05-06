@@ -185,14 +185,14 @@ export async function approveHash() {
   await clickAndApprove(3)
 }
 
-export async function approveAddress() {
+export async function approveAddress(isGroupless: boolean = false) {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
     await _touch(1)
     await staxFlexApproveOnce()
     return
   }
-  await clickAndApprove(2)
+  await clickAndApprove(isGroupless ? 3 : 2)
 }
 
 export function isStaxOrFlex(): boolean {

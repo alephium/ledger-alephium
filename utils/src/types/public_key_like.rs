@@ -1,5 +1,7 @@
 use super::{ED25519PubKey, SecP256K1PubKey, SecP256R1PubKey};
+use crate::base58::base58_encode_inputs;
 use crate::buffer::{Buffer, Writable};
+use crate::types::lockup_script::P2PK_PREFIX;
 use crate::types::{Checksum, Checksumable};
 use crate::{decode::*, djb_hash_with_prefix};
 
@@ -18,6 +20,20 @@ impl Checksumable for PublicKeyLike {
     fn calc_checksum(&self) -> Checksum {
         let hash: [u8; 4] = djb_hash_with_prefix(self.get_type(), self.key_bytes()).to_be_bytes();
         Checksum(hash)
+    }
+}
+
+impl PublicKeyLike {
+    pub fn to_base58_address<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
+        let checksum = self.calc_checksum();
+        base58_encode_inputs(
+            &[
+                &[P2PK_PREFIX, self.get_type()],
+                self.key_bytes(),
+                &checksum.0,
+            ],
+            output,
+        )
     }
 }
 

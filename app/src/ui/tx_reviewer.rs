@@ -3,8 +3,10 @@ use crate::{
     blake2b_hasher::Blake2bHasher,
     error_code::ErrorCode,
     handler::TOKEN_METADATA_SIZE,
-    nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE},
-    nvm::{NVM, NVM_DATA_SIZE},
+    nvm::{
+        swapping_buffer::{SwappingBuffer, RAM_SIZE},
+        NVM, NVM_DATA_SIZE,
+    },
     public_key::{to_base58_address, Address, ADDRESS_MAX_SIZE},
     token_verifier::TokenVerifier,
     ui::bytes_to_string,
@@ -293,6 +295,8 @@ impl TxReviewer {
     pub fn write_p2pk_address(&mut self, p2pk: &P2PK) -> Result<usize, ErrorCode> {
         let mut output = [0u8; ADDRESS_MAX_SIZE];
         let str_bytes = p2pk
+            .key
+            .value
             .to_base58_address(&mut output)
             .ok_or(ErrorCode::Overflow)?;
         self.buffer.write(str_bytes)
@@ -428,7 +432,7 @@ impl TxReviewer {
             UnlockScript::P2MPKH(_) => self.has_external_inputs = true,
             UnlockScript::P2SH(_) => self.has_external_inputs = true,
             UnlockScript::SameAsPrevious => (),
-            UnlockScript::P2PK => self.has_external_inputs = true,
+            UnlockScript::P2PK => self.has_external_inputs = !device_address.is_groupless,
             UnlockScript::P2HMPK(_) => self.has_external_inputs = true,
             _ => panic!(),
         };

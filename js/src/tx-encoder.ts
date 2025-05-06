@@ -66,15 +66,15 @@ export function encodeProofLength(length: number): Uint8Array {
   return buffer;
 }
 
-export function encodeUnsignedTx(path: string, unsignedTx: Buffer): Frame[] {
+export function encodeUnsignedTx(path: string, keyTypeBytes: Buffer, unsignedTx: Buffer): Frame[] {
   const encodedPath = serializePath(path)
-  const firstFrameTxLength = MAX_PAYLOAD_SIZE - 20;
+  const firstFrameTxLength = MAX_PAYLOAD_SIZE - 21;
   if (firstFrameTxLength >= unsignedTx.length) {
-    return [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx]) }]
+    return [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, keyTypeBytes, unsignedTx]) }]
   }
 
   const firstFrameTxData = unsignedTx.slice(0, firstFrameTxLength)
-  const frames: Frame[] = [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, firstFrameTxData]) }]
+  const frames: Frame[] = [{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, keyTypeBytes, firstFrameTxData]) }]
   let fromIndex = firstFrameTxLength
   while (fromIndex < unsignedTx.length) {
     const remain = unsignedTx.length - fromIndex

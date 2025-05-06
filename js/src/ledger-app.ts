@@ -36,25 +36,31 @@ export class AlephiumApp {
     return `${response[0]}.${response[1]}.${response[2]}`
   }
 
-  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType, display = false): Promise<readonly [Account, number]> {
+  private checkKeyType(_keyType?: KeyType): [KeyType, Buffer] {
+    const keyType = _keyType ?? 'default'
+    if (keyType !== 'default' && keyType !== 'gl-secp256k1') {
+      throw Error(`${keyType} is not supported yet`)
+    }
+    const bytes = Buffer.from([keyType === 'default' ? 0 : 1])
+    return [keyType, bytes]
+  }
+
+  async getAccount(startPath: string, targetGroup?: number, _keyType?: KeyType, display = false): Promise<readonly [Account, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
 
-    if (keyType === 'bip340-schnorr') {
-      throw Error('BIP340-Schnorr is not supported yet')
-    }
-
+    const [keyType, keyTypeBytes] = this.checkKeyType(_keyType)
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
-    const payload = Buffer.concat([serde.serializePath(startPath), Buffer.from([display ? 1 : 0])]);
+    const payload = Buffer.concat([serde.serializePath(startPath), keyTypeBytes, Buffer.from([display ? 1 : 0])]);
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, payload)
     const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
-    const address = addressFromPublicKey(publicKey)
+    const address = addressFromPublicKey(publicKey, keyType)
     const group = groupOfAddress(address)
     const hdIndex = response.slice(65, 69).readUInt32BE(0)
 
-    return [{ publicKey: publicKey, address: address, group: group, keyType: keyType ?? 'default' }, hdIndex] as const
+    return [{ publicKey: publicKey, address: address, group: group, keyType }, hdIndex] as const
   }
 
   async signHash(path: string, hash: Buffer): Promise<string> {
@@ -70,12 +76,13 @@ export class AlephiumApp {
     return decodeSignature(response)
   }
 
-  async signUnsignedTx(path: string, unsignedTx: Buffer): Promise<string> {
+  async signUnsignedTx(path: string, unsignedTx: Buffer, _keyType?: KeyType): Promise<string> {
+    const [_, keyTypeBytes] = this.checkKeyType(_keyType)
     console.log(`unsigned tx size: ${unsignedTx.length}`)
     const tokenMetadata = getTokenMetadata(unsignedTx)
     serde.checkTokenMetadata(tokenMetadata)
     const tokenMetadataFrames = encodeTokenMetadata(tokenMetadata)
-    const txFrames = encodeUnsignedTx(path, unsignedTx)
+    const txFrames = encodeUnsignedTx(path, keyTypeBytes, unsignedTx)
     const allFrames = [...tokenMetadataFrames, ...txFrames]
 
     let response: Buffer | undefined = undefined

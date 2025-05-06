@@ -10,6 +10,7 @@ mod blake2b_hasher;
 mod debug;
 mod error_code;
 mod handler;
+mod key_type;
 mod nvm;
 mod public_key;
 mod settings;

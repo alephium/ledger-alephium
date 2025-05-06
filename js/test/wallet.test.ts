@@ -78,11 +78,30 @@ describe('ledger wallet', () => {
     await app.close()
   })
 
+  it('should get public key: groupless', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account, hdIndex] = await app.getAccount(path, undefined, 'gl-secp256k1')
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  })
+
   it('should get public key and confirm address', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     approveAddress()
     const [account, hdIndex] = await app.getAccount(path, undefined, undefined, true)
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  }, 30000)
+
+  it('should get public key and confirm address: groupless', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    approveAddress(true)
+    const [account, hdIndex] = await app.getAccount(path, undefined, 'gl-secp256k1', true)
     expect(hdIndex).toBe(pathIndex)
     console.log(account)
     await app.close()
@@ -104,7 +123,7 @@ describe('ledger wallet', () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     for (let group = 0; group < GROUP_NUM; group++) {
-      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
+      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('bip340-schnorr is not supported yet')
     }
     await app.close()
   })
@@ -268,38 +287,6 @@ describe('ledger wallet', () => {
 
     await app.close()
   }, 120000)
-
-  async function genTokensAndDestinations(
-    fromAddress: string,
-    toAddress: string,
-    mintAmount: bigint,
-    transferAmount: bigint
-  ) {
-    const tokens: TokenMetadata[] = []
-    const tokenSymbol = 'TestTokenABC'
-    const destinations: node.Destination[] = []
-    for (let i = 0; i < 5; i += 1) {
-      const tokenInfo = await mintToken(fromAddress, mintAmount);
-      const tokenMetadata: TokenMetadata = {
-        version: 0,
-        tokenId: tokenInfo.contractId,
-        symbol: tokenSymbol.slice(0, tokenSymbol.length - i),
-        decimals: 18 - i
-      }
-      tokens.push(tokenMetadata)
-      destinations.push({
-        address: toAddress,
-        attoAlphAmount: DUST_AMOUNT.toString(),
-        tokens: [
-          {
-            id: tokenMetadata.tokenId,
-            amount: transferAmount.toString()
-          }
-        ]
-      })
-    }
-    return { tokens, destinations }
-  }
 
   it('should transfer tokens with proof', async () => {
     const transport = await createTransport()
@@ -623,6 +610,41 @@ describe('ledger wallet', () => {
     })
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const balance = await getALPHBalance(testAccount.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer from groupless address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account] = await app.getAccount(path, undefined, 'gl-secp256k1', false)
+    console.log(account)
+
+    await transferToAddress(account.address)
+
+    const result = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: account.publicKey,
+      fromPublicKeyType: 'gl-secp256k1',
+      destinations: [
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    }) as node.BuildGrouplessTransferTxResult
+    const buildTxResult = result.transferTx
+
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), 'gl-secp256k1')
+    expect(transactionVerifySignature(buildTxResult.txId, account.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(account.address)
     expect(balance < (ONE_ALPH * 8n)).toEqual(true)
 
     await app.close()

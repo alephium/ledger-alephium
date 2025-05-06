@@ -76,19 +76,6 @@ pub struct P2PK {
     pub group: Byte,
 }
 
-impl P2PK {
-    pub fn to_base58_address<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
-        base58_encode_inputs(
-            &[
-                &[P2PK_PREFIX, self.key.value.get_type()],
-                self.key.value.key_bytes(),
-                &self.key.checksum.0,
-            ],
-            output,
-        )
-    }
-}
-
 impl Reset for P2PK {
     fn reset(&mut self) {
         self.key.reset();
