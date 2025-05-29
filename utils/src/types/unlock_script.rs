@@ -5,7 +5,7 @@ use crate::decode::*;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
 pub struct PublicKeyWithIndex {
-    public_key: PublicKey,
+    public_key: SecP256K1PubKey,
     index: U16,
 }
 
@@ -65,7 +65,7 @@ impl RawDecoder for P2SH {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
 pub enum UnlockScript {
-    P2PKH(PublicKey),
+    P2PKH(SecP256K1PubKey),
     P2MPKH(StreamingDecoder<AVector<PublicKeyWithIndex>>),
     P2SH(StreamingDecoder<P2SH>),
     SameAsPrevious,
@@ -82,7 +82,7 @@ impl Reset for UnlockScript {
 impl UnlockScript {
     fn from_type(tpe: u8) -> Option<Self> {
         match tpe {
-            0 => Some(UnlockScript::P2PKH(PublicKey::default())),
+            0 => Some(UnlockScript::P2PKH(SecP256K1PubKey::default())),
             1 => Some(UnlockScript::P2MPKH(StreamingDecoder::default())),
             2 => Some(UnlockScript::P2SH(StreamingDecoder::default())),
             3 => Some(UnlockScript::SameAsPrevious),
@@ -130,7 +130,7 @@ mod tests {
     use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
-    use crate::types::{PublicKey, UnlockScript};
+    use crate::types::{SecP256K1PubKey, UnlockScript};
     use crate::TempData;
     use std::vec;
 
@@ -143,7 +143,7 @@ mod tests {
             let mut bytes = vec![0u8];
             let hash_bytes = gen_bytes(33, 33);
             bytes.extend(&hash_bytes);
-            let unlock_script = UnlockScript::P2PKH(PublicKey::from_bytes(
+            let unlock_script = UnlockScript::P2PKH(SecP256K1PubKey::from_bytes(
                 hash_bytes.as_slice().try_into().unwrap(),
             ));
 

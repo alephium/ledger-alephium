@@ -42,7 +42,7 @@ pub use hint::Hint;
 pub use instr::Instr;
 pub use lockup_script::LockupScript;
 pub use method::Method;
-pub use public_key::PublicKey;
+pub use public_key::SecP256K1PubKey;
 pub use script::Script;
 pub use timestamp::TimeStamp;
 pub use token::Token;
