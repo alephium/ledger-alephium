@@ -1,6 +1,7 @@
 use super::{Byte32, Hash, U16};
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
+use crate::types::{Byte, Checksummed, PublicKeyLike};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
@@ -66,11 +67,44 @@ impl RawDecoder for P2MPKH {
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
+pub struct P2PK {
+    pub key: Checksummed<PublicKeyLike>,
+    pub group: Byte,
+}
+
+impl Reset for P2PK {
+    fn reset(&mut self) {
+        self.key.reset();
+        self.group.reset();
+    }
+}
+
+impl RawDecoder for P2PK {
+    fn step_size(&self) -> u16 {
+        self.key.step_size() + 1
+    }
+
+    fn decode<W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'_, W>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            step if step < self.key.step_size() => self.key.decode(buffer, stage),
+            step if step < self.step_size() => self.group.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
+        }
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
 pub enum LockupScript {
     P2PKH(Hash),
     P2MPKH(StreamingDecoder<P2MPKH>),
     P2SH(Hash),
     P2C(Hash),
+    P2PK(StreamingDecoder<P2PK>),
     #[default]
     Unknown,
 }
@@ -88,6 +122,7 @@ impl LockupScript {
             1 => Some(LockupScript::P2MPKH(StreamingDecoder::default())),
             2 => Some(LockupScript::P2SH(Hash::default())),
             3 => Some(LockupScript::P2C(Hash::default())),
+            4 => Some(LockupScript::P2PK(StreamingDecoder::default())),
             _ => None,
         }
     }
@@ -98,6 +133,7 @@ impl LockupScript {
             LockupScript::P2MPKH(_) => 1,
             LockupScript::P2SH(_) => 2,
             LockupScript::P2C(_) => 3,
+            LockupScript::P2PK(_) => 4,
             _ => 0xff, // dead branch
         }
     }
@@ -129,6 +165,7 @@ impl RawDecoder for LockupScript {
             LockupScript::P2MPKH(hashes) => hashes.decode_children(buffer, stage),
             LockupScript::P2SH(hash) => hash.decode(buffer, stage),
             LockupScript::P2C(hash) => hash.decode(buffer, stage),
+            LockupScript::P2PK(p2pk) => p2pk.decode_children(buffer, stage),
             LockupScript::Unknown => Err(DecodeError::InternalError),
         }
     }
@@ -142,8 +179,9 @@ mod tests {
     use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
+    use crate::types::test_utils::{test_decode, test_decode1};
     use crate::types::u256::tests::hex_to_bytes;
-    use crate::types::{Hash, LockupScript};
+    use crate::types::{Hash, LockupScript, PublicKeyLike, SecP256R1PubKey};
     use crate::TempData;
     use std::vec;
 
@@ -200,34 +238,29 @@ mod tests {
     #[test]
     fn test_decode_p2mpkh() {
         let bytes = hex_to_bytes("0103a3cd757be03c7dac8d48bf79e2a7d6e735e018a9c054b99138c7b29738c437ecef51c98556924afa1cd1a8026c3d2d33ee1d491e1fe77c73a75a2d0129f061951dd2aa371711d1faea1c96d395f08eb94de1f388993e8be3f4609dc327ab513a02").unwrap();
-        {
-            let mut temp_data = TempData::new();
-            let mut buffer = Buffer::new(&bytes, &mut temp_data);
-            let mut decoder = new_decoder::<LockupScript>();
-            let result = decoder.decode(&mut buffer).unwrap();
-            assert!(result.is_some());
-            assert!(decoder.stage.is_complete());
-            assert_eq!(temp_data.get(), &bytes);
-        }
+        let data = bytes[1..].to_vec().clone();
+        test_decode::<LockupScript>(01u8, data, None, Some(&bytes));
+    }
 
-        let mut temp_data = TempData::new();
-        let mut length: usize = 0;
-        let mut decoder = new_decoder::<LockupScript>();
-
-        while length < bytes.len() {
-            let remain = bytes.len() - length;
-            let size = random_usize(0, remain);
-            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
-            length += size;
-
-            let result = decoder.decode(&mut buffer).unwrap();
-            if length == bytes.len() {
-                assert!(result.is_some());
-                assert!(decoder.stage.is_complete());
-                assert_eq!(temp_data.get(), &bytes);
-            } else {
-                assert_eq!(result, None);
+    #[test]
+    fn test_decode_p2pk() {
+        let data = hex_to_bytes(
+            "036394a7ef0dee6b4a89fe1be67f89fe7bd87c69370c80f7c1773fc7a556ec0fbd02ca39a41801",
+        )
+        .unwrap();
+        let key_bytes =
+            hex_to_bytes("6394a7ef0dee6b4a89fe1be67f89fe7bd87c69370c80f7c1773fc7a556ec0fbd02")
+                .unwrap();
+        let key =
+            PublicKeyLike::WebAuthn(SecP256R1PubKey::from_bytes(key_bytes.try_into().unwrap()));
+        let check = |result: Option<&LockupScript>| match result.unwrap() {
+            LockupScript::P2PK(inner) => {
+                assert!(inner.stage.is_complete());
+                assert_eq!(inner.inner.key.value, key);
+                assert_eq!(inner.inner.group.0, 1);
             }
-        }
+            _ => assert!(false),
+        };
+        test_decode1(4u8, data, &check, None);
     }
 }

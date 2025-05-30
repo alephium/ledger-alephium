@@ -3,6 +3,8 @@ use crate::decode::*;
 use crate::fixed_size_bytes;
 
 fixed_size_bytes!(SecP256K1PubKey, 33);
+fixed_size_bytes!(SecP256R1PubKey, 33);
+fixed_size_bytes!(ED25519PubKey, 32);
 
 #[cfg(test)]
 mod tests {

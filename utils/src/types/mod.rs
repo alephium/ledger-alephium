@@ -3,6 +3,7 @@ pub mod avector;
 pub mod bool;
 pub mod byte;
 pub mod byte32;
+pub mod checksum;
 mod compact_integer;
 pub mod hint;
 pub mod i256;
@@ -11,6 +12,7 @@ pub mod instr;
 pub mod lockup_script;
 pub mod method;
 pub mod public_key;
+pub mod public_key_like;
 pub mod script;
 pub mod timestamp;
 pub mod token;
@@ -27,6 +29,7 @@ pub mod method_selector;
 pub mod u16;
 
 pub use byte32::Byte32;
+pub use checksum::{Checksum, Checksumable, Checksummed};
 pub use i256::I256;
 pub use u256::U256;
 
@@ -42,7 +45,8 @@ pub use hint::Hint;
 pub use instr::Instr;
 pub use lockup_script::LockupScript;
 pub use method::Method;
-pub use public_key::SecP256K1PubKey;
+pub use public_key::{ED25519PubKey, SecP256K1PubKey, SecP256R1PubKey};
+pub use public_key_like::PublicKeyLike;
 pub use script::Script;
 pub use timestamp::TimeStamp;
 pub use token::Token;
@@ -80,6 +84,19 @@ pub mod test_utils {
         value: Option<&T>,
         expected_temp_data: Option<&Vec<u8>>,
     ) {
+        let func = |result: Option<&T>| match value {
+            Some(_) => assert_eq!(result, value),
+            None => assert!(result.is_some()),
+        };
+        test_decode1(prefix, data, &func, expected_temp_data);
+    }
+
+    pub fn test_decode1<T: Default + RawDecoder + PartialEq + Debug>(
+        prefix: u8,
+        data: Vec<u8>,
+        func: &dyn Fn(Option<&T>) -> (),
+        expected_temp_data: Option<&Vec<u8>>,
+    ) {
         let bytes = [&[prefix][..], &data[..]].concat();
 
         {
@@ -87,10 +104,7 @@ pub mod test_utils {
             let mut buffer = Buffer::new(&bytes, &mut temp_data);
             let mut decoder = new_decoder::<T>();
             let result = decoder.decode(&mut buffer).unwrap();
-            match value {
-                Some(_) => assert_eq!(result, value),
-                None => assert!(result.is_some()),
-            }
+            func(result);
         }
 
         let mut length: usize = 0;
@@ -105,10 +119,7 @@ pub mod test_utils {
 
             let result = decoder.decode(&mut buffer).unwrap();
             if length == bytes.len() {
-                match value {
-                    Some(_) => assert_eq!(result, value),
-                    None => assert!(result.is_some()),
-                }
+                func(result);
                 assert!(decoder.stage.is_complete());
                 match expected_temp_data {
                     Some(data) => assert_eq!(*data, temp_data.get().to_vec()),

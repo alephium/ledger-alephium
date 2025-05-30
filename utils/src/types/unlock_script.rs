@@ -70,6 +70,7 @@ pub enum UnlockScript {
     P2SH(StreamingDecoder<P2SH>),
     SameAsPrevious,
     PoLW(SecP256K1PubKey),
+    P2PK,
     #[default]
     Unknown,
 }
@@ -88,6 +89,7 @@ impl UnlockScript {
             2 => Some(UnlockScript::P2SH(StreamingDecoder::default())),
             3 => Some(UnlockScript::SameAsPrevious),
             4 => Some(UnlockScript::PoLW(SecP256K1PubKey::default())),
+            5 => Some(UnlockScript::P2PK),
             _ => None,
         }
     }
@@ -120,6 +122,7 @@ impl RawDecoder for UnlockScript {
             UnlockScript::P2SH(script) => script.decode_children(buffer, stage),
             UnlockScript::SameAsPrevious => Ok(DecodeStage::COMPLETE),
             UnlockScript::PoLW(public_key) => public_key.decode(buffer, stage),
+            UnlockScript::P2PK => Ok(DecodeStage::COMPLETE),
             UnlockScript::Unknown => Err(DecodeError::InternalError),
         }
     }
@@ -129,11 +132,11 @@ impl RawDecoder for UnlockScript {
 mod tests {
     extern crate std;
 
+    use super::u256::tests::hex_to_bytes;
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::test_utils::test_decode;
     use crate::types::{SecP256K1PubKey, UnlockScript};
-
-    use super::u256::tests::hex_to_bytes;
+    use std::vec;
 
     #[test]
     fn test_decode_p2pkh() {
@@ -158,5 +161,10 @@ mod tests {
             public_key.clone().try_into().unwrap(),
         ));
         test_decode(4u8, public_key, Some(&unlock_script), None)
+    }
+
+    #[test]
+    fn test_decode_p2pk() {
+        test_decode(5u8, vec![], Some(&UnlockScript::P2PK), None)
     }
 }

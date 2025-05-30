@@ -52,6 +52,15 @@ pub fn djb_hash(data: &[u8]) -> i32 {
     hash.0
 }
 
+pub fn djb_hash_with_prefix(prefix: u8, data: &[u8]) -> i32 {
+    let mut hash = Wrapping(5381_i32);
+    hash = ((hash << 5) + hash) + Wrapping(prefix as i32);
+    data.iter().for_each(|&byte| {
+        hash = ((hash << 5) + hash) + Wrapping(byte as i32);
+    });
+    hash.0
+}
+
 pub fn xor_bytes(data: i32) -> u8 {
     let bytes = data.to_be_bytes();
     bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3]
@@ -133,10 +142,18 @@ mod tests {
     fn test_djb_hash() {
         assert_eq!(djb_hash(&[]), 5381);
         assert_eq!(djb_hash(&[97]), 177670);
+        assert_eq!(djb_hash_with_prefix(97, &[]), 177670);
         assert_eq!(djb_hash(&[122]), 177695);
+        assert_eq!(djb_hash_with_prefix(122, &[]), 177695);
         assert_eq!(djb_hash(&[102, 111, 111]), 193491849);
+        assert_eq!(djb_hash_with_prefix(102, &[111, 111]), 193491849);
         assert_eq!(djb_hash(&[98, 97, 114]), 193487034);
+        assert_eq!(djb_hash_with_prefix(98, &[97, 114]), 193487034);
         assert_eq!(djb_hash(&[49, 50, 51, 52, 53, 54, 55, 56, 57]), 902675330);
+        assert_eq!(
+            djb_hash_with_prefix(49, &[50, 51, 52, 53, 54, 55, 56, 57]),
+            902675330
+        );
     }
 
     #[test]
