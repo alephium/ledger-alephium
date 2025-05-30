@@ -29,7 +29,8 @@ export enum OutputType {
   Multisig,
   Token,
   BaseAndToken,
-  MultisigAndToken
+  MultisigAndToken,
+  P2PK
 }
 
 const NanospClickTable = new Map([
@@ -38,6 +39,7 @@ const NanospClickTable = new Map([
   [OutputType.Token, 6],
   [OutputType.BaseAndToken, 6],
   [OutputType.MultisigAndToken, 8],
+  [OutputType.P2PK, 4],
 ])
 
 const StaxClickTable = new Map([
@@ -46,6 +48,7 @@ const StaxClickTable = new Map([
   [OutputType.Token, 2],
   [OutputType.BaseAndToken, 2],
   [OutputType.MultisigAndToken, 2],
+  [OutputType.P2PK, 1],
 ])
 
 const FlexClickTable = new Map([
@@ -54,6 +57,7 @@ const FlexClickTable = new Map([
   [OutputType.Token, 2],
   [OutputType.BaseAndToken, 2],
   [OutputType.MultisigAndToken, 3],
+  [OutputType.P2PK, 1],
 ])
 
 function getOutputClickSize(outputType: OutputType) {

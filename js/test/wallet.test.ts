@@ -1,9 +1,37 @@
 import { AlephiumApp, GROUP_NUM } from '../src/ledger-app'
-import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
-import { getSigner, mintToken, transfer } from '@alephium/web3-test'
+import {
+  ALPH_TOKEN_ID,
+  Address,
+  DUST_AMOUNT,
+  NodeProvider,
+  ONE_ALPH,
+  binToHex,
+  codec,
+  groupOfAddress,
+  node,
+  sleep,
+  transactionVerifySignature,
+  waitForTxConfirmation,
+  web3,
+  SignTransferTxResult,
+  addressFromPublicKey
+} from '@alephium/web3'
+import { getSigner, mintToken, transfer, testPrivateKey } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
+import {
+  approveAddress,
+  approveHash,
+  approveTx,
+  createTransport,
+  enableBlindSigning,
+  getRandomInt,
+  isStaxOrFlex,
+  needToAutoApprove,
+  OutputType,
+  skipBlindSigningWarning,
+  staxFlexAcceptRisk
+} from './utils'
 import { TokenMetadata } from '../src/types'
 import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
@@ -22,7 +50,7 @@ describe('ledger wallet', () => {
   async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
     const balance0 = await getALPHBalance(address)
     const fromAccount = await getSigner()
-    const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)
+    const transferResult = (await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)) as SignTransferTxResult
     await waitForTxConfirmation(transferResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(address)
     expect(balance1 - balance0).toEqual(amount)
@@ -111,7 +139,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -146,7 +174,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 3n).toString(),
         },
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx(Array(2).fill(OutputType.Base))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -178,7 +206,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Multisig]);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -218,7 +246,7 @@ describe('ledger wallet', () => {
           ]
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.MultisigAndToken, OutputType.Multisig])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -405,7 +433,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 19n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -511,7 +539,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -536,7 +564,7 @@ describe('ledger wallet', () => {
     const buildTxResult = await nodeProvider.contracts.postContractsUnsignedTxDeployContract({
       fromPublicKey: testAccount.publicKey,
       bytecode: '00010c010000000002d38d0b3636020000'
-    })
+    }) as node.BuildSimpleDeployContractTxResult
 
     setTimeout(() => skipBlindSigningWarning(), 1000)
     await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
@@ -560,6 +588,42 @@ describe('ledger wallet', () => {
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const details = await nodeProvider.transactions.getTransactionsDetailsTxid(submitResult.txId)
     expect(details.scriptExecutionOk).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer to groupless addresses', async () => {
+    const wallet = new PrivateKeyWallet({ privateKey: testPrivateKey })
+    const publicKey = wallet.account.publicKey
+    const address = addressFromPublicKey(publicKey, 'gl-secp256k1')
+    console.log(`address: ${address}`)
+
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: address,
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    }) as node.BuildSimpleTransferTxResult
+
+    approveTx([OutputType.P2PK])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
 
     await app.close()
   }, 120000)
