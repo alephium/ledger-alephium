@@ -623,7 +623,7 @@ describe('ledger wallet', () => {
 
     await transferToAddress(account.address)
 
-    const result = await nodeProvider.transactions.postTransactionsBuild({
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
       fromPublicKey: account.publicKey,
       fromPublicKeyType: 'gl-secp256k1',
       destinations: [
@@ -632,8 +632,41 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    }) as node.BuildGrouplessTransferTxResult
-    const buildTxResult = result.transferTx
+    })
+
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), 'gl-secp256k1')
+    expect(transactionVerifySignature(buildTxResult.txId, account.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(account.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer to p2hmpk address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account] = await app.getAccount(path, undefined, 'gl-secp256k1', false)
+    console.log(account)
+
+    await transferToAddress(account.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: account.publicKey,
+      fromPublicKeyType: 'gl-secp256k1',
+      destinations: [
+        {
+          address: 'AysNhoEDMej7hyoTBnVb2zNSvJ5zSj6LXoB3LwnTv2NGaZ7ufh',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
 
     approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), 'gl-secp256k1')

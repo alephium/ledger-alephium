@@ -235,9 +235,13 @@ mod tests {
     use crate::decode::{new_decoder, Decoder};
     use crate::types::byte32::tests::gen_bytes;
     use crate::types::i32::tests::random_usize;
+    use crate::types::lockup_script::P2HMPK;
     use crate::types::test_utils::{test_decode, test_decode1};
     use crate::types::u256::tests::hex_to_bytes;
-    use crate::types::{Hash, LockupScript, PublicKeyLike, SecP256R1PubKey};
+    use crate::types::{
+        Byte, Byte32, Checksumable, Checksummed, ED25519PubKey, Hash, LockupScript, PublicKeyLike,
+        SecP256K1PubKey, SecP256R1PubKey,
+    };
     use crate::TempData;
     use std::vec;
 
@@ -343,5 +347,95 @@ mod tests {
             _ => assert!(false),
         };
         test_decode1(5u8, data, &check, None);
+    }
+
+    fn check_p2pk_address(key: &PublicKeyLike, expected: &str) {
+        let mut output = [0u8; 60];
+        let result = key.to_base58_address(&mut output).unwrap();
+        assert_eq!(std::str::from_utf8(result).unwrap(), expected);
+        assert_ne!(
+            std::str::from_utf8(result).unwrap(),
+            &expected[0..expected.len() - 1]
+        );
+    }
+
+    #[test]
+    fn test_p2hk_to_base58() {
+        let secp256k1_key: [u8; 33] =
+            hex_to_bytes("cda5fea4d7f1eab784a5c353537166e9bac417a97af077d6afb6426b8f47a0ee2d")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        check_p2pk_address(
+            &PublicKeyLike::SecP256K1(SecP256K1PubKey(secp256k1_key)),
+            "3cbeSBY1arGK1Puv8WwocLGzTgVqKsQfeLoW1FytjSzKHK5dsf4Mh",
+        );
+
+        let secp256r1_key: [u8; 33] =
+            hex_to_bytes("903edf6a966bae2f1ad71fbf738318f7629366db960f27cd158144d14a5faae167")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        check_p2pk_address(
+            &PublicKeyLike::SecP256R1(SecP256R1PubKey(secp256r1_key)),
+            "3ciAhvphB77V4pu5S4VJeGuZMLFJzBtLXfAwKA6nkLNJ8mvdQ7z2f",
+        );
+
+        let ed25519_key: [u8; 32] =
+            hex_to_bytes("8933f4a213edca26f8e9013b3f7e09435456607b2f47d3be0bd7d02a668b2b3f")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        check_p2pk_address(
+            &PublicKeyLike::ED25519(ED25519PubKey(ed25519_key)),
+            "bQTCfVQLpwerW4aKHbpU2zqWFrSSZYhAvisYXezNsrt17F9NHsP",
+        );
+
+        let webauthn_key: [u8; 33] =
+            hex_to_bytes("359736d14cf738eff9f020eb0bbc07340c5a63678b74dffeb10b84df28a41cb985")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        check_p2pk_address(
+            &PublicKeyLike::WebAuthn(SecP256R1PubKey(webauthn_key)),
+            "3cxHkEexKHY5KG4vPFJrogEQzWC1B4Nn4dG3VznfrEo6ySXxVYBd5",
+        );
+    }
+
+    fn check_p2hmpk_address(p2hmpk: &P2HMPK, expected: &str) {
+        let mut output = [0u8; 60];
+        let result = p2hmpk.to_base58_address(&mut output).unwrap();
+        assert_eq!(std::str::from_utf8(result).unwrap(), expected);
+        assert_ne!(
+            std::str::from_utf8(result).unwrap(),
+            &expected[0..expected.len() - 1]
+        );
+    }
+
+    #[test]
+    fn test_p2hmpk_to_base58() {
+        let bytes: [u8; 32] =
+            hex_to_bytes("1ec688aea4256d0615ed68561bdf25e888988498bea291c24b2eaae1cfa2c43d")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+        let hash = Byte32(bytes);
+        let checksum = hash.calc_checksum();
+        let p2hmpk = P2HMPK {
+            hash: Checksummed {
+                value: hash,
+                checksum: checksum,
+            },
+            group: Byte::default(),
+        };
+        check_p2hmpk_address(
+            &p2hmpk,
+            "AxH161tgrpG1X6nwtMdqxe5HxXhMWnrwdMHx4N1qSQMuzsXkS2",
+        );
     }
 }
