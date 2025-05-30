@@ -5,7 +5,7 @@ use crate::{
     handler::TOKEN_METADATA_SIZE,
     nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE},
     nvm::{NVM, NVM_DATA_SIZE},
-    public_key::{to_base58_address, Address},
+    public_key::{to_base58_address, Address, ADDRESS_MAX_SIZE},
     token_verifier::TokenVerifier,
     ui::bytes_to_string,
 };
@@ -17,6 +17,7 @@ use ledger_device_sdk::NVMData;
 use utils::{
     base58::ALPHABET,
     types::{
+        lockup_script::{P2HMPK, P2PK},
         AssetOutput, Byte32, Hash, LockupScript, Token, TxInput, UnlockScript, UnsignedTx, I32,
         U256,
     },
@@ -289,6 +290,22 @@ impl TxReviewer {
         self.buffer.write(str_bytes)
     }
 
+    pub fn write_p2pk_address(&mut self, p2pk: &P2PK) -> Result<usize, ErrorCode> {
+        let mut output = [0u8; ADDRESS_MAX_SIZE];
+        let str_bytes = p2pk
+            .to_base58_address(&mut output)
+            .ok_or(ErrorCode::Overflow)?;
+        self.buffer.write(str_bytes)
+    }
+
+    pub fn write_p2hmpk_address(&mut self, p2hmpk: &P2HMPK) -> Result<usize, ErrorCode> {
+        let mut output = [0u8; ADDRESS_MAX_SIZE];
+        let str_bytes = p2hmpk
+            .to_base58_address(&mut output)
+            .ok_or(ErrorCode::Overflow)?;
+        self.buffer.write(str_bytes)
+    }
+
     fn get_token_metadata(&self, token_id: &Hash) -> Option<(TokenSymbol, u8)> {
         let token_size = self.token_metadata_length / TOKEN_METADATA_SIZE;
         if token_size == 0 {
@@ -321,6 +338,8 @@ impl TxReviewer {
                 self.write_address(output.lockup_script.get_type(), &hash.0)?
             }
             LockupScript::P2MPKH(_) => self.write_multi_sig(temp_data)?,
+            LockupScript::P2PK(p2pk) => self.write_p2pk_address(&p2pk.inner)?,
+            LockupScript::P2HMPK(p2hmpk) => self.write_p2hmpk_address(&p2hmpk.inner)?,
             _ => panic!(), // dead branch
         };
 
@@ -409,6 +428,8 @@ impl TxReviewer {
             UnlockScript::P2MPKH(_) => self.has_external_inputs = true,
             UnlockScript::P2SH(_) => self.has_external_inputs = true,
             UnlockScript::SameAsPrevious => (),
+            UnlockScript::P2PK => self.has_external_inputs = true,
+            UnlockScript::P2HMPK(_) => self.has_external_inputs = true,
             _ => panic!(),
         };
 

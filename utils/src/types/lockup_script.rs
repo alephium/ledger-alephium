@@ -1,7 +1,11 @@
 use super::{Byte32, Hash, U16};
+use crate::base58::base58_encode_inputs;
 use crate::buffer::{Buffer, Writable};
 use crate::types::{Byte, Checksum, Checksumable, Checksummed, PublicKeyLike};
 use crate::{decode::*, djb_hash};
+
+pub const P2PK_PREFIX: u8 = 4u8;
+pub const P2HMPK_PREFIX: u8 = 5u8;
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
@@ -72,6 +76,19 @@ pub struct P2PK {
     pub group: Byte,
 }
 
+impl P2PK {
+    pub fn to_base58_address<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
+        base58_encode_inputs(
+            &[
+                &[P2PK_PREFIX, self.key.value.get_type()],
+                self.key.value.key_bytes(),
+                &self.key.checksum.0,
+            ],
+            output,
+        )
+    }
+}
+
 impl Reset for P2PK {
     fn reset(&mut self) {
         self.key.reset();
@@ -109,6 +126,15 @@ impl Checksumable for Hash {
 pub struct P2HMPK {
     pub hash: Checksummed<Hash>,
     pub group: Byte,
+}
+
+impl P2HMPK {
+    pub fn to_base58_address<'a>(&self, output: &'a mut [u8]) -> Option<&'a [u8]> {
+        base58_encode_inputs(
+            &[&[P2HMPK_PREFIX], &self.hash.value.0, &self.hash.checksum.0],
+            output,
+        )
+    }
 }
 
 impl Reset for P2HMPK {

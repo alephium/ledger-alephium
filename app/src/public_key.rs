@@ -8,6 +8,7 @@ use utils::{check_group, djb_hash, xor_bytes};
 
 const RAW_PUBKEY_SIZE: usize = 65;
 const COMPRESSED_PUBKEY_SIZE: usize = 33;
+pub const ADDRESS_MAX_SIZE: usize = 60;
 
 pub fn derive_pub_key(
     path: &mut [u32],
@@ -73,13 +74,13 @@ pub fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), E
 }
 
 pub struct Address {
-    bytes: [u8; 46],
+    bytes: [u8; ADDRESS_MAX_SIZE],
     length: usize,
 }
 
 impl Address {
     pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
+        let mut bytes = [0u8; ADDRESS_MAX_SIZE];
         let device_public_key =
             derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
         let public_key_hash = hash_of_public_key(device_public_key.as_ref());
@@ -89,7 +90,7 @@ impl Address {
     }
 
     pub fn from_pub_key(pub_key: &ECPublicKey<65, 'W'>) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
+        let mut bytes = [0u8; ADDRESS_MAX_SIZE];
         let public_key_hash = hash_of_public_key(pub_key.as_ref());
         let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
         let length = device_address.len();
