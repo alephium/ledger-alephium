@@ -60,3 +60,63 @@ fn reset(dest: &mut [u8]) {
         index += 1;
     }
 }
+
+#[cfg(test)]
+pub mod test_utils {
+    extern crate std;
+
+    use core::fmt::Debug;
+    use std::vec::Vec;
+
+    use crate::buffer::Buffer;
+    use crate::decode::RawDecoder;
+    use crate::decode::{new_decoder, Decoder};
+    use crate::types::i32::tests::random_usize;
+    use crate::TempData;
+
+    pub fn test_decode<T: Default + RawDecoder + PartialEq + Debug>(
+        prefix: u8,
+        data: Vec<u8>,
+        value: Option<&T>,
+        expected_temp_data: Option<&Vec<u8>>,
+    ) {
+        let bytes = [&[prefix][..], &data[..]].concat();
+
+        {
+            let mut temp_data = TempData::new();
+            let mut buffer = Buffer::new(&bytes, &mut temp_data);
+            let mut decoder = new_decoder::<T>();
+            let result = decoder.decode(&mut buffer).unwrap();
+            match value {
+                Some(_) => assert_eq!(result, value),
+                None => assert!(result.is_some()),
+            }
+        }
+
+        let mut length: usize = 0;
+        let mut decoder = new_decoder::<T>();
+
+        let mut temp_data = TempData::new();
+        while length < bytes.len() {
+            let remain = bytes.len() - length;
+            let size = random_usize(0, remain);
+            let mut buffer = Buffer::new(&bytes[length..(length + size)], &mut temp_data);
+            length += size;
+
+            let result = decoder.decode(&mut buffer).unwrap();
+            if length == bytes.len() {
+                match value {
+                    Some(_) => assert_eq!(result, value),
+                    None => assert!(result.is_some()),
+                }
+                assert!(decoder.stage.is_complete());
+                match expected_temp_data {
+                    Some(data) => assert_eq!(*data, temp_data.get().to_vec()),
+                    None => (),
+                }
+            } else {
+                assert_eq!(result, None);
+            }
+        }
+    }
+}
