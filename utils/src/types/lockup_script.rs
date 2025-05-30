@@ -1,7 +1,7 @@
 use super::{Byte32, Hash, U16};
 use crate::buffer::{Buffer, Writable};
-use crate::decode::*;
-use crate::types::{Byte, Checksummed, PublicKeyLike};
+use crate::types::{Byte, Checksum, Checksumable, Checksummed, PublicKeyLike};
+use crate::{decode::*, djb_hash};
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
@@ -97,6 +97,45 @@ impl RawDecoder for P2PK {
     }
 }
 
+impl Checksumable for Hash {
+    fn calc_checksum(&self) -> Checksum {
+        let hash: [u8; 4] = djb_hash(&self.0).to_be_bytes();
+        Checksum(hash)
+    }
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default)]
+pub struct P2HMPK {
+    pub hash: Checksummed<Hash>,
+    pub group: Byte,
+}
+
+impl Reset for P2HMPK {
+    fn reset(&mut self) {
+        self.hash.reset();
+        self.group.reset();
+    }
+}
+
+impl RawDecoder for P2HMPK {
+    fn step_size(&self) -> u16 {
+        self.hash.step_size() + 1
+    }
+
+    fn decode<W: Writable>(
+        &mut self,
+        buffer: &mut Buffer<'_, W>,
+        stage: &DecodeStage,
+    ) -> DecodeResult<DecodeStage> {
+        match stage.step {
+            step if step < self.hash.step_size() => self.hash.decode(buffer, stage),
+            step if step < self.step_size() => self.group.decode(buffer, stage),
+            _ => Err(DecodeError::InternalError),
+        }
+    }
+}
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Default)]
 pub enum LockupScript {
@@ -105,6 +144,7 @@ pub enum LockupScript {
     P2SH(Hash),
     P2C(Hash),
     P2PK(StreamingDecoder<P2PK>),
+    P2HMPK(StreamingDecoder<P2HMPK>),
     #[default]
     Unknown,
 }
@@ -123,6 +163,7 @@ impl LockupScript {
             2 => Some(LockupScript::P2SH(Hash::default())),
             3 => Some(LockupScript::P2C(Hash::default())),
             4 => Some(LockupScript::P2PK(StreamingDecoder::default())),
+            5 => Some(LockupScript::P2HMPK(StreamingDecoder::default())),
             _ => None,
         }
     }
@@ -134,6 +175,7 @@ impl LockupScript {
             LockupScript::P2SH(_) => 2,
             LockupScript::P2C(_) => 3,
             LockupScript::P2PK(_) => 4,
+            LockupScript::P2HMPK(_) => 5,
             _ => 0xff, // dead branch
         }
     }
@@ -166,6 +208,7 @@ impl RawDecoder for LockupScript {
             LockupScript::P2SH(hash) => hash.decode(buffer, stage),
             LockupScript::P2C(hash) => hash.decode(buffer, stage),
             LockupScript::P2PK(p2pk) => p2pk.decode_children(buffer, stage),
+            LockupScript::P2HMPK(p2hmpk) => p2hmpk.decode_children(buffer, stage),
             LockupScript::Unknown => Err(DecodeError::InternalError),
         }
     }
@@ -262,5 +305,30 @@ mod tests {
             _ => assert!(false),
         };
         test_decode1(4u8, data, &check, None);
+    }
+
+    #[test]
+    fn test_decode_p2hmpk() {
+        let data = hex_to_bytes(
+            "d86790cb655097d8e6f357af86aab2ee1c21ea1462a64d323938a3fc5824d1433f359ff402",
+        )
+        .unwrap();
+        let hash = Hash::from_bytes(
+            hex_to_bytes("d86790cb655097d8e6f357af86aab2ee1c21ea1462a64d323938a3fc5824d143")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap(),
+        );
+
+        let check = |result: Option<&LockupScript>| match result.unwrap() {
+            LockupScript::P2HMPK(inner) => {
+                assert!(inner.stage.is_complete());
+                assert_eq!(inner.inner.hash.value, hash);
+                assert_eq!(inner.inner.group.0, 2);
+            }
+            _ => assert!(false),
+        };
+        test_decode1(5u8, data, &check, None);
     }
 }
