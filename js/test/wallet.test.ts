@@ -100,6 +100,7 @@ describe('ledger wallet', () => {
   it('should get public key and confirm address: groupless', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
+    expect(() => app.getAccount(path, 1, 'gl-secp256k1', true)).rejects.toThrow('Cannot specify the target group for groupless addresses')
     approveAddress(true)
     const [account, hdIndex] = await app.getAccount(path, undefined, 'gl-secp256k1', true)
     expect(hdIndex).toBe(pathIndex)
@@ -453,7 +454,7 @@ describe('ledger wallet', () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
-    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(testAccount.group)
+    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(groupOfAddress(testAccount.address))
     for (let i = 0; i < 2; i += 1) {
       await transferToAddress(testAccount.address, ONE_ALPH)
       await transferToAddress(newAccount.address, ONE_ALPH)

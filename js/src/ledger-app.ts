@@ -51,6 +51,9 @@ export class AlephiumApp {
     }
 
     const [keyType, keyTypeBytes] = this.checkKeyType(_keyType)
+    if (keyType === 'gl-secp256k1' && targetGroup !== undefined) {
+      throw Error('Cannot specify the target group for groupless addresses')
+    }
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const payload = Buffer.concat([serde.serializePath(startPath), keyTypeBytes, Buffer.from([display ? 1 : 0])]);
