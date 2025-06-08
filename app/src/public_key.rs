@@ -1,13 +1,17 @@
 use crate::blake2b_hasher::{Blake2bHasher, BLAKE2B_HASH_SIZE};
 use crate::error_code::ErrorCode;
+use crate::key_type::KeyType;
 use ledger_device_sdk::ecc::SeedDerive;
 use ledger_device_sdk::ecc::{ECPublicKey, Secp256k1};
 use ledger_device_sdk::io::Reply;
 use utils::base58::base58_encode_inputs;
+use utils::types::PublicKeyLike;
+use utils::types::SecP256K1PubKey;
 use utils::{check_group, djb_hash, xor_bytes};
 
 const RAW_PUBKEY_SIZE: usize = 65;
 const COMPRESSED_PUBKEY_SIZE: usize = 33;
+pub const ADDRESS_MAX_SIZE: usize = 60;
 
 pub fn derive_pub_key(
     path: &mut [u32],
@@ -46,8 +50,8 @@ fn derive_pub_key_for_group(
     }
 }
 
-pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
-    assert!(pub_key.len() == RAW_PUBKEY_SIZE);
+#[inline]
+fn get_compressed_pubkey(pub_key: &[u8]) -> [u8; COMPRESSED_PUBKEY_SIZE] {
     let mut compressed = [0_u8; COMPRESSED_PUBKEY_SIZE];
     compressed[1..COMPRESSED_PUBKEY_SIZE].copy_from_slice(&pub_key[1..COMPRESSED_PUBKEY_SIZE]);
     if pub_key.last().unwrap() % 2 == 0 {
@@ -55,7 +59,12 @@ pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
     } else {
         compressed[0] = 0x03
     }
+    compressed
+}
 
+pub fn hash_of_public_key(pub_key: &[u8]) -> [u8; BLAKE2B_HASH_SIZE] {
+    assert!(pub_key.len() == RAW_PUBKEY_SIZE);
+    let compressed = get_compressed_pubkey(pub_key);
     Blake2bHasher::hash(&compressed).unwrap()
 }
 
@@ -73,27 +82,48 @@ pub fn sign_hash(path: &[u32], message: &[u8]) -> Result<([u8; 72], u32, u32), E
 }
 
 pub struct Address {
-    bytes: [u8; 46],
+    bytes: [u8; ADDRESS_MAX_SIZE],
     length: usize,
+    pub is_groupless: bool,
 }
 
 impl Address {
-    pub fn from_path(path: &[u32]) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
+    pub fn from_path(path: &[u32], key_type: KeyType) -> Result<Self, ErrorCode> {
         let device_public_key =
             derive_pub_key_by_path(path).map_err(|_| ErrorCode::DerivingPublicKeyFailed)?;
-        let public_key_hash = hash_of_public_key(device_public_key.as_ref());
-        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
-        let length = device_address.len();
-        Ok(Self { bytes, length })
+        Self::from_pub_key(&device_public_key, key_type)
     }
 
-    pub fn from_pub_key(pub_key: &ECPublicKey<65, 'W'>) -> Result<Self, ErrorCode> {
-        let mut bytes = [0u8; 46];
-        let public_key_hash = hash_of_public_key(pub_key.as_ref());
-        let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
-        let length = device_address.len();
-        Ok(Self { bytes, length })
+    pub fn from_pub_key(
+        pub_key: &ECPublicKey<65, 'W'>,
+        key_type: KeyType,
+    ) -> Result<Self, ErrorCode> {
+        let mut bytes = [0u8; ADDRESS_MAX_SIZE];
+        match key_type {
+            KeyType::Default => {
+                let public_key_hash = hash_of_public_key(pub_key.as_ref());
+                let device_address = to_base58_address(0u8, &public_key_hash, &mut bytes)?;
+                let length = device_address.len();
+                Ok(Self {
+                    bytes,
+                    length,
+                    is_groupless: false,
+                })
+            }
+            KeyType::GLSecp256k1 => {
+                let key_bytes = get_compressed_pubkey(pub_key.as_ref());
+                let pub_key_like = PublicKeyLike::SecP256K1(SecP256K1PubKey(key_bytes));
+                let device_address = pub_key_like
+                    .to_base58_address(&mut bytes)
+                    .ok_or(ErrorCode::Overflow)?;
+                let length = device_address.len();
+                Ok(Self {
+                    bytes,
+                    length,
+                    is_groupless: true,
+                })
+            }
+        }
     }
 
     pub fn get_address_bytes(&self) -> &[u8] {

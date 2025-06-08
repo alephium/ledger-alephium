@@ -1,9 +1,37 @@
 import { AlephiumApp, GROUP_NUM } from '../src/ledger-app'
-import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, codec, groupOfAddress, node, sleep, transactionVerifySignature, waitForTxConfirmation, web3 } from '@alephium/web3'
-import { getSigner, mintToken, transfer } from '@alephium/web3-test'
+import {
+  ALPH_TOKEN_ID,
+  Address,
+  DUST_AMOUNT,
+  NodeProvider,
+  ONE_ALPH,
+  binToHex,
+  codec,
+  groupOfAddress,
+  node,
+  sleep,
+  transactionVerifySignature,
+  waitForTxConfirmation,
+  web3,
+  SignTransferTxResult,
+  addressFromPublicKey
+} from '@alephium/web3'
+import { getSigner, mintToken, transfer, testPrivateKey } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
+import {
+  approveAddress,
+  approveHash,
+  approveTx,
+  createTransport,
+  enableBlindSigning,
+  getRandomInt,
+  isStaxOrFlex,
+  needToAutoApprove,
+  OutputType,
+  skipBlindSigningWarning,
+  staxFlexAcceptRisk
+} from './utils'
 import { TokenMetadata } from '../src/types'
 import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
@@ -22,7 +50,7 @@ describe('ledger wallet', () => {
   async function transferToAddress(address: Address, amount: bigint = ONE_ALPH * 10n) {
     const balance0 = await getALPHBalance(address)
     const fromAccount = await getSigner()
-    const transferResult = await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)
+    const transferResult = (await transfer(fromAccount, address, ALPH_TOKEN_ID, amount)) as SignTransferTxResult
     await waitForTxConfirmation(transferResult.txId, 1, 1000)
     const balance1 = await getALPHBalance(address)
     expect(balance1 - balance0).toEqual(amount)
@@ -50,11 +78,31 @@ describe('ledger wallet', () => {
     await app.close()
   })
 
+  it('should get public key: groupless', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account, hdIndex] = await app.getAccount(path, undefined, 'gl-secp256k1')
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  })
+
   it('should get public key and confirm address', async () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     approveAddress()
     const [account, hdIndex] = await app.getAccount(path, undefined, undefined, true)
+    expect(hdIndex).toBe(pathIndex)
+    console.log(account)
+    await app.close()
+  }, 30000)
+
+  it('should get public key and confirm address: groupless', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    expect(() => app.getAccount(path, 1, 'gl-secp256k1', true)).rejects.toThrow('Cannot specify the target group for groupless addresses')
+    approveAddress(true)
+    const [account, hdIndex] = await app.getAccount(path, undefined, 'gl-secp256k1', true)
     expect(hdIndex).toBe(pathIndex)
     console.log(account)
     await app.close()
@@ -76,7 +124,7 @@ describe('ledger wallet', () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     for (let group = 0; group < GROUP_NUM; group++) {
-      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('BIP340-Schnorr is not supported yet')
+      await expect(app.getAccount(path, group, 'bip340-schnorr')).rejects.toThrow('bip340-schnorr is not supported yet')
     }
     await app.close()
   })
@@ -111,7 +159,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -146,7 +194,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 3n).toString(),
         },
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx(Array(2).fill(OutputType.Base))
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -178,7 +226,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Multisig]);
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -218,7 +266,7 @@ describe('ledger wallet', () => {
           ]
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.MultisigAndToken, OutputType.Multisig])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -240,38 +288,6 @@ describe('ledger wallet', () => {
 
     await app.close()
   }, 120000)
-
-  async function genTokensAndDestinations(
-    fromAddress: string,
-    toAddress: string,
-    mintAmount: bigint,
-    transferAmount: bigint
-  ) {
-    const tokens: TokenMetadata[] = []
-    const tokenSymbol = 'TestTokenABC'
-    const destinations: node.Destination[] = []
-    for (let i = 0; i < 5; i += 1) {
-      const tokenInfo = await mintToken(fromAddress, mintAmount);
-      const tokenMetadata: TokenMetadata = {
-        version: 0,
-        tokenId: tokenInfo.contractId,
-        symbol: tokenSymbol.slice(0, tokenSymbol.length - i),
-        decimals: 18 - i
-      }
-      tokens.push(tokenMetadata)
-      destinations.push({
-        address: toAddress,
-        attoAlphAmount: DUST_AMOUNT.toString(),
-        tokens: [
-          {
-            id: tokenMetadata.tokenId,
-            amount: transferAmount.toString()
-          }
-        ]
-      })
-    }
-    return { tokens, destinations }
-  }
 
   it('should transfer tokens with proof', async () => {
     const transport = await createTransport()
@@ -405,7 +421,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 19n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([OutputType.Base])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -438,7 +454,7 @@ describe('ledger wallet', () => {
     const transport = await createTransport()
     const app = new AlephiumApp(transport)
     const [testAccount] = await app.getAccount(path)
-    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(testAccount.group)
+    const { account: newAccount, unlockScript: unlockScript0 } = getAccount(groupOfAddress(testAccount.address))
     for (let i = 0; i < 2; i += 1) {
       await transferToAddress(testAccount.address, ONE_ALPH)
       await transferToAddress(newAccount.address, ONE_ALPH)
@@ -511,7 +527,7 @@ describe('ledger wallet', () => {
           attoAlphAmount: (ONE_ALPH * 2n).toString(),
         }
       ]
-    })
+    }) as node.BuildSimpleTransferTxResult
 
     approveTx([])
     const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
@@ -536,7 +552,7 @@ describe('ledger wallet', () => {
     const buildTxResult = await nodeProvider.contracts.postContractsUnsignedTxDeployContract({
       fromPublicKey: testAccount.publicKey,
       bytecode: '00010c010000000002d38d0b3636020000'
-    })
+    }) as node.BuildSimpleDeployContractTxResult
 
     setTimeout(() => skipBlindSigningWarning(), 1000)
     await expect(app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))).rejects.toThrow()
@@ -560,6 +576,110 @@ describe('ledger wallet', () => {
     await waitForTxConfirmation(submitResult.txId, 1, 1000)
     const details = await nodeProvider.transactions.getTransactionsDetailsTxid(submitResult.txId)
     expect(details.scriptExecutionOk).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer to groupless addresses', async () => {
+    const wallet = new PrivateKeyWallet({ privateKey: testPrivateKey })
+    const publicKey = wallet.account.publicKey
+    const address = addressFromPublicKey(publicKey, 'gl-secp256k1')
+    console.log(`address: ${address}`)
+
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [testAccount] = await app.getAccount(path)
+    await transferToAddress(testAccount.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: testAccount.publicKey,
+      destinations: [
+        {
+          address: address,
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    }) as node.BuildSimpleTransferTxResult
+
+    approveTx([OutputType.P2PK])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'))
+    expect(transactionVerifySignature(buildTxResult.txId, testAccount.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(testAccount.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer from groupless address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account] = await app.getAccount(path, undefined, 'gl-secp256k1', false)
+    console.log(account)
+
+    await transferToAddress(account.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: account.publicKey,
+      fromPublicKeyType: 'gl-secp256k1',
+      destinations: [
+        {
+          address: '1BmVCLrjttchZMW7i6df7mTdCKzHpy38bgDbVL1GqV6P7',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
+
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), 'gl-secp256k1')
+    expect(transactionVerifySignature(buildTxResult.txId, account.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(account.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
+
+    await app.close()
+  }, 120000)
+
+  it('should transfer to p2hmpk address', async () => {
+    const transport = await createTransport()
+    const app = new AlephiumApp(transport)
+    const [account] = await app.getAccount(path, undefined, 'gl-secp256k1', false)
+    console.log(account)
+
+    await transferToAddress(account.address)
+
+    const buildTxResult = await nodeProvider.transactions.postTransactionsBuild({
+      fromPublicKey: account.publicKey,
+      fromPublicKeyType: 'gl-secp256k1',
+      destinations: [
+        {
+          address: 'AysNhoEDMej7hyoTBnVb2zNSvJ5zSj6LXoB3LwnTv2NGaZ7ufh',
+          attoAlphAmount: (ONE_ALPH * 2n).toString(),
+        }
+      ]
+    })
+
+    approveTx([OutputType.Base])
+    const signature = await app.signUnsignedTx(path, Buffer.from(buildTxResult.unsignedTx, 'hex'), 'gl-secp256k1')
+    expect(transactionVerifySignature(buildTxResult.txId, account.publicKey, signature)).toBe(true)
+
+    const submitResult = await nodeProvider.transactions.postTransactionsSubmit({
+      unsignedTx: buildTxResult.unsignedTx,
+      signature: signature
+    })
+    await waitForTxConfirmation(submitResult.txId, 1, 1000)
+    const balance = await getALPHBalance(account.address)
+    expect(balance < (ONE_ALPH * 8n)).toEqual(true)
 
     await app.close()
   }, 120000)

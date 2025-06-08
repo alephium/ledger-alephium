@@ -3,6 +3,7 @@ use super::*;
 use crate::buffer::{Buffer, Writable};
 use crate::decode::*;
 use crate::types::method_selector::MethodSelector;
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Instr {
     CallLocal(Byte),
@@ -61,11 +62,11 @@ pub enum Instr {
     U256ModAdd,
     U256ModSub,
     U256ModMul,
-    U256BitAnd,
-    U256BitOr,
-    U256Xor,
-    U256SHL,
-    U256SHR,
+    NumericBitAnd,
+    NumericBitOr,
+    NumericXor,
+    NumericSHL,
+    NumericSHR,
     I256ToU256,
     I256ToByteVec,
     U256ToI256,
@@ -146,6 +147,11 @@ pub enum Instr {
     I256ToString,
     BoolToString,
     GroupOfAddress,
+    VerifySignature,
+    GetSegregatedWebAuthnSignature,
+    DevInstr(Byte),
+    I256RoundInfinityDiv,
+    U256RoundInfinityDiv,
     LoadMutField(Byte),
     StoreMutField(Byte),
     ApproveAlph,
@@ -199,6 +205,8 @@ pub enum Instr {
     CreateMapEntry(Byte, Byte),
     MethodSelector(MethodSelector),
     CallExternalBySelector(MethodSelector),
+    ExternalCallerContractId,
+    ExternalCallerAddress,
     Unknown,
 }
 impl Reset for Instr {
@@ -270,11 +278,11 @@ impl Instr {
             53 => Some(Self::U256ModAdd),
             54 => Some(Self::U256ModSub),
             55 => Some(Self::U256ModMul),
-            56 => Some(Self::U256BitAnd),
-            57 => Some(Self::U256BitOr),
-            58 => Some(Self::U256Xor),
-            59 => Some(Self::U256SHL),
-            60 => Some(Self::U256SHR),
+            56 => Some(Self::NumericBitAnd),
+            57 => Some(Self::NumericBitOr),
+            58 => Some(Self::NumericXor),
+            59 => Some(Self::NumericSHL),
+            60 => Some(Self::NumericSHR),
             61 => Some(Self::I256ToU256),
             62 => Some(Self::I256ToByteVec),
             63 => Some(Self::U256ToI256),
@@ -355,6 +363,11 @@ impl Instr {
             138 => Some(Self::I256ToString),
             139 => Some(Self::BoolToString),
             140 => Some(Self::GroupOfAddress),
+            141 => Some(Self::VerifySignature),
+            142 => Some(Self::GetSegregatedWebAuthnSignature),
+            143 => Some(Self::DevInstr(Byte::default())),
+            144 => Some(Self::I256RoundInfinityDiv),
+            145 => Some(Self::U256RoundInfinityDiv),
             160 => Some(Self::LoadMutField(Byte::default())),
             161 => Some(Self::StoreMutField(Byte::default())),
             162 => Some(Self::ApproveAlph),
@@ -408,6 +421,8 @@ impl Instr {
             210 => Some(Self::CreateMapEntry(Byte::default(), Byte::default())),
             211 => Some(Self::MethodSelector(MethodSelector::default())),
             212 => Some(Self::CallExternalBySelector(MethodSelector::default())),
+            213 => Some(Self::ExternalCallerContractId),
+            214 => Some(Self::ExternalCallerAddress),
             _ => None,
         }
     }
@@ -427,6 +442,7 @@ impl RawDecoder for Instr {
             Self::IfTrue(v0) => v0.step_size(),
             Self::IfFalse(v0) => v0.step_size(),
             Self::DEBUG(v0) => v0.step_size(),
+            Self::DevInstr(v0) => v0.step_size(),
             Self::LoadMutField(v0) => v0.step_size(),
             Self::StoreMutField(v0) => v0.step_size(),
             Self::LoadImmField(v0) => v0.step_size(),
@@ -466,6 +482,7 @@ impl RawDecoder for Instr {
             Self::IfTrue(v0) => v0.decode(buffer, stage),
             Self::IfFalse(v0) => v0.decode(buffer, stage),
             Self::DEBUG(v0) => v0.decode(buffer, stage),
+            Self::DevInstr(v0) => v0.decode(buffer, stage),
             Self::LoadMutField(v0) => v0.decode(buffer, stage),
             Self::StoreMutField(v0) => v0.decode(buffer, stage),
             Self::LoadImmField(v0) => v0.decode(buffer, stage),
@@ -649,6 +666,8 @@ pub mod tests {
             (138, "8a"),
             (139, "8b"),
             (140, "8c"),
+            (141, "8d"),
+            (142, "8e"),
             (160, "a07f"),
             (161, "a180"),
             (162, "a2"),
@@ -702,6 +721,8 @@ pub mod tests {
             (210, "d27f7f"),
             (211, "d300000000"),
             (212, "d400000000"),
+            (213, "d5"),
+            (214, "d6"),
         ];
 
         for &(code, hex) in ALL_INSTRS {

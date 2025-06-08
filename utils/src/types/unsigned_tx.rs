@@ -118,7 +118,9 @@ mod tests {
     use crate::decode::new_decoder;
     use crate::types::i32::tests::random_usize;
     use crate::types::u256::tests::hex_to_bytes;
-    use crate::types::{AVector, Hash, Hint, LockupScript, PublicKey, UnlockScript, I32, U256};
+    use crate::types::{
+        AVector, Hash, Hint, LockupScript, SecP256K1PubKey, UnlockScript, I32, U256,
+    };
     use crate::TempData;
     use blake2::{Blake2b, Digest};
     use core::cmp::min;
@@ -147,7 +149,7 @@ mod tests {
     }
 
     fn p2pkh_unlock_script(public_key_hex: &str) -> UnlockScript {
-        let public_key = PublicKey::from_bytes(
+        let public_key = SecP256K1PubKey::from_bytes(
             hex_to_bytes(public_key_hex)
                 .unwrap()
                 .as_slice()

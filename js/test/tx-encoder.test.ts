@@ -64,17 +64,18 @@ describe('TxEncoder', () => {
   })
 
   it('should encode tx', () => {
+    const keyTypeBytes = Buffer.from([0])
     const path = `m/44'/1234'/0'/0/0`
     const encodedPath = serializePath(path)
     const unsignedTx0 = randomBytes(200)
-    const frames0 = encodeUnsignedTx(path, unsignedTx0)
-    expect(frames0).toEqual([{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx0]) }])
+    const frames0 = encodeUnsignedTx(path, keyTypeBytes, unsignedTx0)
+    expect(frames0).toEqual([{ p1: 1, p2: 0, data: Buffer.concat([encodedPath, keyTypeBytes, unsignedTx0]) }])
 
     const unsignedTx1 = randomBytes(250)
-    const frames1 = encodeUnsignedTx(path, unsignedTx1)
+    const frames1 = encodeUnsignedTx(path, keyTypeBytes, unsignedTx1)
     expect(frames1).toEqual([
-      { p1: 1, p2: 0, data: Buffer.concat([encodedPath, unsignedTx1.slice(0, MAX_PAYLOAD_SIZE - 20)]) },
-      { p1: 1, p2: 1, data: unsignedTx1.slice( MAX_PAYLOAD_SIZE - 20) },
+      { p1: 1, p2: 0, data: Buffer.concat([encodedPath, keyTypeBytes, unsignedTx1.slice(0, MAX_PAYLOAD_SIZE - 21)]) },
+      { p1: 1, p2: 1, data: unsignedTx1.slice( MAX_PAYLOAD_SIZE - 21) },
     ])
   })
 })

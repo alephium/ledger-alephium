@@ -4,6 +4,7 @@ use utils::deserialize_path;
 use crate::{
     debug::print::{println, println_slice},
     error_code::ErrorCode,
+    key_type::KeyType,
     public_key::{derive_pub_key, Address},
     sign_tx_context::SignTxContext,
     ui::{bytes_to_string, review_address, sign_hash_ui, tx_reviewer::TxReviewer},
@@ -64,8 +65,10 @@ pub fn handle_apdu(
         }
         Ins::GetPubKey => {
             let data = comm.get_data()?;
-            // 1 byte flag indicating whether address verification is needed
-            if data.len() != PATH_LENGTH + 1 {
+            // there are 2 bytes following the path:
+            // 1. 1 byte flag indicating the key type
+            // 2. 1 byte flag indicating whether address verification is needed
+            if data.len() != PATH_LENGTH + 2 {
                 return Err(ErrorCode::BadLen.into());
             }
             let raw_path = &data[..PATH_LENGTH];
@@ -81,9 +84,10 @@ pub fn handle_apdu(
             let p2 = apdu_header.p2; // Target group
             let (pk, hd_index) = derive_pub_key(&mut path, p1, p2)?;
 
-            let need_to_display = data[PATH_LENGTH] != 0;
+            let key_type = KeyType::from(data[PATH_LENGTH])?;
+            let need_to_display = data[PATH_LENGTH + 1] != 0;
             if need_to_display {
-                let address = Address::from_pub_key(&pk)?;
+                let address = Address::from_pub_key(&pk, key_type)?;
                 let address_str = bytes_to_string(address.get_address_bytes())?;
                 review_address(address_str)?;
             }
@@ -176,18 +180,19 @@ fn handle_sign_tx(
         (0, 1) => tx_reviewer.handle_token_metadata(data), // token metadata and proof frame
         (0, 2) => tx_reviewer.handle_token_proof(data),    // the following token proof frame
         (1, 0) => {
-            // the first unsigned tx frame
-            if data.len() < PATH_LENGTH + SCRIPT_OFFSET {
+            // the first unsigned tx frame, add 1 byte for the key type
+            if data.len() < PATH_LENGTH + 1 + SCRIPT_OFFSET {
                 return Err(ErrorCode::BadLen);
             }
-            let tx_data = &data[PATH_LENGTH..];
+            let tx_data = &data[(PATH_LENGTH + 1)..];
             let is_tx_execute_script = tx_data[SCRIPT_OFFSET - 1] == CALL_CONTRACT_FLAG;
             if is_tx_execute_script {
                 tx_reviewer.check_blind_signing()?;
             }
             tx_reviewer.set_tx_execute_script(is_tx_execute_script);
 
-            sign_tx_context.init(&data[..PATH_LENGTH])?;
+            let key_type = KeyType::from(data[PATH_LENGTH])?;
+            sign_tx_context.init(&data[..PATH_LENGTH], key_type)?;
             sign_tx_context.handle_tx_data(apdu_header, tx_data, tx_reviewer)
         }
         (1, 1) => sign_tx_context.handle_tx_data(apdu_header, data, tx_reviewer), // the following unsigned tx frame

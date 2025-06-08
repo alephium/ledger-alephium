@@ -29,7 +29,8 @@ export enum OutputType {
   Multisig,
   Token,
   BaseAndToken,
-  MultisigAndToken
+  MultisigAndToken,
+  P2PK
 }
 
 const NanospClickTable = new Map([
@@ -38,6 +39,7 @@ const NanospClickTable = new Map([
   [OutputType.Token, 6],
   [OutputType.BaseAndToken, 6],
   [OutputType.MultisigAndToken, 8],
+  [OutputType.P2PK, 4],
 ])
 
 const StaxClickTable = new Map([
@@ -46,6 +48,7 @@ const StaxClickTable = new Map([
   [OutputType.Token, 2],
   [OutputType.BaseAndToken, 2],
   [OutputType.MultisigAndToken, 2],
+  [OutputType.P2PK, 1],
 ])
 
 const FlexClickTable = new Map([
@@ -54,6 +57,7 @@ const FlexClickTable = new Map([
   [OutputType.Token, 2],
   [OutputType.BaseAndToken, 2],
   [OutputType.MultisigAndToken, 3],
+  [OutputType.P2PK, 1],
 ])
 
 function getOutputClickSize(outputType: OutputType) {
@@ -181,14 +185,14 @@ export async function approveHash() {
   await clickAndApprove(3)
 }
 
-export async function approveAddress() {
+export async function approveAddress(isGroupless: boolean = false) {
   if (!needToAutoApprove()) return
   if (isStaxOrFlex()) {
     await _touch(1)
     await staxFlexApproveOnce()
     return
   }
-  await clickAndApprove(2)
+  await clickAndApprove(isGroupless ? 3 : 2)
 }
 
 export function isStaxOrFlex(): boolean {

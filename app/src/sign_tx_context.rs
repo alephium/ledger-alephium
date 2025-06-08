@@ -4,6 +4,7 @@ use utils::{
     buffer::Buffer, decode::StreamingDecoder, deserialize_path, types::UnsignedTx, PATH_LENGTH,
 };
 
+use crate::key_type::KeyType;
 use crate::nvm::swapping_buffer::{SwappingBuffer, RAM_SIZE};
 use crate::nvm::{NVM, NVM_DATA_SIZE};
 use crate::public_key::sign_hash;
@@ -51,13 +52,13 @@ impl SignTxContext {
     }
 
     // Initialize the context
-    pub fn init(&mut self, data: &[u8]) -> Result<(), ErrorCode> {
+    pub fn init(&mut self, data: &[u8], key_type: KeyType) -> Result<(), ErrorCode> {
         deserialize_path(data, &mut self.path, ErrorCode::HDPathDecodingFailed)?;
         self.tx_decoder.reset();
         self.current_step = DecodeStep::Init;
         self.hasher.reset();
         self.temp_data.reset(0);
-        self.device_address = Some(Address::from_path(&self.path)?);
+        self.device_address = Some(Address::from_path(&self.path, key_type)?);
         Ok(())
     }
 
