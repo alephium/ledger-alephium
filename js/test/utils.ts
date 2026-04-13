@@ -100,7 +100,6 @@ interface Position {
 
 const STAX_CONTINUE_POSITION = { x: 342, y: 606 }
 const STAX_APPROVE_POSITION = { x: 200, y: 515 }
-const STAX_REJECT_POSITION = { x: 36, y: 606 }
 const STAX_SETTINGS_POSITION = { x: 342, y: 55 }
 const STAX_BLIND_SETTING_POSITION = { x: 342, y: 90 }
 const STAX_GO_TO_SETTINGS = { x: 36, y: 606 }
@@ -108,7 +107,6 @@ const STAX_ACCEPT_RISK_POSITION = { x: 36, y: 606 }
 
 const FLEX_CONTINUE_POSITION = { x: 430, y: 550 }
 const FLEX_APPROVE_POSITION = { x: 240, y: 435 }
-const FLEX_REJECT_POSITION = { x: 55, y: 530 }
 const FLEX_SETTINGS_POSITION = { x: 405, y: 75 }
 const FLEX_BLIND_SETTING_POSITION = { x: 405, y: 96 }
 const FLEX_GO_TO_SETTINGS = { x: 55, y: 530 }

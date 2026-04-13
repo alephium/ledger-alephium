@@ -1,5 +1,5 @@
 import { tokenMerkleProofs } from "./merkle"
-import { checkTokenMetadata, serializePath, serializeSingleTokenMetadata } from "./serde"
+import { serializePath, serializeSingleTokenMetadata } from "./serde"
 import { MAX_PAYLOAD_SIZE, TokenMetadata } from "./types"
 
 export interface Frame {
