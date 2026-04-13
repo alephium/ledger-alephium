@@ -4,6 +4,9 @@
   "license": "GPL",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "repository": {
+    "url": "https://github.com/alephium/ledger-alephium"
+  },
   "exports": {
     ".": "./dist/src/index.js"
   },
