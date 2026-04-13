@@ -8,6 +8,10 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-leman.[0-9]+'
   workflow_dispatch:
 
+permissions:
+  id-token: write # Required for OIDC authentication
+  contents: read
+
 jobs:
   get_dist_tag:
     runs-on: ubuntu-latest
@@ -21,7 +25,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 16
+          node-version: 24
       - name: Get the tag name
         id: get_tag
         run: |
@@ -42,12 +46,10 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 16
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
       - name: Publish to npm
         run: |
           cd js
           npm ci
           npm run pub
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
