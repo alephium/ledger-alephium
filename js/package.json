@@ -1,6 +1,6 @@
 {
   "name": "@alephium/ledger-app",
-  "version": "0.6.1-rc.0",
+  "version": "0.6.3-rc.0",
   "license": "GPL",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
