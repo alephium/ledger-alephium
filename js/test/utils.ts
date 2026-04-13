@@ -1,5 +1,4 @@
 import SpeculosTransport from '@ledgerhq/hw-transport-node-speculos'
-import fetch from 'node-fetch'
 import { sleep } from '@alephium/web3'
 import Transport from '@ledgerhq/hw-transport'
 import NodeTransport from '@ledgerhq/hw-transport-node-hid'
