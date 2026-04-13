@@ -38,6 +38,7 @@ jobs:
         shell: bash
   publish:
     runs-on: ubuntu-latest
+    needs: get_dist_tag
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
@@ -52,4 +53,5 @@ jobs:
         run: |
           cd js
           npm ci
-          npm run pub
+          npm run build
+          npm publish --access public --tag ${{ needs.get_dist_tag.outputs.DIST_TAG }}

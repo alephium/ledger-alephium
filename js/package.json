@@ -13,8 +13,7 @@
     "lint:fix": "eslint . --fix",
     "test": "BACKEND=speculos jest -i --config ./jest-config.json",
     "speculos-test": "BACKEND=speculos jest -i --config ./jest-config.json",
-    "device-test": "BACKEND=device jest -i --config ./jest-config.json",
-    "pub": "npm run build && npm publish --access public"
+    "device-test": "BACKEND=device jest -i --config ./jest-config.json"
   },
   "prettier": {
     "printWidth": 120,
