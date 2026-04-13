@@ -3,8 +3,7 @@ import { ALPH_TOKEN_ID, Address, DUST_AMOUNT, NodeProvider, ONE_ALPH, binToHex, 
 import { getSigner, mintToken, transfer } from '@alephium/web3-test'
 import { PrivateKeyWallet } from '@alephium/web3-wallet'
 import blake from 'blakejs'
-import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk, staxFlexApproveOnce } from './utils'
-import { TokenMetadata } from '../src/types'
+import { approveAddress, approveHash, approveTx, createTransport, enableBlindSigning, getRandomInt, isNanos, isStaxOrFlex, needToAutoApprove, OutputType, skipBlindSigningWarning, staxFlexAcceptRisk } from './utils'
 import { randomBytes } from 'crypto'
 import { merkleTokens, tokenMerkleProofs } from '../src/merkle'
 
@@ -240,38 +239,6 @@ describe('ledger wallet', () => {
 
     await app.close()
   }, 120000)
-
-  async function genTokensAndDestinations(
-    fromAddress: string,
-    toAddress: string,
-    mintAmount: bigint,
-    transferAmount: bigint
-  ) {
-    const tokens: TokenMetadata[] = []
-    const tokenSymbol = 'TestTokenABC'
-    const destinations: node.Destination[] = []
-    for (let i = 0; i < 5; i += 1) {
-      const tokenInfo = await mintToken(fromAddress, mintAmount);
-      const tokenMetadata: TokenMetadata = {
-        version: 0,
-        tokenId: tokenInfo.contractId,
-        symbol: tokenSymbol.slice(0, tokenSymbol.length - i),
-        decimals: 18 - i
-      }
-      tokens.push(tokenMetadata)
-      destinations.push({
-        address: toAddress,
-        attoAlphAmount: DUST_AMOUNT.toString(),
-        tokens: [
-          {
-            id: tokenMetadata.tokenId,
-            amount: transferAmount.toString()
-          }
-        ]
-      })
-    }
-    return { tokens, destinations }
-  }
 
   it('should transfer tokens with proof', async () => {
     const transport = await createTransport()

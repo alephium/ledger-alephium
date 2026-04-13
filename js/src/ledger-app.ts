@@ -1,12 +1,9 @@
-import { Account, KeyType, addressFromPublicKey, binToHex, codec, encodeHexSignature, groupOfAddress } from '@alephium/web3'
+import { GroupedAccount, GroupedKeyType, KeyType, addressFromPublicKey, binToHex, codec, encodeHexSignature, groupOfAddress } from '@alephium/web3'
 import Transport, { StatusCodes } from '@ledgerhq/hw-transport'
 import * as serde from './serde'
-import { ec as EC } from 'elliptic'
 import { MAX_TOKEN_SIZE, MAX_TOKEN_SYMBOL_LENGTH, TokenMetadata } from './types'
 import { encodeTokenMetadata, encodeUnsignedTx } from './tx-encoder'
 import { merkleTokens } from './merkle'
-
-const ec = new EC('secp256k1')
 
 export const CLA = 0x80
 export enum INS {
@@ -36,25 +33,27 @@ export class AlephiumApp {
     return `${response[0]}.${response[1]}.${response[2]}`
   }
 
-  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType, display = false): Promise<readonly [Account, number]> {
+  async getAccount(startPath: string, targetGroup?: number, keyType?: KeyType, display = false): Promise<readonly [GroupedAccount, number]> {
     if ((targetGroup ?? 0) >= GROUP_NUM) {
       throw Error(`Invalid targetGroup: ${targetGroup}`)
     }
 
-    if (keyType === 'bip340-schnorr') {
-      throw Error('BIP340-Schnorr is not supported yet')
+    if (keyType !== undefined && keyType !== 'default') {
+      throw Error(`Unsupported key type: ${keyType}`)
     }
 
     const p1 = targetGroup === undefined ? 0x00 : GROUP_NUM
     const p2 = targetGroup === undefined ? 0x00 : targetGroup
     const payload = Buffer.concat([serde.serializePath(startPath), Buffer.from([display ? 1 : 0])]);
     const response = await this.transport.send(CLA, INS.GET_PUBLIC_KEY, p1, p2, payload)
-    const publicKey = ec.keyFromPublic(response.slice(0, 65)).getPublic(true, 'hex')
+    const prefix = (response[64] & 1) === 1 ? '03' : '02'
+    const publicKey = prefix + response.slice(1, 33).toString('hex')
     const address = addressFromPublicKey(publicKey)
     const group = groupOfAddress(address)
     const hdIndex = response.slice(65, 69).readUInt32BE(0)
 
-    return [{ publicKey: publicKey, address: address, group: group, keyType: keyType ?? 'default' }, hdIndex] as const
+    const resolvedKeyType: GroupedKeyType = 'default'
+    return [{ publicKey, address, group, keyType: resolvedKeyType }, hdIndex] as const
   }
 
   async signHash(path: string, hash: Buffer): Promise<string> {

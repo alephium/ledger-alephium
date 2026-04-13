@@ -12,7 +12,6 @@
     "declaration": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "experimentalDecorators": true,
     "noImplicitOverride": true
   },
   "exclude": ["node_modules"],

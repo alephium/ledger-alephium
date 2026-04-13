@@ -1,21 +1,22 @@
 {
   "name": "@alephium/ledger-app",
-  "version": "0.6.0",
+  "version": "0.6.3-rc.0",
   "license": "GPL",
+  "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "repository": {
+    "url": "https://github.com/alephium/ledger-alephium"
+  },
   "exports": {
     ".": "./dist/src/index.js"
   },
   "scripts": {
-    "build": "npm run clean:windows && npm run clean:unix && npx --yes tsc --build .",
-    "clean:unix": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || rm -rf dist",
-    "clean:windows": "node -e \"if (process.platform === 'win32') process.exit(1)\" || , if exist dist rmdir /Q /S dist",
-    "lint": "eslint . --ext ts",
-    "lint:fix": "eslint . --fix --ext ts",
+    "build": "rm -rf dist && tsc --build .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "BACKEND=speculos jest -i --config ./jest-config.json",
     "speculos-test": "BACKEND=speculos jest -i --config ./jest-config.json",
-    "device-test": "BACKEND=device jest -i --config ./jest-config.json",
-    "pub": "npm run build && npm publish --access public"
+    "device-test": "BACKEND=device jest -i --config ./jest-config.json"
   },
   "prettier": {
     "printWidth": 120,
@@ -27,32 +28,27 @@
     "trailingComma": "none"
   },
   "dependencies": {
-    "@alephium/web3": "^1.5.0",
-    "@ledgerhq/hw-transport": "6.31.0",
+    "@alephium/web3": "3.0.0-test.9",
+    "@ledgerhq/hw-transport": "6.34.1",
     "blakejs": "^1.2.1"
   },
   "devDependencies": {
-    "@alephium/cli": "^1.5.0",
-    "@alephium/web3-test": "^1.5.0",
-    "@alephium/web3-wallet": "^1.5.0",
-    "@ledgerhq/hw-transport-node-hid": "6.29.1",
-    "@ledgerhq/hw-transport-node-speculos": "6.29.0",
-    "@types/elliptic": "^6.4.13",
-    "@types/jest": "^27.5.1",
+    "@alephium/cli": "3.0.0-test.9",
+    "@alephium/web3-test": "3.0.0-test.9",
+    "@alephium/web3-wallet": "3.0.0-test.9",
+    "@ledgerhq/hw-transport-node-hid": "6.32.1",
+    "@ledgerhq/hw-transport-node-speculos": "6.33.1",
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.8.10",
-    "@typescript-eslint/eslint-plugin": "^4.30.0",
-    "@typescript-eslint/parser": "^4.30.0",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-prettier": "^4.0.0",
-    "jest": "^28.1.0",
-    "node-fetch": "^2.6.7",
-    "ts-jest": "^28.0.2",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "typescript-eslint": "^8.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
     "ts-node": "^10.7.0",
-    "typescript": "^4.4.2"
+    "typescript": "~5.8.0"
   },
   "engines": {
-    "node": ">=14.0.0",
-    "npm": ">=7.0.0"
+    "node": ">=18.0.0"
   }
 }
